@@ -56,7 +56,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full pl-10 pr-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400"
+                className="w-full pl-10 pr-3 py-2 border border-slate-200 rounded-lg text-slate-900 font-medium bg-white focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400"
                 placeholder="admin@thehobbymerchant.com"
               />
             </div>
@@ -71,7 +71,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full pl-10 pr-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400"
+                className="w-full pl-10 pr-3 py-2 border border-slate-200 rounded-lg text-slate-900 font-medium bg-white focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400"
                 placeholder="••••••••"
               />
             </div>
