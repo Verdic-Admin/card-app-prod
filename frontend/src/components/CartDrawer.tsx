@@ -95,7 +95,7 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
       setTradeSubmitting(false)
     } catch (e: any) {
       console.error("Trade Execution Error:", e);
-      setCartError("Failed to actively upload tradeoff images to the Supabase endpoint. Please refresh.")
+      setCartError(e.message || "Failed to actively upload tradeoff images to the Supabase endpoint. Please refresh.")
       setTradeSubmitting(false)
     }
   }
