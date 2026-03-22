@@ -131,3 +131,37 @@ export async function deleteCardAction(id: string, imageUrl?: string | null) {
   revalidatePath('/admin')
   revalidatePath('/sold')
 }
+
+export async function bulkDeleteCardsAction(items: {id: string, image_url: string | null}[]) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error("Unauthorized")
+
+  const admin = createAdminClient()
+
+  // 1. Delete all images from storage to prevent massive orphaned asset bills
+  const fileNames = items
+    .filter(i => i.image_url)
+    .map(i => {
+      try {
+        const urlObj = new URL(i.image_url!)
+        const pathParts = urlObj.pathname.split('/')
+        return pathParts[pathParts.length - 1]
+      } catch { return null }
+    })
+    .filter(Boolean) as string[]
+
+  if (fileNames.length > 0) {
+    await admin.storage.from('card-images').remove(fileNames)
+  }
+
+  // 2. Delete all records from DB in a single ultra-fast operation
+  const ids = items.map(i => i.id)
+  const { error } = await admin.from('inventory').delete().in('id', ids)
+  
+  if (error) throw new Error(`Bulk delete failed: ${error.message}`)
+
+  revalidatePath('/')
+  revalidatePath('/admin')
+  revalidatePath('/sold')
+}

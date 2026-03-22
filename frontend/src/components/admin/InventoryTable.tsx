@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Database } from '@/types/database.types'
-import { toggleCardStatus, editCardAction, deleteCardAction } from '@/app/actions/inventory'
+import { toggleCardStatus, editCardAction, deleteCardAction, bulkDeleteCardsAction } from '@/app/actions/inventory'
 import { Loader2, Trash2, Edit2, Check, X } from 'lucide-react'
 
 type InventoryItem = Database['public']['Tables']['inventory']['Row']
@@ -16,6 +16,43 @@ export function InventoryTable({ initialItems }: { initialItems: InventoryItem[]
   const [editForm, setEditForm] = useState<Partial<InventoryItem>>({})
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false)
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === items.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(items.map(i => i.id)))
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    const newSet = new Set(selectedIds)
+    if (newSet.has(id)) newSet.delete(id)
+    else newSet.add(id)
+    setSelectedIds(newSet)
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`Are you sure you want to permanently delete ${selectedIds.size} selected cards?`)) return;
+    
+    setIsBulkDeleting(true)
+    setErrorId(null)
+    
+    try {
+      const itemsToDelete = items.filter(i => selectedIds.has(i.id)).map(i => ({ id: i.id, image_url: i.image_url }))
+      await bulkDeleteCardsAction(itemsToDelete)
+      setItems(items.filter(i => !selectedIds.has(i.id)))
+      setSelectedIds(new Set())
+    } catch (err: any) {
+      alert("Failed to bulk delete: " + err.message)
+    } finally {
+      setIsBulkDeleting(false)
+    }
+  }
 
   useEffect(() => setItems(initialItems), [initialItems])
 
@@ -84,11 +121,24 @@ export function InventoryTable({ initialItems }: { initialItems: InventoryItem[]
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-200">
-      <table className="w-full text-left text-sm whitespace-nowrap">
-        <thead className="bg-slate-50 border-b border-slate-200">
-          <tr>
-            <th className="px-4 py-3 font-semibold text-slate-900 w-16">Image</th>
+    <div className="space-y-4">
+      {selectedIds.size > 0 && (
+        <div className="flex items-center justify-between bg-indigo-50 border border-indigo-100 p-3 rounded-lg animate-in fade-in slide-in-from-top-2 shadow-sm">
+          <span className="text-sm font-bold text-indigo-900">{selectedIds.size} cards selected</span>
+          <button onClick={handleBulkDelete} disabled={isBulkDeleting} className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-50 shadow-sm">
+            {isBulkDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+            Mass Delete
+          </button>
+        </div>
+      )}
+      <div className="overflow-x-auto rounded-lg border border-slate-200">
+        <table className="w-full text-left text-sm whitespace-nowrap">
+          <thead className="bg-slate-50 border-b border-slate-200">
+            <tr>
+              <th className="px-4 py-3 text-center w-12">
+                <input type="checkbox" checked={items.length > 0 && selectedIds.size === items.length} onChange={toggleSelectAll} className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer" />
+              </th>
+              <th className="px-4 py-3 font-semibold text-slate-900 w-16">Image</th>
             <th className="px-4 py-3 font-semibold text-slate-900">Card Details</th>
             <th className="px-4 py-3 font-semibold text-slate-900 text-right">Price</th>
             <th className="px-4 py-3 font-semibold text-slate-900 text-center">Status</th>
@@ -97,7 +147,10 @@ export function InventoryTable({ initialItems }: { initialItems: InventoryItem[]
         </thead>
         <tbody className="divide-y divide-slate-100">
           {items.map(item => (
-            <tr key={item.id} className="hover:bg-slate-50/50 group">
+            <tr key={item.id} className={`group hover:bg-slate-50/50 transition-colors ${selectedIds.has(item.id) ? 'bg-indigo-50/50' : ''}`}>
+              <td className="px-4 py-3 text-center">
+                <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer transition-all" />
+              </td>
               <td className="px-4 py-3">
                 <div className="w-12 h-16 bg-slate-100 rounded overflow-hidden flex items-center justify-center border border-slate-200">
                   {item.image_url ? (
@@ -200,6 +253,7 @@ export function InventoryTable({ initialItems }: { initialItems: InventoryItem[]
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }
