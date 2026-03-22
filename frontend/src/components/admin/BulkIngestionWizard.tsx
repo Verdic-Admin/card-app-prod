@@ -179,6 +179,7 @@ export function BulkIngestionWizard() {
                     }
                     setQueue(prev => [...prev, newCard])
                 }
+                setIsHardwareSyncing(false);
                 worker.terminate();
             } else if (e.data.type === 'ERROR') {
                 setIsHardwareSyncing(false);
