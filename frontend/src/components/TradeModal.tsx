@@ -110,15 +110,20 @@ export function TradeModal({ isOpen, onClose, cartItems, onSuccess, targetCard }
 
               <div className="pt-4 border-t border-zinc-800">
                  <label className="text-xs font-bold text-zinc-500 ml-1 mb-1 block">Offer Details / Trade Components</label>
-                 <textarea required placeholder="What are you offering? (e.g., '2023 Bowman Chrome Draft Paul Skenes Base for your Ohtani')" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} className="w-full p-2.5 text-sm font-medium border border-zinc-800 rounded-xl focus:ring-2 focus:ring-cyan-500 outline-none min-h-[80px] resize-none bg-zinc-900 focus:bg-zinc-800 text-white placeholder:text-zinc-600 transition-colors shadow-inner" />
+                 <textarea required placeholder="Describe your offer here (e.g., I will trade these 4 slabs for your 1/1...)" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} className="w-full p-2.5 text-sm font-medium border border-zinc-800 rounded-xl focus:ring-2 focus:ring-cyan-500 outline-none min-h-[80px] resize-none bg-zinc-900 focus:bg-zinc-800 text-white placeholder:text-zinc-600 transition-colors shadow-inner" />
               </div>
 
               <div>
                  <label className="text-xs font-bold text-zinc-500 ml-1 mb-1 block">Attach Photos (Optional but recommended)</label>
                  <input type="file" multiple accept="image/*" onChange={handleImageUpload} className="w-full text-sm font-medium text-zinc-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-zinc-800 file:text-cyan-400 hover:file:bg-zinc-700 cursor-pointer border border-zinc-800 rounded-xl bg-zinc-900 transition-colors" />
+                 <p className="text-[10px] text-zinc-500 italic mt-2 ml-1">Bundle offer? You can upload as many trade items for this card as you want. Just select multiple photos.</p>
                  
                  {previews.length > 0 && (
-                   <div className="grid grid-cols-4 sm:grid-cols-5 gap-3 mt-4">
+                   <div className="mt-4 border border-zinc-800/50 bg-zinc-900/50 p-3 rounded-xl border-dashed">
+                     <p className="text-[10px] font-black tracking-widest uppercase text-cyan-400 mb-3 flex items-center gap-2">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> {previews.length} photos attached to this offer
+                     </p>
+                     <div className="grid grid-cols-4 sm:grid-cols-5 gap-3">
                      {previews.map((src, idx) => (
                         <div key={idx} className="relative aspect-square w-full bg-zinc-900 rounded-lg border border-zinc-700 overflow-hidden shadow-inner group transition-all hover:border-cyan-500">
                            <img src={src} className="w-full h-full object-cover" />
@@ -127,6 +132,7 @@ export function TradeModal({ isOpen, onClose, cartItems, onSuccess, targetCard }
                            </button>
                         </div>
                      ))}
+                     </div>
                    </div>
                  )}
               </div>
