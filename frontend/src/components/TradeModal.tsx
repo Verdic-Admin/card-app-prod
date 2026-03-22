@@ -5,7 +5,7 @@ import { X, Handshake, Loader2, CheckCircle2 } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
 
 export function TradeModal({ isOpen, onClose, cartItems, onSuccess, targetCard }: { isOpen: boolean, onClose: () => void, cartItems: any[], onSuccess: () => void, targetCard?: any }) {
-  const { addTradeToCart } = useCart()
+  const { addTradeToCart, setIsCartOpen } = useCart()
   const [form, setForm] = useState({ name: '', email: '', notes: '' })
   const [images, setImages] = useState<File[]>([])
   const [previews, setPreviews] = useState<string[]>([])
@@ -58,6 +58,7 @@ export function TradeModal({ isOpen, onClose, cartItems, onSuccess, targetCard }
     setTimeout(() => {
       setTradeSuccess(false)
       onSuccess()
+      setIsCartOpen(true)
     }, 2000)
     
     setIsSubmitting(false)
@@ -80,9 +81,9 @@ export function TradeModal({ isOpen, onClose, cartItems, onSuccess, targetCard }
         <div className="p-5 md:p-6 overflow-y-auto z-10 custom-scrollbar bg-zinc-950">
           {tradeSuccess ? (
             <div className="text-center py-16 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <CheckCircle2 className="w-20 h-20 text-emerald-400 mx-auto mb-6 drop-shadow-[0_0_15px_rgba(52,211,153,0.5)]" />
-              <h3 className="text-2xl font-black text-white mb-2">Offer Binding Successful!</h3>
-              <p className="text-zinc-400 font-medium text-lg">The store owner has received your exact trade parameters. We'll be in touch soon.</p>
+              <CheckCircle2 className="w-20 h-20 text-cyan-400 mx-auto mb-6 drop-shadow-[0_0_15px_rgba(34,211,238,0.5)]" />
+              <h3 className="text-2xl font-black text-white mb-2">Offer Drafted!</h3>
+              <p className="text-zinc-400 font-medium text-lg">Your trade proposal has securely moved into your bundle. Open your cart to finalize submission.</p>
             </div>
           ) : (
             <form onSubmit={handleTradeSubmit} className="space-y-6">
