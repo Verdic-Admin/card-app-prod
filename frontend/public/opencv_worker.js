@@ -4,12 +4,20 @@ self.onmessage = function(e) {
     if (e.data.type === 'PROCESS_HARDWARE_SCANS') {
         const { frontsObj, backsObj } = e.data;
         
-        // Wait for Native WebAssembly OpenCV to fully mount
         if (self.cv && self.cv.getBuildInformation) {
             processScans(frontsObj, backsObj);
         } else {
             self.cv['onRuntimeInitialized'] = () => {
                 processScans(frontsObj, backsObj);
+            };
+        }
+    } else if (e.data.type === 'PROCESS_SINGLE_SCAN') {
+        const { imageObj, id } = e.data;
+        if (self.cv && self.cv.getBuildInformation) {
+            processSingleScan(imageObj, id);
+        } else {
+            self.cv['onRuntimeInitialized'] = () => {
+                processSingleScan(imageObj, id);
             };
         }
     }
@@ -61,6 +69,37 @@ function imageDataFromMat(mat) {
     // Convert RGBA WebAssembly array back into JS Native Browser ImageData
     const imgData = new self.ImageData(new Uint8ClampedArray(mat.data), mat.cols, mat.rows);
     return imgData;
+}
+
+function processSingleScan(imageObj, id) {
+    try {
+        const cards = processCardsSinglePass(imageObj.imageData, imageObj.width, imageObj.height);
+        
+        if (cards && cards.length > 0) {
+            // Assume the absolute largest valid contour is the target object
+            let c = cards[0]; 
+            let result = {
+                 id: id,
+                 tightData: imageDataFromMat(c.imgTight),
+                 paddedData: imageDataFromMat(c.imgPadded)
+            };
+            
+            c.imgTight.delete(); c.imgPadded.delete();
+            if (c.cleanup) c.cleanup();
+            
+            // Clean up memory buffer leaks from any accidentally grabbed smaller artifacts
+            for (let i = 1; i < cards.length; i++) {
+                cards[i].imgTight.delete(); cards[i].imgPadded.delete();
+                if (cards[i].cleanup) cards[i].cleanup();
+            }
+            
+            self.postMessage({ type: 'SINGLE_SUCCESS', result: result });
+        } else {
+            self.postMessage({ type: 'SINGLE_ERROR', id: id, message: "No edges detected cleanly. Skipping WASM layer." });
+        }
+    } catch (err) {
+        self.postMessage({ type: 'SINGLE_ERROR', id: id, message: err.toString() });
+    }
 }
 
 function processCardsSinglePass(imageData, width, height) {

@@ -112,6 +112,96 @@ export function BulkIngestionWizard() {
     });
 
     setQueue(prev => [...prev, ...newCards])
+    
+    // Auto-trigger native WebAssembly OpenCV math locally to tighten edge limits, and instantly daisy-chain the Gemini AI pipeline extraction!
+    newCards.forEach(c => runSingleWasm(c))
+  }
+
+  const runSingleWasm = async (card: QueuedCard) => {
+     // Local isolation block mapping single image frames identically into the C++ ported core
+     const processImageToTightFile = async (file: File, prefix: string): Promise<{tight: File, padded: File} | null> => {
+        return new Promise(async (resolve) => {
+             try {
+                const img = await createImageBitmap(file);
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width; canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return resolve(null);
+                ctx.drawImage(img, 0, 0);
+                const imgData = ctx.getImageData(0, 0, img.width, img.height);
+                
+                const worker = new Worker('/opencv_worker.js');
+                worker.onmessage = async (e) => {
+                    if (e.data.type === 'SINGLE_SUCCESS') {
+                        const res = e.data.result;
+                        const toFile = async (data: ImageData, name: string): Promise<File> => {
+                             const c2 = document.createElement('canvas');
+                             c2.width = data.width; c2.height = data.height;
+                             const ctx2 = c2.getContext('2d')!;
+                             ctx2.putImageData(data, 0, 0);
+                             const blob = await new Promise<Blob | null>(r => c2.toBlob(r, 'image/jpeg', 0.95));
+                             return new File([blob!], name, { type: 'image/jpeg' });
+                        };
+                        const tight = await toFile(res.tightData, `${prefix}_Tight.jpg`);
+                        const padded = await toFile(res.paddedData, `${prefix}_Padded.jpg`);
+                        worker.terminate();
+                        resolve({tight, padded});
+                    } else if (e.data.type === 'SINGLE_ERROR') {
+                        worker.terminate();
+                        resolve(null);
+                    }
+                };
+                worker.postMessage({
+                    type: 'PROCESS_SINGLE_SCAN',
+                    imageObj: { imageData: imgData.data.buffer, width: imgData.width, height: imgData.height },
+                    id: file.name
+                }, [imgData.data.buffer]);
+             } catch (err) {
+                console.error("WASM setup fail:", err);
+                resolve(null);
+             }
+        });
+     };
+     
+     // Flash the UI scanner animation silently before Gemini takes over
+     updateCard(card.id, { status: 'scanning' });
+     
+     let finalFront = card.file; let finalFrontPadded = card.padded_file;
+     let finalBack = card.back_file; let finalBackPadded = card.back_padded_file;
+     let frontRes = null; let backRes = null;
+     
+     frontRes = await processImageToTightFile(card.file, `Crop_${card.id}_SideA`);
+     if (frontRes) {
+        finalFront = frontRes.tight;
+        finalFrontPadded = frontRes.padded;
+     }
+     
+     if (card.back_file) {
+        backRes = await processImageToTightFile(card.back_file, `Crop_${card.id}_SideB`);
+        if (backRes) {
+           finalBack = backRes.tight;
+           finalBackPadded = backRes.padded;
+        }
+     }
+     
+     // Rapid hot-swap bridging the extracted tight files onto the component states. The new UI will instantly update the image previews seamlessly.
+     const updatedCard = {
+        ...card,
+        file: finalFront,
+        padded_file: finalFrontPadded,
+        preview: frontRes ? URL.createObjectURL(finalFront) : card.preview,
+        back_file: finalBack,
+        back_padded_file: finalBackPadded,
+        back_preview: (backRes && finalBack) ? URL.createObjectURL(finalBack) : card.back_preview
+     };
+     
+     setQueue(prev => prev.map(c => c.id === card.id ? updatedCard : c));
+     
+     if (frontRes) URL.revokeObjectURL(card.preview);
+     if (backRes && card.back_preview) URL.revokeObjectURL(card.back_preview);
+     
+     // Natively transition the strictly bounded crops natively straight to the Gemini Pipeline mapping
+     await scanCard(updatedCard);
   }
 
   const [isHardwareSyncing, setIsHardwareSyncing] = useState(false);
