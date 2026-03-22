@@ -5,6 +5,8 @@ import { InventoryTable } from '@/components/admin/InventoryTable'
 import { SignOutButton } from '@/components/admin/SignOutButton'
 import { LedgerDashboard } from '@/components/admin/LedgerDashboard'
 
+import Link from 'next/link'
+
 export const dynamic = 'force-dynamic'
 
 export default async function AdminPage() {
@@ -29,7 +31,12 @@ export default async function AdminPage() {
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Admin Platform</h1>
           <p className="text-slate-500 mt-1 font-medium">Manage inventory, perform massive bulk scans, and track sales.</p>
         </div>
-        <SignOutButton />
+        <div className="flex items-center gap-4">
+          <Link href="/admin/settings" className="px-4 py-2 bg-indigo-50 text-indigo-700 font-bold rounded-lg hover:bg-indigo-100 transition-colors">
+            Site Settings
+          </Link>
+          <SignOutButton />
+        </div>
       </div>
 
       <div className="flex flex-col space-y-10">

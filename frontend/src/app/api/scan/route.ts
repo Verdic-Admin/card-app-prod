@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
 
-    const prompt = "Examine this baseball card image carefully. Return ONLY a valid JSON object with exactly these keys: 'player_name', 'year', 'card_set', 'parallel_insert_type', 'card_number', and 'side' (must exactly be 'Front', 'Back', or 'Dual'). It is absolutely critical that you correctly extract the 'card_number', as this is used for database joining. IMPORTANT: For the 'parallel_insert_type' (e.g., Refractor, Prizm, Silver, colored borders, numbered print runs like 10/99), look extremely closely at BOTH the visual foil, sheen, and color styling on the FRONT of the card, and any stamped serial numbers on the BACK. Do NOT default to 'Base' if the card has a distinct colorful border or holographic visual style."
+    const prompt = "Examine this baseball card image carefully. Return ONLY a valid JSON object with exactly these keys: 'player_name', 'team_name', 'year', 'card_set', 'parallel_insert_type', 'card_number', and 'side' (must exactly be 'Front', 'Back', or 'Dual'). It is absolutely critical that you correctly extract the 'card_number', as this is used for database joining. IMPORTANT: For the 'parallel_insert_type' (e.g., Refractor, Prizm, Silver, colored borders, numbered print runs like 10/99), look extremely closely at BOTH the visual foil, sheen, and color styling on the FRONT of the card, and any stamped serial numbers on the BACK. Do NOT default to 'Base' if the card has a distinct colorful border or holographic visual style."
 
     const parts: any[] = [
       prompt,
@@ -79,6 +79,7 @@ export async function POST(request: Request) {
 
     const finalResponse = {
       player_name: normalizedJson['playername'] || normalizedJson['player'] || (json as any).player_name || '',
+      team_name: normalizedJson['teamname'] || normalizedJson['team'] || (json as any).team_name || '',
       year: normalizedJson['year'] || (json as any).year || '',
       card_set: normalizedJson['cardset'] || normalizedJson['set'] || (json as any).card_set || '',
       parallel_insert_type: normalizedJson['parallelinserttype'] || normalizedJson['parallel'] || normalizedJson['insert'] || (json as any).parallel_insert_type || '',

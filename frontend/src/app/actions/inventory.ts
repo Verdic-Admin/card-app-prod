@@ -43,6 +43,7 @@ export async function addCardAction(formData: FormData) {
   const { error: dbError } = await (admin.from('inventory') as any)
     .insert({
       player_name: payload.player_name,
+      team_name: payload.team_name,
       year: payload.year,
       card_set: payload.card_set,
       parallel_insert_type: payload.parallel_insert_type,

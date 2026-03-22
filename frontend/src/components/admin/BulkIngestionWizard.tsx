@@ -14,6 +14,7 @@ interface QueuedCard {
   errorMsg?: string;
   data: {
     player_name: string;
+    team_name: string;
     year: string;
     card_set: string;
     parallel_insert_type: string;
@@ -63,7 +64,7 @@ export function BulkIngestionWizard() {
       preview: URL.createObjectURL(f),
       status: 'queued',
       data: {
-        player_name: '', year: '', card_set: '', parallel_insert_type: '', card_number: '',
+        player_name: '', team_name: '', year: '', card_set: '', parallel_insert_type: '', card_number: '',
         comp1: '', comp2: '', comp3: '', side: '', isFetchingComps: false
       }
     }))
@@ -98,6 +99,7 @@ export function BulkIngestionWizard() {
         data: {
           ...card.data,
           player_name: json.player_name || '',
+          team_name: json.team_name || '',
           year: json.year || '',
           card_set: json.card_set || '',
           parallel_insert_type: json.parallel_insert_type || '',
@@ -481,7 +483,10 @@ export function BulkIngestionWizard() {
             </div>
 
             <div className="p-4 space-y-2 bg-white flex-grow">
-               <input disabled={card.status === 'saved' || card.status === 'saving'} type="text" value={card.data.player_name} onChange={e => updateCardData(card.id, 'player_name', e.target.value)} className="w-full p-2 text-sm font-bold text-slate-900 bg-white placeholder:text-slate-400 placeholder:font-normal border border-slate-300 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none disabled:opacity-50 transition-colors shadow-sm" placeholder="Player Name" />
+               <div className="flex gap-2">
+                 <input disabled={card.status === 'saved' || card.status === 'saving'} type="text" value={card.data.player_name} onChange={e => updateCardData(card.id, 'player_name', e.target.value)} className="w-1/2 p-2 text-sm font-bold text-slate-900 bg-white placeholder:text-slate-400 placeholder:font-normal border border-slate-300 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none disabled:opacity-50 transition-colors shadow-sm" placeholder="Player Name" />
+                 <input disabled={card.status === 'saved' || card.status === 'saving'} type="text" value={card.data.team_name} onChange={e => updateCardData(card.id, 'team_name', e.target.value)} className="w-1/2 p-2 text-sm font-bold text-slate-900 bg-white placeholder:text-slate-400 placeholder:font-normal border border-slate-300 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none disabled:opacity-50 transition-colors shadow-sm" placeholder="Team Name" />
+               </div>
                <div className="flex gap-2">
                  <input disabled={card.status === 'saved'} type="text" value={card.data.year} onChange={e => updateCardData(card.id, 'year', e.target.value)} className="w-1/3 p-2 text-xs font-bold text-slate-900 bg-white placeholder:text-slate-400 placeholder:font-normal border border-slate-300 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none disabled:opacity-50 transition-colors shadow-sm" placeholder="Year" />
                  <input disabled={card.status === 'saved'} type="text" value={card.data.card_set} onChange={e => updateCardData(card.id, 'card_set', e.target.value)} className="w-2/3 p-2 text-xs font-bold text-slate-900 bg-white placeholder:text-slate-400 placeholder:font-normal border border-slate-300 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none disabled:opacity-50 transition-colors shadow-sm" placeholder="Card Set" />

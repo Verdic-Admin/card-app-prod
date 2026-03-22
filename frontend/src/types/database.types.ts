@@ -14,6 +14,7 @@ export interface Database {
           id: string
           filename: string | null
           player_name: string | null
+          team_name: string | null
           year: string | null
           card_number: string | null
           card_set: string | null
@@ -33,6 +34,7 @@ export interface Database {
           id?: string
           filename?: string | null
           player_name?: string | null
+          team_name?: string | null
           year?: string | null
           card_number?: string | null
           card_set?: string | null
@@ -50,6 +52,7 @@ export interface Database {
           id?: string
           filename?: string | null
           player_name?: string | null
+          team_name?: string | null
           year?: string | null
           card_number?: string | null
           card_set?: string | null

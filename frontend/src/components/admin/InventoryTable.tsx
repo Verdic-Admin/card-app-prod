@@ -110,7 +110,10 @@ export function InventoryTable({ initialItems }: { initialItems: InventoryItem[]
               <td className="px-4 py-3 min-w-[320px]">
                 {editingId === item.id ? (
                   <div className="space-y-2 font-sans">
-                    <input type="text" value={editForm.player_name || ''} onChange={e => setEditForm({...editForm, player_name: e.target.value})} className="w-full p-2 text-sm font-bold text-slate-900 bg-white placeholder:text-slate-400 placeholder:font-normal border border-indigo-200 rounded focus:ring-2 focus:ring-indigo-500 outline-none transition-colors" placeholder="Player Name" />
+                    <div className="flex gap-2">
+                      <input type="text" value={editForm.player_name || ''} onChange={e => setEditForm({...editForm, player_name: e.target.value})} className="w-1/2 p-2 text-sm font-bold text-slate-900 bg-white placeholder:text-slate-400 placeholder:font-normal border border-indigo-200 rounded focus:ring-2 focus:ring-indigo-500 outline-none transition-colors" placeholder="Player Name" />
+                      <input type="text" value={editForm.team_name || ''} onChange={e => setEditForm({...editForm, team_name: e.target.value})} className="w-1/2 p-2 text-sm font-bold text-slate-900 bg-white placeholder:text-slate-400 placeholder:font-normal border border-indigo-200 rounded focus:ring-2 focus:ring-indigo-500 outline-none transition-colors" placeholder="Team Name" />
+                    </div>
                     <div className="flex gap-2">
                       <input type="text" value={editForm.year || ''} onChange={e => setEditForm({...editForm, year: e.target.value})} className="w-1/3 p-2 text-sm font-bold text-slate-900 bg-white placeholder:text-slate-400 placeholder:font-normal border border-indigo-100 rounded focus:border-indigo-500 outline-none transition-colors" placeholder="Year" />
                       <input type="text" value={editForm.card_set || ''} onChange={e => setEditForm({...editForm, card_set: e.target.value})} className="w-2/3 p-2 text-sm font-bold text-slate-900 bg-white placeholder:text-slate-400 placeholder:font-normal border border-indigo-100 rounded focus:border-indigo-500 outline-none transition-colors" placeholder="Card Set" />
@@ -126,6 +129,7 @@ export function InventoryTable({ initialItems }: { initialItems: InventoryItem[]
                        {item.player_name}
                        {item.back_image_url && <span className="text-[9px] font-black text-white bg-indigo-500 px-1.5 py-0.5 rounded shadow-sm uppercase tracking-wider">Dual Sided</span>}
                     </div>
+                    {item.team_name && <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{item.team_name}</div>}
                     <div className="text-xs text-slate-600 mt-0.5 font-medium">{item.year} {item.card_set} {item.card_number ? `#${item.card_number}` : ''} {item.parallel_insert_type ? `• ${item.parallel_insert_type}` : ''}</div>
                   </>
                 )}
