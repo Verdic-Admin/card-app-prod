@@ -394,6 +394,11 @@ export function BulkIngestionWizard() {
       
       await addCardAction(data)
       updateCard(card.id, { status: 'saved' })
+      
+      // Graciously hold the Success state for 1.2s to flash the green checkmark before unmounting!
+      setTimeout(() => {
+         setQueue(prev => prev.filter(c => c.id !== card.id))
+      }, 1200)
     } catch (err: any) {
       updateCard(card.id, { status: 'error', errorMsg: err.message })
     }
