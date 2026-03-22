@@ -16,6 +16,7 @@ export function StoreFilters({ availableTeams, availableYears }: StoreFiltersPro
   const [isOpen, setIsOpen] = useState(false)
 
   const [query, setQuery] = useState(searchParams.get('q') || '')
+  const [teamQuery, setTeamQuery] = useState('')
   
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -81,16 +82,33 @@ export function StoreFilters({ availableTeams, availableYears }: StoreFiltersPro
 
       <div className="space-y-3">
         <label className="text-sm font-bold text-zinc-400 tracking-wide uppercase">Team</label>
-        <select 
-          value={activeTeam}
-          onChange={e => setFilter('team', e.target.value)}
-          className="w-full p-2.5 text-sm bg-zinc-900 border border-zinc-800 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none transition-colors cursor-pointer text-white font-medium"
-        >
-          <option value="">All Teams ({availableTeams.length})</option>
-          {availableTeams.map(t => (
-            <option key={t} value={t}>{t}</option>
-          ))}
-        </select>
+        <div className="relative mb-2">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
+            <input 
+              type="text"
+              placeholder="Filter teams..."
+              value={teamQuery}
+              onChange={e => setTeamQuery(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 text-xs bg-zinc-900 border border-zinc-800 rounded-md focus:ring-2 focus:ring-cyan-500 outline-none transition-colors placeholder:text-zinc-600 text-white font-medium shadow-sm"
+            />
+        </div>
+        <div className="max-h-48 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+           <button 
+             onClick={() => setFilter('team', '')}
+             className={`w-full text-left px-3 py-1.5 text-xs rounded-md transition-colors ${!activeTeam ? 'bg-cyan-900/40 text-cyan-400 font-bold border border-cyan-800/50' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'}`}
+           >
+             All Teams ({availableTeams.length})
+           </button>
+           {availableTeams.filter(t => t.toLowerCase().includes(teamQuery.toLowerCase())).map(t => (
+             <button 
+               key={t}
+               onClick={() => setFilter('team', t)}
+               className={`w-full text-left px-3 py-1.5 text-xs rounded-md transition-colors ${activeTeam === t ? 'bg-cyan-900/40 text-cyan-400 font-bold border border-cyan-800/50' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'}`}
+             >
+               {t}
+             </button>
+           ))}
+        </div>
       </div>
 
       <div className="space-y-3">

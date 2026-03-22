@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { Upload, Loader2, CheckCircle2, AlertCircle, Play, Save, Check, ExternalLink, Link2, Unlink, RefreshCw, Archive } from 'lucide-react'
 import { addCardAction } from '@/app/actions/inventory'
+import { PRO_TEAMS } from '@/lib/constants/teams'
 import JSZip from 'jszip'
 
 interface QueuedCard {
@@ -639,7 +640,12 @@ export function BulkIngestionWizard() {
             <div className="p-4 space-y-2 bg-white flex-grow">
                <div className="flex gap-2">
                  <input disabled={card.status === 'saved' || card.status === 'saving'} type="text" value={card.data.player_name} onChange={e => updateCardData(card.id, 'player_name', e.target.value)} className="w-1/2 p-2 text-sm font-bold text-slate-900 bg-white placeholder:text-slate-400 placeholder:font-normal border border-slate-300 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none disabled:opacity-50 transition-colors shadow-sm" placeholder="Player Name" />
-                 <input disabled={card.status === 'saved' || card.status === 'saving'} type="text" value={card.data.team_name} onChange={e => updateCardData(card.id, 'team_name', e.target.value)} className="w-1/2 p-2 text-sm font-bold text-slate-900 bg-white placeholder:text-slate-400 placeholder:font-normal border border-slate-300 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none disabled:opacity-50 transition-colors shadow-sm" placeholder="Team Name" />
+                 <div className="w-1/2 relative">
+                    <input list={`teams-${card.id}`} disabled={card.status === 'saved' || card.status === 'saving'} type="text" value={card.data.team_name} onChange={e => updateCardData(card.id, 'team_name', e.target.value)} className="w-full p-2 text-sm font-bold text-slate-900 bg-white placeholder:text-slate-400 placeholder:font-normal border border-slate-300 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none disabled:opacity-50 transition-colors shadow-sm" placeholder="Team Name" />
+                    <datalist id={`teams-${card.id}`}>
+                       {PRO_TEAMS.map(team => <option key={team} value={team} />)}
+                    </datalist>
+                 </div>
                </div>
                <div className="flex gap-2">
                  <input disabled={card.status === 'saved'} type="text" value={card.data.year} onChange={e => updateCardData(card.id, 'year', e.target.value)} className="w-1/3 p-2 text-xs font-bold text-slate-900 bg-white placeholder:text-slate-400 placeholder:font-normal border border-slate-300 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none disabled:opacity-50 transition-colors shadow-sm" placeholder="Year" />

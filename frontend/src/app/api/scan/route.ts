@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai'
 import { TOPPS_TAXONOMY } from '@/utils/taxonomy'
+import { PRO_TEAMS } from '@/lib/constants/teams'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -23,10 +24,30 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(await file.arrayBuffer())
     const base64Image = buffer.toString('base64')
 
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+    const model = genAI.getGenerativeModel({ 
+      model: 'gemini-2.5-flash',
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: SchemaType.OBJECT,
+          properties: {
+            player_name: { type: SchemaType.STRING },
+            team_name: { type: SchemaType.STRING, enum: PRO_TEAMS },
+            year: { type: SchemaType.STRING },
+            card_set: { type: SchemaType.STRING },
+            parallel_insert_type: { type: SchemaType.STRING },
+            card_number: { type: SchemaType.STRING },
+            side: { type: SchemaType.STRING, enum: ['Front', 'Back', 'Dual'] }
+          },
+          required: ['player_name', 'team_name', 'year', 'card_set', 'parallel_insert_type', 'card_number', 'side']
+        }
+      }
+    })
 
-    const prompt = `Examine this baseball card image meticulously. Return ONLY a valid JSON object with exactly these keys: 'player_name', 'team_name', 'year', 'card_set', 'parallel_insert_type', 'card_number', and 'side' (must exactly be 'Front', 'Back', or 'Dual'). It is absolutely critical that you correctly extract the 'card_number', as this is used for database joining. 
+    const prompt = `Examine this baseball card image meticulously. Return ONLY a valid JSON object perfectly matching the required schema keys. It is absolutely critical that you correctly extract the 'card_number', as this is used for database joining. 
+
+*** CRITICAL INSTRUCTION FOR 'team_name' ***
+To determine the team, you MUST read the legal copyright text or stat box on the BACK (Side B) of the card. You must then map that team strictly to one of the exact string values provided in the master teams list. Do not invent names.
 
 *** CRITICAL INSTRUCTION FOR 'parallel_insert_type' ***
 Sports cards frequently have rare 'Parallel' or 'Insert' variations. You MUST look extremely closely at the card for ANY of the following:
