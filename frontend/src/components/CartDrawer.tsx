@@ -14,6 +14,9 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [cartError, setCartError] = useState<string | null>(null)
 
+  const isAllTrades = cartItems.length > 0 && cartItems.every(i => i.isTradeProposal);
+  const meetsMinimum = isAllTrades || cartTotal >= settings.cart_minimum;
+
   useEffect(() => {
     if (isCartOpen && cartItems.length > 0) {
       const runPreFlight = async () => {
@@ -129,8 +132,8 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
               )}
               {cartItems.map(item => (
                 <div key={item.cartItemId} className="flex gap-4 p-3 bg-zinc-900 rounded-2xl border border-zinc-800 shadow-sm relative pr-12 transition-all hover:border-zinc-700">
-                  <div className="w-16 h-20 bg-zinc-950 rounded-lg overflow-hidden flex-shrink-0 border border-zinc-800 relative shadow-inner flex items-center justify-center p-1">
-                     <img src={item.image_url!} className="w-full h-full object-contain" />
+                  <div className="w-16 h-16 bg-zinc-950 rounded-lg overflow-hidden flex-shrink-0 border border-zinc-800 relative shadow-inner flex items-center justify-center p-0.5">
+                     <img src={item.image_url!} className="w-full h-full object-cover rounded-md" />
                   </div>
                   <div className="flex flex-col flex-1 py-1 pr-1">
                     <span className="font-extrabold text-sm text-white leading-tight">{item.player_name}</span>
@@ -173,7 +176,7 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
                   <span className="text-3xl font-black text-white tracking-tighter">${cartTotal.toFixed(2)}</span>
                 </div>
 
-                {cartTotal < settings.cart_minimum && (
+                {(!isAllTrades && cartTotal < settings.cart_minimum) && (
                   <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800 shadow-sm relative overflow-hidden">
                     <div className="relative z-10">
                        <h4 className="text-xs font-black text-zinc-400 uppercase tracking-widest mb-1.5 flex justify-between items-center">
@@ -183,28 +186,14 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
                        <div className="w-full bg-zinc-950 rounded-full h-2.5 overflow-hidden border border-zinc-800">
                           <div className="bg-cyan-500 h-2.5 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (cartTotal / settings.cart_minimum) * 100)}%` }}></div>
                        </div>
-                       <p className="text-[10px] font-bold text-zinc-500 mt-2">Add more items to unlock secure checkout.</p>
+                       <p className="text-[10px] font-bold text-zinc-500 mt-2">Add more cash items to unlock secure checkout.</p>
                     </div>
                   </div>
                 )}
                 
-                <button onClick={handleCheckout} disabled={checkoutLoading || cartTotal < settings.cart_minimum} className="w-full bg-[#FFC439] hover:bg-[#F4B82A] text-zinc-950 font-black py-4 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md active:scale-[0.98] disabled:opacity-50 disabled:grayscale text-lg">
-                  {checkoutLoading ? <Loader2 className="w-6 h-6 animate-spin"/> : 'Checkout with PayPal'}
+                <button onClick={handleCheckout} disabled={checkoutLoading || !meetsMinimum} className="w-full bg-[#FFC439] hover:bg-[#F4B82A] text-zinc-950 font-black py-4 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md active:scale-[0.98] disabled:opacity-50 disabled:grayscale text-lg">
+                  {checkoutLoading ? <Loader2 className="w-6 h-6 animate-spin"/> : isAllTrades ? 'Submit Trade Offers' : 'Checkout with PayPal'}
                 </button>
-                
-                {settings.allow_offers && (
-                  <>
-                    <div className="relative flex items-center py-1">
-                      <div className="flex-grow border-t border-zinc-800"></div>
-                      <span className="flex-shrink-0 mx-4 text-zinc-600 text-[10px] font-black uppercase tracking-widest">OR</span>
-                      <div className="flex-grow border-t border-zinc-800"></div>
-                    </div>
-
-                    <button onClick={() => setIsTradeModalOpen(true)} className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-black tracking-wide py-4 px-4 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-sm text-sm uppercase">
-                      <Handshake className="w-5 h-5" /> Propose a Trade
-                    </button>
-                  </>
-                )}
               </div>
           </div>
         )}

@@ -118,11 +118,11 @@ export function TradeModal({ isOpen, onClose, cartItems, onSuccess, targetCard }
                  <input type="file" multiple accept="image/*" onChange={handleImageUpload} className="w-full text-sm font-medium text-zinc-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-zinc-800 file:text-cyan-400 hover:file:bg-zinc-700 cursor-pointer border border-zinc-800 rounded-xl bg-zinc-900 transition-colors" />
                  
                  {previews.length > 0 && (
-                   <div className="flex gap-3 overflow-x-auto py-3 custom-scrollbar">
+                   <div className="grid grid-cols-4 sm:grid-cols-5 gap-3 mt-4">
                      {previews.map((src, idx) => (
-                        <div key={idx} className="relative w-20 h-20 flex-shrink-0 bg-zinc-900 rounded-lg border border-zinc-700 overflow-hidden shadow-inner group transition-all">
+                        <div key={idx} className="relative aspect-square w-full bg-zinc-900 rounded-lg border border-zinc-700 overflow-hidden shadow-inner group transition-all hover:border-cyan-500">
                            <img src={src} className="w-full h-full object-cover" />
-                           <button type="button" onClick={() => removeImage(idx)} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                           <button type="button" onClick={() => removeImage(idx)} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                               <X className="w-3 h-3" />
                            </button>
                         </div>
