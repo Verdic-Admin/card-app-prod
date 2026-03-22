@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Upload, Loader2, CheckCircle2, AlertCircle, Play, Save, Check, ExternalLink, Link2, Unlink, RefreshCw, Archive } from 'lucide-react'
+import { Upload, Loader2, CheckCircle2, AlertCircle, Play, Save, Check, ExternalLink, Link2, Unlink, RefreshCw, Archive, Trash2 } from 'lucide-react'
 import { addCardAction } from '@/app/actions/inventory'
 import { PRO_TEAMS } from '@/lib/constants/teams'
 import JSZip from 'jszip'
@@ -225,6 +225,10 @@ export function BulkIngestionWizard() {
 
   const updateCardData = (id: string, field: keyof QueuedCard['data'], val: string) => {
     setQueue(prev => prev.map(c => c.id === id ? { ...c, data: { ...c.data, [field]: val } } : c))
+  }
+
+  const removeCard = (id: string) => {
+    setQueue(prev => prev.filter(c => c.id !== id))
   }
 
   const scanCard = async (card: QueuedCard) => {
@@ -584,7 +588,10 @@ export function BulkIngestionWizard() {
       {/* Staging Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6">
         {queue.map(card => (
-          <div key={card.id} className={`rounded-xl border flex flex-col overflow-hidden transition-all shadow-sm ${card.status === 'saved' ? 'opacity-50 grayscale border-slate-200 bg-slate-50' : card.status === 'error' ? 'border-red-300 ring-4 ring-red-100/50' : card.status === 'scanning' ? 'border-indigo-400 ring-4 ring-indigo-100/50' : card.status === 'ready' ? 'border-amber-300 ring-2 ring-amber-50' : 'border-slate-200'}`}>
+          <div key={card.id} className={`rounded-xl border flex flex-col overflow-hidden transition-all shadow-sm relative ${card.status === 'saved' ? 'opacity-50 grayscale border-slate-200 bg-slate-50' : card.status === 'error' ? 'border-red-300 ring-4 ring-red-100/50' : card.status === 'scanning' ? 'border-indigo-400 ring-4 ring-indigo-100/50' : card.status === 'ready' ? 'border-amber-300 ring-2 ring-amber-50' : 'border-slate-200'}`}>
+             <button onClick={() => removeCard(card.id)} disabled={card.status === 'saving' || card.status === 'saved'} className="absolute top-2 right-2 p-1.5 z-20 bg-white/50 hover:bg-red-100 text-slate-400 hover:text-red-600 rounded-full transition-colors disabled:opacity-0" title="Delete from Queue">
+               <Trash2 className="w-4 h-4 cursor-pointer" />
+             </button>
             <div className="flex items-stretch p-4 bg-slate-50 border-b border-slate-200/60 gap-4 relative">
               <div className="flex gap-3 relative z-10 flex-shrink-0">
                  <div 
