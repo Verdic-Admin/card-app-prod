@@ -7,7 +7,7 @@ import { createAdminClient, createClient } from '@/utils/supabase/server'
 export async function validateCartCompleteness(itemIds: string[]) {
   const supabase = await createClient()
   
-  if (itemIds.length === 0) return { valid: false, unavailableIds: [] }
+  if (!itemIds || itemIds.length === 0) return { valid: true, unavailableIds: [] }
 
   const { data, error } = await (supabase.from('inventory') as any)
     .select('id, status')

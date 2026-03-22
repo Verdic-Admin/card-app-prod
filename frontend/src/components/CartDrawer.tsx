@@ -92,7 +92,8 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
       })), settings.paypal_email)
       window.location.href = url
     } catch (e: any) {
-      setCartError("Failed to actively validate cart availability. Please refresh.")
+      console.error("Cart Checkout Execution Error:", e);
+      setCartError(e.message || "Failed to actively submit payload or validate availability. Please refresh.")
       setCheckoutLoading(false)
     }
   }
