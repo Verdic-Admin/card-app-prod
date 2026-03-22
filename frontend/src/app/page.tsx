@@ -52,15 +52,15 @@ export default async function Home(props: { searchParams: Promise<{ [key: string
 
         <div className="flex-1 w-full min-w-0">
           <div className="mb-8 flex items-center justify-between">
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900">Available Inventory</h2>
-            <span className="bg-emerald-100 text-emerald-800 text-xs font-semibold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 flex-shrink-0">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+            <h2 className="text-2xl font-black tracking-tight text-white">Available Inventory</h2>
+            <span className="bg-cyan-950 text-cyan-400 text-xs font-bold px-3 py-1 rounded-full inline-flex items-center gap-2 flex-shrink-0 border border-cyan-900/50">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
               {items?.length || 0} Cards
             </span>
           </div>
           
           {error ? (
-            <div className="bg-red-50 text-red-600 p-4 rounded-lg">
+            <div className="bg-red-950/30 text-red-400 border border-red-900/50 font-bold p-4 rounded-lg shadow-sm">
               Failed to load inventory. Please try again later.
             </div>
           ) : (
