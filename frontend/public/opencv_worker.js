@@ -28,7 +28,9 @@ function processScans(frontsObj, backsObj) {
         
         for (let i = 0; i < numPairs; i++) {
             const fTight = sortedFronts[i].imgTight;
+            const fPadded = sortedFronts[i].imgPadded;
             const bTight = sortedBacks[i].imgTight;
+            const bPadded = sortedBacks[i].imgPadded;
             
             // We ship the raw ImageData buffer natively back to the main thread via Structured Clone.
             // Main thread can encode it into jpegs easily.
