@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { TOPPS_TAXONOMY } from '@/utils/taxonomy'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -33,7 +34,13 @@ Sports cards frequently have rare 'Parallel' or 'Insert' variations. You MUST lo
 2. Unique or distinct colored borders/backgrounds (e.g. Red, Blue, Gold, Camo, Mojo, Wave).
 3. Stamped serial numbers indicating a limited print run (e.g. 10/99).
 4. Sub-set Insert names (e.g. 'Downtown', 'Kaboom', 'Home Run Challenge').
-If ANY of these visual styles, foil types, or names are present, you MUST populate 'parallel_insert_type' with a highly descriptive name (e.g. 'Blue Refractor', 'Silver Prizm', '#/99', 'Gold Border'). Never default to an empty string if the card is visually holographic or has a distinct color scheme! Only leave empty if it is a truly standard, non-holographic Base card.`
+If ANY of these visual styles, foil types, or names are present, you MUST populate 'parallel_insert_type' with a highly descriptive name (e.g. 'Blue Refractor', 'Silver Prizm', '#/99', 'Gold Border'). Never default to an empty string if the card is visually holographic or has a distinct color scheme! Only leave empty if it is a truly standard, non-holographic Base card.
+
+*** MASSIVE KNOWLEDGE BASE: TOPPS TAXONOMY ***
+You must absolutely reference the incredibly detailed taxonomy manual below to correctly identify the card sets, substrates, and ultra-rare parallels:
+
+${TOPPS_TAXONOMY}
+`
 
     const parts: any[] = [
       prompt,
