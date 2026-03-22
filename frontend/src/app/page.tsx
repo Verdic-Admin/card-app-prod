@@ -2,10 +2,12 @@ import { Hero } from "@/components/Hero";
 import { CardGrid } from "@/components/CardGrid";
 import { createClient } from "@/utils/supabase/server";
 import { StoreFilters } from "@/components/StoreFilters";
+import { getStoreSettings } from "@/app/actions/settings";
 
 export default async function Home(props: { searchParams: Promise<{ [key: string]: string | undefined }> | any }) {
   const searchParams = await props.searchParams;
   const supabase = await createClient();
+  const settings = await getStoreSettings();
 
   // 1. Dynamically extract the highly precise lists of available teams and years that actually exist in the DB right now
   const { data: filterData } = await supabase
@@ -43,7 +45,7 @@ export default async function Home(props: { searchParams: Promise<{ [key: string
 
   return (
     <div>
-      <Hero />
+      <Hero settings={settings} />
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-16 flex flex-col lg:flex-row items-start gap-8">
         
         <StoreFilters availableTeams={availableTeams} availableYears={availableYears} />

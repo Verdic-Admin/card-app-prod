@@ -146,6 +146,43 @@ export default function SettingsPage() {
           </div>
         </div>
 
+        {/* Marketplace Customization */}
+        <div>
+          <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+            <span className="bg-blue-100 text-blue-700 w-6 h-6 flex items-center justify-center rounded-full text-xs">3</span> 
+            Marketplace Header & Socials
+          </h3>
+          <div className="space-y-6 p-5 bg-slate-50 border border-slate-100 rounded-xl">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Store Description (Hero Text)</label>
+              <textarea 
+                rows={3}
+                value={settings.store_description} 
+                onChange={e => setSettings({...settings, store_description: e.target.value})}
+                className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-900 font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none shadow-sm transition-all resize-none"
+                placeholder="Prices reflect direct-to-buyer savings..."
+              />
+              <p className="text-[10px] text-slate-500 mt-1.5 font-medium">This text appears front and center on your main marketplace page.</p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 border-t border-slate-200/60 pt-6">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Instagram URL</label>
+                  <input type="url" value={settings.social_instagram} onChange={e => setSettings({...settings, social_instagram: e.target.value})} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm placeholder:text-slate-300" placeholder="https://instagram.com/..." />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Twitter/X URL</label>
+                  <input type="url" value={settings.social_twitter} onChange={e => setSettings({...settings, social_twitter: e.target.value})} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm placeholder:text-slate-300" placeholder="https://x.com/..." />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Facebook URL</label>
+                  <input type="url" value={settings.social_facebook} onChange={e => setSettings({...settings, social_facebook: e.target.value})} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm placeholder:text-slate-300" placeholder="https://facebook.com/..." />
+                </div>
+            </div>
+            <p className="text-[10px] text-slate-500 font-medium p-3 bg-blue-50/50 rounded-lg border border-blue-100">Leave any social link securely blank if you want its icon to automatically hide from the storefront.</p>
+          </div>
+        </div>
+
         {/* Submit */}
         <div className="pt-6 border-t border-slate-200 flex items-center justify-between">
             <div>

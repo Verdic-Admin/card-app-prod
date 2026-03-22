@@ -8,6 +8,10 @@ export interface StoreSettings {
     site_announcement: string;
     paypal_email: string;
     allow_offers: boolean;
+    store_description: string;
+    social_instagram: string;
+    social_twitter: string;
+    social_facebook: string;
 }
 
 export async function getStoreSettings(): Promise<StoreSettings> {
@@ -26,7 +30,11 @@ export async function getStoreSettings(): Promise<StoreSettings> {
             cart_minimum: 20.00,
             site_announcement: '',
             paypal_email: process.env.NEXT_PUBLIC_PAYPAL_EMAIL || '',
-            allow_offers: true
+            allow_offers: true,
+            store_description: 'Zero-Fee Sports Card Storefront. Prices reflect direct-to-buyer savings. No hidden buyer premiums, just high-quality cards shipped directly to you.',
+            social_instagram: '',
+            social_twitter: '',
+            social_facebook: ''
         }
     }
     
