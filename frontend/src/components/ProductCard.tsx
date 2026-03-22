@@ -77,26 +77,26 @@ export function ProductCard({ item }: ProductCardProps) {
           <span className="text-xs font-bold text-zinc-500 mt-1 uppercase tracking-widest">
             {item.year} • #{item.card_number}
           </span>
-          <p className="text-sm text-zinc-400 mt-2 mb-5 flex-grow font-semibold">
+          <p className="text-sm text-zinc-400 mt-2 mb-4 flex-grow font-semibold">
             {item.card_set} • <span className="text-cyan-400">{item.parallel_insert_type}</span>
           </p>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between mt-auto gap-3 sm:gap-0">
-            <span className="font-black text-2xl text-white tracking-tighter">
+          <div className="flex flex-col mt-auto gap-3">
+            <span className="font-black text-3xl text-white tracking-tighter">
               ${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}
             </span>
             {isAvailable && (
-              <div className="flex gap-2">
+              <div className="grid grid-cols-2 gap-2 w-full">
                      <button 
                         onClick={(e) => { e.stopPropagation(); setIsTradeModalOpen(true); }}
-                        className="text-xs font-bold py-2.5 px-4 rounded-lg transition-all shadow-md active:scale-95 bg-zinc-950 hover:bg-zinc-800 text-zinc-300 border border-zinc-700 hover:border-zinc-500 uppercase tracking-widest"
+                        className="w-full text-xs font-bold py-3 rounded-lg transition-all shadow-md active:scale-95 bg-zinc-950 hover:bg-zinc-800 text-zinc-300 border border-zinc-700 hover:border-zinc-500 uppercase tracking-widest flex items-center justify-center"
                      >
-                        Offer/Trade
+                        Propose Trade
                      </button>
                   <button 
                     onClick={(e) => { e.stopPropagation(); addToCart(item); }}
                     disabled={isInCart}
-                    className={`text-sm font-bold py-2.5 px-5 rounded-lg transition-all shadow-md active:scale-95 flex-grow sm:flex-grow-0 ${
+                    className={`w-full text-sm font-bold py-3 rounded-lg transition-all shadow-md active:scale-95 flex items-center justify-center ${
                       isInCart 
                         ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-900 cursor-default shadow-none' 
                         : 'bg-white hover:bg-cyan-500 hover:text-white text-zinc-950 border border-zinc-200 hover:border-cyan-500'

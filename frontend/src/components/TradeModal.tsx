@@ -1,15 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Handshake, Loader2, CheckCircle2, Plus, Trash2 } from 'lucide-react'
-import { submitTradeOffer } from '@/app/actions/trades'
-
-
+import { X, Handshake, Loader2, CheckCircle2 } from 'lucide-react'
+import { useCart } from '@/context/CartContext'
 
 export function TradeModal({ isOpen, onClose, cartItems, onSuccess, targetCard }: { isOpen: boolean, onClose: () => void, cartItems: any[], onSuccess: () => void, targetCard?: any }) {
+  const { addTradeToCart } = useCart()
   const [form, setForm] = useState({ name: '', email: '', notes: '' })
-  
-
+  const [images, setImages] = useState<File[]>([])
+  const [previews, setPreviews] = useState<string[]>([])
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [tradeSuccess, setTradeSuccess] = useState(false)
@@ -18,42 +17,50 @@ export function TradeModal({ isOpen, onClose, cartItems, onSuccess, targetCard }
 
 
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const newFiles = Array.from(e.target.files);
+      setImages(prev => [...prev, ...newFiles]);
+      const newPreviews = newFiles.map(f => URL.createObjectURL(f));
+      setPreviews(prev => [...prev, ...newPreviews]);
+    }
+  }
+  
+  const removeImage = (index: number) => {
+    URL.revokeObjectURL(previews[index]);
+    setImages(prev => prev.filter((_, i) => i !== index));
+    setPreviews(prev => prev.filter((_, i) => i !== index));
+  }
+
   const handleTradeSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsSubmitting(true)
-    try {
-      const eForm = e.currentTarget
-      const data = new FormData()
-      data.append('name', form.name)
-      data.append('email', form.email)
-      
-      const combinedOffer = form.notes ? `Buyer Offer/Notes: ${form.notes}` : `No additional text notes provided.`;
-      
-      data.append('offer', combinedOffer)
-      
-      if (targetCard) {
-         data.append('targetItems', JSON.stringify([targetCard]))
-      } else {
-         data.append('targetItems', JSON.stringify(cartItems))
-      }
-      
-      const fileInput = eForm.querySelector('input[type="file"]') as HTMLInputElement
-      if (fileInput?.files?.[0]) {
-        data.append('image', fileInput.files[0])
-      }
-
-      await submitTradeOffer(data)
-      setTradeSuccess(true)
-      
-      setTimeout(() => {
-        setTradeSuccess(false)
-        onSuccess()
-      }, 4000)
-    } catch (err) {
-      alert("Store Server rejected trade offer. Network connection failed.")
-    } finally {
-      setIsSubmitting(false)
-    }
+    
+    // Pass everything natively to the Shopping Cart explicitly replacing Server dispatches
+    const targets = targetCard ? [targetCard] : cartItems;
+    
+    targets.forEach(target => {
+       addTradeToCart(target, {
+          name: form.name,
+          email: form.email,
+          notes: form.notes,
+          offerImages: images,
+          offerImageUrls: previews
+       });
+    });
+    
+    // Clear out base items from standard cart to migrate them wholly to trade items
+    // Wait, let's let success callback handle that if needed, since TradeModal just initiates Add to Cart
+    
+    setImages([]); setPreviews([]); setForm({ name: '', email: '', notes: '' });
+    
+    setTradeSuccess(true)
+    setTimeout(() => {
+      setTradeSuccess(false)
+      onSuccess()
+    }, 2000)
+    
+    setIsSubmitting(false)
   }
 
   return (
@@ -102,17 +109,30 @@ export function TradeModal({ isOpen, onClose, cartItems, onSuccess, targetCard }
               </div>
 
               <div className="pt-4 border-t border-zinc-800">
-                 <label className="text-xs font-bold text-zinc-500 ml-1 mb-1 block">Additional Notes / Flaws</label>
-                 <textarea placeholder="Any specific issues like centering or soft corners?" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} className="w-full p-2.5 text-sm font-medium border border-zinc-800 rounded-xl focus:ring-2 focus:ring-cyan-500 outline-none min-h-[80px] resize-none bg-zinc-900 focus:bg-zinc-800 text-white placeholder:text-zinc-600 transition-colors shadow-inner" />
+                 <label className="text-xs font-bold text-zinc-500 ml-1 mb-1 block">Offer Details / Trade Components</label>
+                 <textarea required placeholder="What are you offering? (e.g., '2023 Bowman Chrome Draft Paul Skenes Base for your Ohtani')" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} className="w-full p-2.5 text-sm font-medium border border-zinc-800 rounded-xl focus:ring-2 focus:ring-cyan-500 outline-none min-h-[80px] resize-none bg-zinc-900 focus:bg-zinc-800 text-white placeholder:text-zinc-600 transition-colors shadow-inner" />
               </div>
 
               <div>
-                 <label className="text-xs font-bold text-zinc-500 ml-1 mb-1 block">Attach Group Photo (Optional)</label>
-                 <input type="file" accept="image/*" className="w-full text-sm font-medium text-zinc-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-zinc-800 file:text-cyan-400 hover:file:bg-zinc-700 cursor-pointer border border-zinc-800 rounded-xl bg-zinc-900 transition-colors" />
+                 <label className="text-xs font-bold text-zinc-500 ml-1 mb-1 block">Attach Photos (Optional but recommended)</label>
+                 <input type="file" multiple accept="image/*" onChange={handleImageUpload} className="w-full text-sm font-medium text-zinc-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-zinc-800 file:text-cyan-400 hover:file:bg-zinc-700 cursor-pointer border border-zinc-800 rounded-xl bg-zinc-900 transition-colors" />
+                 
+                 {previews.length > 0 && (
+                   <div className="flex gap-3 overflow-x-auto py-3 custom-scrollbar">
+                     {previews.map((src, idx) => (
+                        <div key={idx} className="relative w-20 h-20 flex-shrink-0 bg-zinc-900 rounded-lg border border-zinc-700 overflow-hidden shadow-inner group transition-all">
+                           <img src={src} className="w-full h-full object-cover" />
+                           <button type="button" onClick={() => removeImage(idx)} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <X className="w-3 h-3" />
+                           </button>
+                        </div>
+                     ))}
+                   </div>
+                 )}
               </div>
 
-              <button disabled={isSubmitting} type="submit" className="w-full bg-cyan-600 hover:bg-cyan-500 text-zinc-950 font-black py-4 px-4 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 mt-4 shadow-xl text-lg tracking-wide z-20 sticky bottom-0">
-                {isSubmitting ? <Loader2 className="w-6 h-6 animate-spin text-zinc-950" /> : 'Lock In Binding Offer'}
+              <button disabled={isSubmitting || !form.name || !form.email || !form.notes} type="submit" className="w-full bg-cyan-600 hover:bg-cyan-500 text-zinc-950 font-black py-4 px-4 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 mt-4 shadow-xl text-lg tracking-wide z-20 sticky bottom-0">
+                {isSubmitting ? <Loader2 className="w-6 h-6 animate-spin text-zinc-950" /> : 'Add Trade to Cart'}
               </button>
             </form>
           )}

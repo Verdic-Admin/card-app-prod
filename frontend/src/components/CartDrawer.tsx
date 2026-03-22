@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useCart } from '@/context/CartContext'
 import { X, ShoppingCart, Trash2, Handshake, Loader2, CheckCircle2 } from 'lucide-react'
 import { generatePayPalCartUrl } from '@/utils/paypal'
-import { validateCartCompleteness } from '@/app/actions/trades'
+import { validateCartCompleteness, submitTradeOffer } from '@/app/actions/trades'
 import { TradeModal } from '@/components/TradeModal'
 import { StoreSettings } from '@/app/actions/settings'
 
@@ -18,7 +18,9 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
     if (isCartOpen && cartItems.length > 0) {
       const runPreFlight = async () => {
         try {
-          const check = await validateCartCompleteness(cartItems.map(i => i.id))
+          const cashItems = cartItems.filter(i => !i.isTradeProposal);
+          if (cashItems.length === 0) return;
+          const check = await validateCartCompleteness(cashItems.map(i => i.id))
           if (!check.valid) {
             kickItems(check.unavailableIds)
             setCartError("Heads up! Another collector just snagged an item while it was in your cart, but the rest of your stack is ready to go.")
@@ -29,7 +31,7 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
       }
       runPreFlight()
     }
-  }, [isCartOpen])
+  }, [isCartOpen, cartItems])
 
   if (!isCartOpen) return null
 
@@ -37,7 +39,42 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
     setCartError(null)
     setCheckoutLoading(true)
     try {
-      const check = await validateCartCompleteness(cartItems.map(i => i.id))
+      const cashItems = cartItems.filter(i => !i.isTradeProposal);
+      const tradeItems = cartItems.filter(i => i.isTradeProposal);
+
+      // Branch 1: Iteratively parse and push all Local Trade states directly to CRM backend
+      if (tradeItems.length > 0) {
+         for (const trade of tradeItems) {
+            if (!trade.tradeDetails) continue;
+            
+            const data = new FormData();
+            data.append('name', trade.tradeDetails.name);
+            data.append('email', trade.tradeDetails.email);
+            data.append('offer', trade.tradeDetails.notes);
+            
+            // Clean local cart DOM scopes safely returning the target strictly to Supabase interfaces
+            const { cartItemId, isTradeProposal, tradeDetails, ...cleanInventoryItem } = trade;
+            data.append('targetItems', JSON.stringify([cleanInventoryItem]));
+            
+            trade.tradeDetails.offerImages.forEach(file => {
+               data.append('images', file);
+            });
+            
+            await submitTradeOffer(data);
+         }
+      }
+      
+      // Branch 2: Immediate checkout escape if there is literally 0 financial logic needed
+      if (cashItems.length === 0) {
+         clearCart();
+         setIsCartOpen(false);
+         alert("Trade Offers Submitted Successfully! We have received your sealed proposals and will be reviewing them shortly.");
+         setCheckoutLoading(false);
+         return;
+      }
+      
+      // Branch 3: Standard Stripe/PayPal Escrow Sweeping
+      const check = await validateCartCompleteness(cashItems.map(i => i.id))
       
       if (!check.valid) {
         kickItems(check.unavailableIds)
@@ -46,7 +83,7 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
         return
       }
 
-      const url = generatePayPalCartUrl(cartItems.map(i => ({
+      const url = generatePayPalCartUrl(cashItems.map(i => ({
         itemName: `${i.year} ${i.card_set} ${i.player_name} ${i.parallel_insert_type} ${i.card_number ? `#${i.card_number}` : ''}`.trim().replace(/\s+/g, ' '),
         amount: i.listed_price ?? i.avg_price ?? 0
       })), settings.paypal_email)
@@ -91,7 +128,7 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
                 </div>
               )}
               {cartItems.map(item => (
-                <div key={item.id} className="flex gap-4 p-3 bg-zinc-900 rounded-2xl border border-zinc-800 shadow-sm relative pr-12 transition-all hover:border-zinc-700">
+                <div key={item.cartItemId} className="flex gap-4 p-3 bg-zinc-900 rounded-2xl border border-zinc-800 shadow-sm relative pr-12 transition-all hover:border-zinc-700">
                   <div className="w-16 h-20 bg-zinc-950 rounded-lg overflow-hidden flex-shrink-0 border border-zinc-800 relative shadow-inner flex items-center justify-center p-1">
                      <img src={item.image_url!} className="w-full h-full object-contain" />
                   </div>
@@ -99,9 +136,27 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
                     <span className="font-extrabold text-sm text-white leading-tight">{item.player_name}</span>
                     <span className="text-xs font-semibold text-zinc-400 mt-0.5 line-clamp-1">{item.year} {item.card_set}</span>
                     <span className="text-[10px] uppercase font-bold text-cyan-500 tracking-widest mt-1">{item.parallel_insert_type}</span>
-                    <span className="font-black text-white mt-auto tracking-tight">${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}</span>
+                    
+                    {item.isTradeProposal ? (
+                       <span className="mt-auto inline-block">
+                          <span className="text-[9px] font-black text-white bg-cyan-700 px-2 py-0.5 rounded uppercase tracking-widest leading-none border border-cyan-500 shadow-sm">Trade Proposal</span>
+                       </span>
+                    ) : (
+                       <span className="font-black text-white mt-auto tracking-tight">${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}</span>
+                    )}
                   </div>
-                  <button onClick={() => removeFromCart(item.id)} className="absolute top-1/2 -translate-y-1/2 right-3 p-2 text-zinc-600 hover:text-red-400 hover:bg-red-950 rounded-xl transition-colors">
+
+                  {item.isTradeProposal && item.tradeDetails && item.tradeDetails.offerImageUrls.length > 0 && (
+                     <div className="absolute right-14 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-70">
+                        {item.tradeDetails.offerImageUrls.map((url, idx) => (
+                           <div key={idx} className="w-8 h-8 rounded border border-zinc-700 overflow-hidden shadow-inner hidden sm:block">
+                              <img src={url} className="w-full h-full object-cover" />
+                           </div>
+                        ))}
+                     </div>
+                  )}
+
+                  <button onClick={() => removeFromCart(item.cartItemId!)} className="absolute top-1/2 -translate-y-1/2 right-3 p-2 text-zinc-600 hover:text-red-400 hover:bg-red-950 rounded-xl transition-colors">
                     <Trash2 className="w-5 h-5" />
                   </button>
                 </div>

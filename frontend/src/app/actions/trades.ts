@@ -34,34 +34,38 @@ export async function submitTradeOffer(formData: FormData) {
   const buyer_email = formData.get('email') as string;
   const offer_text = formData.get('offer') as string;
   const target_items = JSON.parse(formData.get('targetItems') as string);
-  const imageFile = formData.get('image') as File | null;
+  const imageFiles = formData.getAll('images') as File[];
 
-  let attached_image_url = null;
+  let attached_image_urls: string[] = [];
 
-  if (imageFile) {
-    const fileExt = imageFile.name.split('.').pop()
-    const fileName = `trade_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
-    const filePath = `trades/${fileName}`
+  for (const imageFile of imageFiles) {
+    if (imageFile && imageFile.size > 0) {
+      const fileExt = imageFile.name.split('.').pop()
+      const fileName = `trade_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
+      const filePath = `trades/${fileName}`
 
-    // Pumping trade images into the exact same public bucket
-    const { error: uploadError } = await supabaseAdmin.storage
-      .from('trade-images')
-      .upload(filePath, imageFile, {
-        cacheControl: '3600',
-        upsert: false
-      })
+      // Pumping trade images into the exact same public bucket
+      const { error: uploadError } = await supabaseAdmin.storage
+        .from('trade-images')
+        .upload(filePath, imageFile, {
+          cacheControl: '3600',
+          upsert: false
+        })
 
-    if (uploadError) {
-      console.error("Failed to upload trade image:", uploadError)
-      throw new Error(`Execution error dropping payload into DB: ${uploadError.message}`)
+      if (uploadError) {
+        console.error("Failed to upload trade image:", uploadError)
+        throw new Error(`Execution error dropping payload into DB: ${uploadError.message}`)
+      }
+
+      const { data: { publicUrl } } = supabaseAdmin.storage
+        .from('trade-images')
+        .getPublicUrl(filePath)
+
+      attached_image_urls.push(publicUrl);
     }
-
-    const { data: { publicUrl } } = supabaseAdmin.storage
-      .from('trade-images')
-      .getPublicUrl(filePath)
-
-    attached_image_url = publicUrl;
   }
+  
+  const final_image_urls = attached_image_urls.length > 0 ? attached_image_urls.join(',') : null;
 
   const { error } = await (supabaseAdmin.from('trade_offers') as any)
     .insert({
@@ -69,7 +73,7 @@ export async function submitTradeOffer(formData: FormData) {
       buyer_email,
       offer_text,
       target_items,
-      attached_image_url,
+      attached_image_url: final_image_urls,
       status: 'pending'
     })
 
@@ -91,7 +95,7 @@ export async function submitTradeOffer(formData: FormData) {
           _subject: `New Database Trade Offer from ${buyer_name}!`,
           Email: buyer_email,
           Offer: offer_text,
-          Attached_Image: attached_image_url || "User did not attach an image",
+          Attached_Image: final_image_urls || "User did not attach an image",
           Message: "Login to your secure Supabase Dashboard to instantly review exactly what items they requested from your store!"
         })
       });
