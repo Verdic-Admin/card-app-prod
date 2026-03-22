@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Upload, Loader2, CheckCircle2, AlertCircle, Play, Save, Check, ExternalLink, Link2, Unlink, RefreshCw } from 'lucide-react'
+import { Upload, Loader2, CheckCircle2, AlertCircle, Play, Save, Check, ExternalLink, Link2, Unlink, RefreshCw, Archive } from 'lucide-react'
 import { addCardAction } from '@/app/actions/inventory'
+import JSZip from 'jszip'
 
 interface QueuedCard {
   id: string;
@@ -121,39 +122,83 @@ export function BulkIngestionWizard() {
      const backFile = fArray.find(isBackScan) || fArray[1];
      const frontFile = fArray.find(f => f !== backFile) || fArray[0];
 
-     const formData = new FormData();
-     formData.append('fronts', frontFile);
-     formData.append('backs', backFile);
-
      try {
-        const res = await fetch("http://localhost:8000/api/local-scan", {
-           method: "POST",
-           body: formData
-        });
-        if (!res.ok) throw new Error("Local Hardware Scanner failed to respond.");
-        const json = await res.json();
-        
-        if (json.success && json.cards) {
-           const b64toFile = async (dataURI: string, filename: string): Promise<File> => {
-              const res = await fetch(dataURI);
-              const blob = await res.blob();
-              return new File([blob], filename, { type: 'image/jpeg' });
-           }
+        const getImgData = async (file: File) => {
+           const img = await createImageBitmap(file);
+           const canvas = document.createElement('canvas');
+           canvas.width = img.width;
+           canvas.height = img.height;
+           const ctx = canvas.getContext('2d');
+           if (!ctx) throw new Error("Canvas 2D context not available");
+           ctx.drawImage(img, 0, 0);
+           return ctx.getImageData(0, 0, img.width, img.height);
+        };
 
-           const generatedFiles: File[] = [];
-           for (const card of json.cards) {
-              const f1 = await b64toFile(card.frontBase64, `${card.name}_SideA.jpg`);
-              const f2 = await b64toFile(card.backBase64, `${card.name}_SideB.jpg`);
-              generatedFiles.push(f1, f2);
-           }
-           
-           handleFiles(generatedFiles);
-        }
+        const frontsData = await getImgData(frontFile);
+        const backsData = await getImgData(backFile);
+
+        const worker = new Worker('/opencv_worker.js');
+
+        worker.onmessage = async (e) => {
+            if (e.data.type === 'SUCCESS') {
+                const json = e.data;
+                const generatedFiles: File[] = [];
+                
+                for (const card of json.cards) {
+                    const toFile = async (data: ImageData, name: string): Promise<File> => {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = data.width;
+                        canvas.height = data.height;
+                        const ctx = canvas.getContext('2d');
+                        if (!ctx) throw new Error("Canvas 2D context not available");
+                        ctx.putImageData(data, 0, 0);
+                        
+                        const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/jpeg', 0.95));
+                        return new File([blob!], name, { type: 'image/jpeg' });
+                    };
+                    
+                    const f1 = await toFile(card.frontImageData, `${card.name}_SideA.jpg`);
+                    const f2 = await toFile(card.backImageData, `${card.name}_SideB.jpg`);
+                    generatedFiles.push(f1, f2);
+                }
+                
+                setIsHardwareSyncing(false);
+                handleFiles(generatedFiles);
+                worker.terminate();
+            } else if (e.data.type === 'ERROR') {
+                setIsHardwareSyncing(false);
+                alert("WASM OpenCV Target Error: " + e.data.message);
+                worker.terminate();
+            }
+        };
+
+        worker.postMessage({
+            type: 'PROCESS_HARDWARE_SCANS',
+            frontsObj: { imageData: frontsData.data.buffer, width: frontsData.width, height: frontsData.height },
+            backsObj: { imageData: backsData.data.buffer, width: backsData.width, height: backsData.height }
+        }, [frontsData.data.buffer, backsData.data.buffer]);
+        
      } catch(e: any) {
-        alert("Hardware Sync Pipeline Error: " + e.message + ". Ensure Python FastAPI sidecar is actively running on port 8000.");
-     } finally {
         setIsHardwareSyncing(false);
+        alert("Hardware WebWorker Pipeline Crash: " + e.message);
      }
+  }
+
+  const handleDownloadBackupZip = async () => {
+    if (queue.length === 0) return;
+    const zip = new JSZip();
+    queue.forEach(card => {
+       const safeName = card.data.player_name ? `${card.data.player_name}-${card.data.year}-${card.id}` : `raw_crop_${card.id}`;
+       zip.file(`${safeName}_SideA.jpg`, card.file);
+       if (card.back_file) zip.file(`${safeName}_SideB.jpg`, card.back_file);
+    });
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `WASM_OpenCV_Backup_${new Date().toISOString().split('T')[0]}.zip`;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   const updateCard = (id: string, updates: Partial<QueuedCard>) => {
@@ -417,6 +462,15 @@ export function BulkIngestionWizard() {
               Scan All Files
             </button>
           )}
+          {queue.length > 0 && (
+             <button 
+                onClick={handleDownloadBackupZip} 
+                className="bg-zinc-800 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-zinc-900 flex items-center gap-2 transition shadow-sm"
+             >
+                <Archive className="w-4 h-4" />
+                Backup Local ZIP
+             </button>
+          )}
           {queue.filter(c => c.status === 'ready' && c.data.side !== 'Back').length > 0 && (
              <button 
                 onClick={fetchAllComps} 
@@ -480,9 +534,9 @@ export function BulkIngestionWizard() {
             <div className="flex flex-col items-center justify-center gap-2">
               {isHardwareSyncing ? <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" /> : <RefreshCw className="w-8 h-8 text-emerald-500" />}
               <span className="text-sm font-bold text-emerald-700">
-                 {isHardwareSyncing ? 'Executing Python Sidecar Pipeline...' : 'Hardware Sync (Raw Flatbed Scans)'}
+                 {isHardwareSyncing ? 'Executing Native WebAssembly Processor...' : 'Hardware Sync (Native Browser WASM)'}
               </span>
-              <span className="text-[10px] text-emerald-600/80 font-bold uppercase tracking-widest text-center px-4 mt-0.5">Select exactly 1 massive Fronts scan & 1 Backs scan to unleash full local automation</span>
+              <span className="text-[10px] text-emerald-600/80 font-bold uppercase tracking-widest text-center px-4 mt-0.5">Select exactly 1 massive Fronts scan & 1 Backs scan to unleash full local edge-automation</span>
             </div>
             <input type="file" multiple className="hidden" accept="image/*" disabled={isHardwareSyncing} onChange={e => handleHardwareFiles(e.target.files)} />
           </label>

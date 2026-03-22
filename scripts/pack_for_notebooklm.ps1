@@ -14,7 +14,7 @@ $IncludePaths = @(
     "."
 )
 
-$IncludeExtensions = @(".ts", ".tsx", ".css", ".py", ".md", ".txt", ".json", ".yaml", ".env", ".gitignore", ".sql")
+$IncludeExtensions = @(".ts", ".tsx", ".js", ".css", ".py", ".md", ".txt", ".json", ".yaml", ".env", ".gitignore", ".sql")
 $IgnorePatterns = @(
     "*venv*", "*__pycache__*", "*.git*", "*node_modules*", "*.next*",
     "*.csv", "*.png", "*.jpg", "*.svg", "mock_*", "build", "dist", 
