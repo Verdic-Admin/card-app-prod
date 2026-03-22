@@ -14,8 +14,8 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [cartError, setCartError] = useState<string | null>(null)
 
-  const isAllTrades = cartItems.length > 0 && cartItems.every(i => i.isTradeProposal);
-  const meetsMinimum = isAllTrades || cartTotal >= settings.cart_minimum;
+  const cashItems = cartItems.filter(i => !i.isTradeProposal);
+  const tradeItems = cartItems.filter(i => i.isTradeProposal);
 
   useEffect(() => {
     if (isCartOpen && cartItems.length > 0) {
@@ -38,45 +38,12 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
 
   if (!isCartOpen) return null
 
-  const handleCheckout = async () => {
+  const [tradeSubmitting, setTradeSubmitting] = useState(false)
+
+  const handleCashCheckout = async () => {
     setCartError(null)
     setCheckoutLoading(true)
     try {
-      const cashItems = cartItems.filter(i => !i.isTradeProposal);
-      const tradeItems = cartItems.filter(i => i.isTradeProposal);
-
-      // Branch 1: Iteratively parse and push all Local Trade states directly to CRM backend
-      if (tradeItems.length > 0) {
-         for (const trade of tradeItems) {
-            if (!trade.tradeDetails) continue;
-            
-            const data = new FormData();
-            data.append('name', trade.tradeDetails.name);
-            data.append('email', trade.tradeDetails.email);
-            data.append('offer', trade.tradeDetails.notes);
-            
-            // Clean local cart DOM scopes safely returning the target strictly to Supabase interfaces
-            const { cartItemId, isTradeProposal, tradeDetails, ...cleanInventoryItem } = trade;
-            data.append('targetItems', JSON.stringify([cleanInventoryItem]));
-            
-            trade.tradeDetails.offerImages.forEach(file => {
-               data.append('images', file);
-            });
-            
-            await submitTradeOffer(data);
-         }
-      }
-      
-      // Branch 2: Immediate checkout escape if there is literally 0 financial logic needed
-      if (cashItems.length === 0) {
-         clearCart();
-         setIsCartOpen(false);
-         alert("Trade Offers Submitted Successfully! We have received your sealed proposals and will be reviewing them shortly.");
-         setCheckoutLoading(false);
-         return;
-      }
-      
-      // Branch 3: Standard Stripe/PayPal Escrow Sweeping
       const check = await validateCartCompleteness(cashItems.map(i => i.id))
       
       if (!check.valid) {
@@ -97,6 +64,77 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
       setCheckoutLoading(false)
     }
   }
+
+  const handleTradeCheckout = async () => {
+    setCartError(null)
+    setTradeSubmitting(true)
+    try {
+      if (tradeItems.length > 0) {
+         for (const trade of tradeItems) {
+            if (!trade.tradeDetails) continue;
+            
+            const data = new FormData();
+            data.append('name', trade.tradeDetails.name);
+            data.append('email', trade.tradeDetails.email);
+            data.append('offer', trade.tradeDetails.notes);
+            
+            const { cartItemId, isTradeProposal, tradeDetails, ...cleanInventoryItem } = trade;
+            data.append('targetItems', JSON.stringify([cleanInventoryItem]));
+            
+            trade.tradeDetails.offerImages.forEach(file => {
+               data.append('images', file);
+            });
+            
+            await submitTradeOffer(data);
+            removeFromCart(trade.cartItemId!);
+         }
+      }
+      alert("Trade Offers Submitted Successfully! The store owner has been notified.");
+      if (cashItems.length === 0) {
+         setIsCartOpen(false);
+      }
+      setTradeSubmitting(false)
+    } catch (e: any) {
+      console.error("Trade Execution Error:", e);
+      setCartError("Failed to actively upload tradeoff images to the Supabase endpoint. Please refresh.")
+      setTradeSubmitting(false)
+    }
+  }
+
+  const renderItem = (item: any) => (
+    <div key={item.cartItemId} className="flex gap-4 p-3 bg-zinc-900 rounded-2xl border border-zinc-800 shadow-sm relative pr-12 transition-all hover:border-zinc-700">
+      <div className="w-16 h-16 bg-zinc-950 rounded-lg overflow-hidden flex-shrink-0 border border-zinc-800 relative shadow-inner flex items-center justify-center p-0.5">
+         <img src={item.image_url!} className="w-full h-full object-cover rounded-md" />
+      </div>
+      <div className="flex flex-col flex-1 py-1 pr-1">
+        <span className="font-extrabold text-sm text-white leading-tight">{item.player_name}</span>
+        <span className="text-xs font-semibold text-zinc-400 mt-0.5 line-clamp-1">{item.year} {item.card_set}</span>
+        <span className="text-[10px] uppercase font-bold text-cyan-500 tracking-widest mt-1">{item.parallel_insert_type}</span>
+        
+        {item.isTradeProposal ? (
+           <div className="mt-auto flex items-center gap-2 flex-wrap pt-1">
+              <span className="text-[9px] font-black text-white bg-cyan-700 px-2 py-0.5 rounded uppercase tracking-widest leading-none border border-cyan-500 shadow-sm">Trade Proposal</span>
+              
+              {item.tradeDetails && item.tradeDetails.offerImageUrls.length > 0 && (
+                 <div className="flex items-center gap-1 opacity-90">
+                    {item.tradeDetails.offerImageUrls.map((url: string, idx: number) => (
+                       <div key={idx} className="w-5 h-5 rounded hover:scale-150 transition-transform origin-left border border-zinc-700 overflow-hidden shadow-sm">
+                          <img src={url} className="w-full h-full object-cover" />
+                       </div>
+                    ))}
+                 </div>
+              )}
+           </div>
+        ) : (
+           <span className="font-black text-white mt-auto tracking-tight pt-1">${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}</span>
+        )}
+      </div>
+
+      <button onClick={() => removeFromCart(item.cartItemId!)} className="absolute top-1/2 -translate-y-1/2 right-3 p-2 text-zinc-600 hover:text-red-400 hover:bg-red-950 rounded-xl transition-colors">
+        <Trash2 className="w-5 h-5" />
+      </button>
+    </div>
+  )
 
 
 
@@ -125,77 +163,74 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
                <p className="font-bold tracking-wide">Your bundle staging area is empty</p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-6">
               {cartError && (
                 <div className="p-4 bg-red-950/30 text-red-400 text-sm rounded-xl border border-red-900/50 font-bold shadow-sm">
                   {cartError}
                 </div>
               )}
-              {cartItems.map(item => (
-                <div key={item.cartItemId} className="flex gap-4 p-3 bg-zinc-900 rounded-2xl border border-zinc-800 shadow-sm relative pr-12 transition-all hover:border-zinc-700">
-                  <div className="w-16 h-16 bg-zinc-950 rounded-lg overflow-hidden flex-shrink-0 border border-zinc-800 relative shadow-inner flex items-center justify-center p-0.5">
-                     <img src={item.image_url!} className="w-full h-full object-cover rounded-md" />
+              
+              {cashItems.length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="text-[10px] font-black uppercase text-zinc-500 tracking-widest px-2 pb-1 border-b border-zinc-800">Cash Purchases</h3>
+                  <div className="space-y-4">
+                     {cashItems.map(renderItem)}
                   </div>
-                  <div className="flex flex-col flex-1 py-1 pr-1">
-                    <span className="font-extrabold text-sm text-white leading-tight">{item.player_name}</span>
-                    <span className="text-xs font-semibold text-zinc-400 mt-0.5 line-clamp-1">{item.year} {item.card_set}</span>
-                    <span className="text-[10px] uppercase font-bold text-cyan-500 tracking-widest mt-1">{item.parallel_insert_type}</span>
-                    
-                    {item.isTradeProposal ? (
-                       <div className="mt-auto flex items-center gap-2 flex-wrap pt-1">
-                          <span className="text-[9px] font-black text-white bg-cyan-700 px-2 py-0.5 rounded uppercase tracking-widest leading-none border border-cyan-500 shadow-sm">Trade Proposal</span>
-                          
-                          {item.tradeDetails && item.tradeDetails.offerImageUrls.length > 0 && (
-                             <div className="flex items-center gap-1 opacity-90">
-                                {item.tradeDetails.offerImageUrls.map((url, idx) => (
-                                   <div key={idx} className="w-5 h-5 rounded hover:scale-150 transition-transform origin-left border border-zinc-700 overflow-hidden shadow-sm">
-                                      <img src={url} className="w-full h-full object-cover" />
-                                   </div>
-                                ))}
-                             </div>
-                          )}
-                       </div>
-                    ) : (
-                       <span className="font-black text-white mt-auto tracking-tight pt-1">${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}</span>
-                    )}
-                  </div>
-
-                  <button onClick={() => removeFromCart(item.cartItemId!)} className="absolute top-1/2 -translate-y-1/2 right-3 p-2 text-zinc-600 hover:text-red-400 hover:bg-red-950 rounded-xl transition-colors">
-                    <Trash2 className="w-5 h-5" />
-                  </button>
                 </div>
-              ))}
+              )}
+
+              {tradeItems.length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="text-[10px] font-black uppercase text-cyan-500 tracking-widest px-2 pb-1 border-b border-zinc-800">Trade Escrow</h3>
+                  <div className="space-y-4">
+                     {tradeItems.map(renderItem)}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
 
         {cartItems.length > 0 && (
-          <div className="p-6 bg-zinc-950 border-t border-zinc-800 z-20">
-              <div className="space-y-5 animate-in fade-in zoom-in-95 duration-300">
-                <div className="flex justify-between items-center mb-2 px-1">
-                  <span className="text-zinc-400 font-bold uppercase tracking-widest text-xs">Bundle Total</span>
-                  <span className="text-3xl font-black text-white tracking-tighter">${cartTotal.toFixed(2)}</span>
-                </div>
-
-                {(!isAllTrades && cartTotal < settings.cart_minimum) && (
-                  <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800 shadow-sm relative overflow-hidden">
-                    <div className="relative z-10">
-                       <h4 className="text-xs font-black text-zinc-400 uppercase tracking-widest mb-1.5 flex justify-between items-center">
-                         <span>Minimum Spend: ${settings.cart_minimum.toFixed(2)}</span>
-                         <span className="text-cyan-400 bg-zinc-950 px-2 py-0.5 rounded shadow-sm text-[10px] border border-zinc-800">${(settings.cart_minimum - cartTotal).toFixed(2)} Away</span>
-                       </h4>
-                       <div className="w-full bg-zinc-950 rounded-full h-2.5 overflow-hidden border border-zinc-800">
-                          <div className="bg-cyan-500 h-2.5 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (cartTotal / settings.cart_minimum) * 100)}%` }}></div>
-                       </div>
-                       <p className="text-[10px] font-bold text-zinc-500 mt-2">Add more cash items to unlock secure checkout.</p>
-                    </div>
+          <div className="p-5 bg-zinc-950 border-t border-zinc-800 z-20 space-y-4 shadow-[0_-15px_30px_rgba(0,0,0,0.5)]">
+             
+             {cashItems.length > 0 && (
+                <div className="bg-zinc-900/40 p-5 rounded-2xl border border-zinc-800/60 shadow-inner">
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="text-zinc-400 font-bold uppercase tracking-widest text-[10px]">Cash Total</span>
+                    <span className="text-2xl font-black text-white tracking-tighter">${cartTotal.toFixed(2)}</span>
                   </div>
-                )}
-                
-                <button onClick={handleCheckout} disabled={checkoutLoading || !meetsMinimum} className="w-full bg-[#FFC439] hover:bg-[#F4B82A] text-zinc-950 font-black py-4 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md active:scale-[0.98] disabled:opacity-50 disabled:grayscale text-lg">
-                  {checkoutLoading ? <Loader2 className="w-6 h-6 animate-spin"/> : isAllTrades ? 'Submit Trade Offers' : 'Checkout with PayPal'}
-                </button>
-              </div>
+
+                  {cartTotal < settings.cart_minimum && (
+                     <div className="bg-zinc-950 rounded-xl p-3 border border-zinc-800 shadow-sm relative overflow-hidden mb-4">
+                       <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1.5 flex justify-between items-center">
+                         <span>Minimum: ${settings.cart_minimum.toFixed(2)}</span>
+                         <span className="text-cyan-400 bg-zinc-900 px-2 py-0.5 rounded shadow-sm border border-zinc-800">${(settings.cart_minimum - cartTotal).toFixed(2)} Away</span>
+                       </h4>
+                       <div className="w-full bg-zinc-900 rounded-full h-2 overflow-hidden border border-zinc-800">
+                          <div className="bg-cyan-500 h-2 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (cartTotal / settings.cart_minimum) * 100)}%` }}></div>
+                       </div>
+                     </div>
+                  )}
+                  
+                  <button onClick={handleCashCheckout} disabled={checkoutLoading || cartTotal < settings.cart_minimum} className="w-full bg-[#FFC439] hover:bg-[#F4B82A] text-zinc-950 font-black py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md active:scale-[0.98] disabled:opacity-50 disabled:grayscale text-[15px]">
+                    {checkoutLoading ? <Loader2 className="w-5 h-5 animate-spin"/> : 'Checkout with PayPal'}
+                  </button>
+                </div>
+             )}
+
+             {tradeItems.length > 0 && (
+                <div className="bg-cyan-950/10 p-5 rounded-2xl border border-cyan-900/20 shadow-inner">
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="text-cyan-600 font-black uppercase tracking-widest text-[10px]">Trade Action</span>
+                    <span className="text-sm font-black text-cyan-400 tracking-tight flex items-center gap-1"><Handshake className="w-4 h-4"/> {tradeItems.length} Proposal{tradeItems.length > 1 ? 's' : ''}</span>
+                  </div>
+                  
+                  <button onClick={handleTradeCheckout} disabled={tradeSubmitting} className="w-full bg-cyan-600 hover:bg-cyan-500 text-zinc-950 font-black py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md active:scale-[0.98] disabled:opacity-50 text-[15px]">
+                    {tradeSubmitting ? <Loader2 className="w-5 h-5 animate-spin"/> : 'Submit Trade Offers'}
+                  </button>
+                </div>
+             )}
           </div>
         )}
       </div>
