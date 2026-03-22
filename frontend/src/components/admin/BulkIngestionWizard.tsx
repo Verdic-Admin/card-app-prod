@@ -284,7 +284,8 @@ export function BulkIngestionWizard() {
   const fetchComps = async (card: QueuedCard) => {
     updateCardData(card.id, 'isFetchingComps', 'true' as any)
     try {
-      const parts = [card.data.year, card.data.player_name, card.data.card_set, card.data.parallel_insert_type, card.data.card_number].filter(p => p && p.trim() !== '')
+      const rawParts = [card.data.year, card.data.player_name, card.data.card_set, card.data.parallel_insert_type, card.data.card_number]
+      const parts = rawParts.map(p => String(p || '')).filter(p => p.trim() !== '')
       const searchString = parts.join(' ')
       
       const res = await fetch(`/api/ebay-comps?q=${encodeURIComponent(searchString)}`)
