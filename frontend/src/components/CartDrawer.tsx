@@ -12,6 +12,7 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
   const { cartItems, isCartOpen, setIsCartOpen, removeFromCart, clearCart, cartTotal, kickItems } = useCart()
   const [isTradeModalOpen, setIsTradeModalOpen] = useState(false)
   const [checkoutLoading, setCheckoutLoading] = useState(false)
+  const [tradeSubmitting, setTradeSubmitting] = useState(false)
   const [cartError, setCartError] = useState<string | null>(null)
 
   const cashItems = cartItems.filter(i => !i.isTradeProposal);
@@ -37,8 +38,6 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
   }, [isCartOpen, cartItems])
 
   if (!isCartOpen) return null
-
-  const [tradeSubmitting, setTradeSubmitting] = useState(false)
 
   const handleCashCheckout = async () => {
     setCartError(null)
