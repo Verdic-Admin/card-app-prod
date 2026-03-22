@@ -34,13 +34,14 @@ function processScans(frontsObj, backsObj) {
             // Main thread can encode it into jpegs easily.
             results.push({
                 name: `card_${String(i + 1).padStart(4, '0')}`,
-                frontImageData: imageDataFromMat(fTight),
-                backImageData: imageDataFromMat(bTight)
+                frontTightData: imageDataFromMat(fTight),
+                frontPaddedData: imageDataFromMat(fPadded),
+                backTightData: imageDataFromMat(bTight),
+                backPaddedData: imageDataFromMat(bPadded)
             });
             
-            // Critical Javascript Memory Management: OpenCV WASM must be manually purged
-            fTight.delete();
-            bTight.delete();
+            fTight.delete(); fPadded.delete();
+            bTight.delete(); bPadded.delete();
         }
         
         sortedFronts.forEach(c => c.cleanup && c.cleanup());
@@ -216,17 +217,34 @@ function processCardsSinglePass(imageData, width, height) {
         let dsize = new cv.Size(finalW, finalH);
         cv.warpPerspective(img, warpedTight, matrix, dsize, cv.INTER_CUBIC, cv.BORDER_CONSTANT, new cv.Scalar());
         
+        let pad_px = 50;
+        let p1_pad = cv.matFromArray(4, 1, cv.CV_32FC2, [tl.x, tl.y, tr.x, tr.y, brOut.x, brOut.y, bl.x, bl.y]);
+        let p2_pad = cv.matFromArray(4, 1, cv.CV_32FC2, [
+            pad_px, pad_px,
+            finalW - 1 + pad_px, pad_px,
+            finalW - 1 + pad_px, finalH - 1 + pad_px,
+            pad_px, finalH - 1 + pad_px
+        ]);
+        let matrix_pad = cv.getPerspectiveTransform(p1_pad, p2_pad);
+        let warpedPadded = new cv.Mat();
+        let dsize_pad = new cv.Size(finalW + pad_px * 2, finalH + pad_px * 2);
+        cv.warpPerspective(img, warpedPadded, matrix_pad, dsize_pad, cv.INTER_CUBIC, cv.BORDER_CONSTANT, new cv.Scalar());
+        
         if (isLandscape) {
             let rotated = new cv.Mat();
             cv.rotate(warpedTight, rotated, cv.ROTATE_90_CLOCKWISE);
             warpedTight.delete();
             warpedTight = rotated;
+            
+            let rotatedPad = new cv.Mat();
+            cv.rotate(warpedPadded, rotatedPad, cv.ROTATE_90_CLOCKWISE);
+            warpedPadded.delete();
+            warpedPadded = rotatedPad;
         }
-        
-        // OpenCV WebAssembly outputs RGBA from warpPerspective. Wait, `img` is RGBA when loaded from ImageData. So warpedTight is RGBA.
         
         extractedCards.push({
             imgTight: warpedTight,
+            imgPadded: warpedPadded,
             center: [cx, cy],
             cleanup: () => {} 
         });
@@ -235,6 +253,7 @@ function processCardsSinglePass(imageData, width, height) {
         kernelMicro.delete(); roiDilated.delete(); roiClosed.delete(); 
         roiContours.delete(); roiHierarchy.delete(); maxAreaContour.delete();
         p1.delete(); p2.delete(); matrix.delete();
+        p1_pad.delete(); p2_pad.delete(); matrix_pad.delete();
     }
     
     img.delete();

@@ -8,8 +8,10 @@ import JSZip from 'jszip'
 interface QueuedCard {
   id: string;
   file: File;
+  padded_file?: File;
   preview: string;
   back_file?: File;
+  back_padded_file?: File;
   back_preview?: string;
   status: 'queued' | 'scanning' | 'ready' | 'saving' | 'saved' | 'error';
   errorMsg?: string;
@@ -157,13 +159,25 @@ export function BulkIngestionWizard() {
                         return new File([blob!], name, { type: 'image/jpeg' });
                     };
                     
-                    const f1 = await toFile(card.frontImageData, `${card.name}_SideA.jpg`);
-                    const f2 = await toFile(card.backImageData, `${card.name}_SideB.jpg`);
-                    generatedFiles.push(f1, f2);
+                    const f1Tight = await toFile(card.frontTightData, `${card.name}_SideA_Tight.jpg`);
+                    const f1Padded = await toFile(card.frontPaddedData, `${card.name}_SideA_Padded.jpg`);
+                    const f2Tight = await toFile(card.backTightData, `${card.name}_SideB_Tight.jpg`);
+                    const f2Padded = await toFile(card.backPaddedData, `${card.name}_SideB_Padded.jpg`);
+                    
+                    // Directly scaffold the QueuedCard with the hidden Padded backup strings
+                    const newCard: QueuedCard = {
+                       id: Math.random().toString(36).substring(7),
+                       file: f1Tight,
+                       padded_file: f1Padded,
+                       preview: URL.createObjectURL(f1Tight),
+                       back_file: f2Tight,
+                       back_padded_file: f2Padded,
+                       back_preview: URL.createObjectURL(f2Tight),
+                       status: 'queued',
+                       data: { player_name: '', team_name: '', year: '', card_set: '', parallel_insert_type: '', card_number: '', comp1: '', comp2: '', comp3: '', side: 'Dual', isFetchingComps: false, cost_basis: parseFloat(defaultCostBasis) || 0, accepts_offers: defaultAcceptsOffers }
+                    }
+                    setQueue(prev => [...prev, newCard])
                 }
-                
-                setIsHardwareSyncing(false);
-                handleFiles(generatedFiles);
                 worker.terminate();
             } else if (e.data.type === 'ERROR') {
                 setIsHardwareSyncing(false);
@@ -189,8 +203,10 @@ export function BulkIngestionWizard() {
     const zip = new JSZip();
     queue.forEach(card => {
        const safeName = card.data.player_name ? `${card.data.player_name}-${card.data.year}-${card.id}` : `raw_crop_${card.id}`;
-       zip.file(`${safeName}_SideA.jpg`, card.file);
-       if (card.back_file) zip.file(`${safeName}_SideB.jpg`, card.back_file);
+       zip.file(`Tight_Crops/${safeName}_SideA_Tight.jpg`, card.file);
+       if (card.padded_file) zip.file(`Manual_Backups/${safeName}_SideA_Padded.jpg`, card.padded_file);
+       if (card.back_file) zip.file(`Tight_Crops/${safeName}_SideB_Tight.jpg`, card.back_file);
+       if (card.back_padded_file) zip.file(`Manual_Backups/${safeName}_SideB_Padded.jpg`, card.back_padded_file);
     });
     const blob = await zip.generateAsync({ type: 'blob' });
     const url = URL.createObjectURL(blob);
@@ -317,6 +333,21 @@ export function BulkIngestionWizard() {
            return c
         }).concat(extractedBack)
      })
+  }
+
+  const swapCardImage = (id: string, newFile: File, side: 'front' | 'back') => {
+    setQueue(prev => prev.map(c => {
+      if (c.id === id) {
+        if (side === 'front') {
+           URL.revokeObjectURL(c.preview);
+           return { ...c, file: newFile, preview: URL.createObjectURL(newFile) };
+        } else {
+           if (c.back_preview) URL.revokeObjectURL(c.back_preview);
+           return { ...c, back_file: newFile, back_preview: URL.createObjectURL(newFile) };
+        }
+      }
+      return c;
+    }))
   }
 
   const getAvg = (card: QueuedCard) => {
@@ -575,11 +606,19 @@ export function BulkIngestionWizard() {
                    {card.status === 'scanning' && <div className="absolute inset-0 bg-indigo-900/60 flex items-center justify-center backdrop-blur-[2px] transition-all"><Loader2 className="text-white w-8 h-8 animate-spin" /></div>}
                    {card.status === 'saved' && <div className="absolute inset-0 bg-emerald-900/70 flex items-center justify-center backdrop-blur-[1px] transition-all"><CheckCircle2 className="text-emerald-100 w-10 h-10" /></div>}
                    <div className="absolute inset-x-0 bottom-0 bg-black/60 text-white text-[10px] uppercase tracking-wider font-bold text-center py-1">{card.data.side || 'Front'}</div>
+                   <label className="absolute top-1 left-1 bg-white/90 hover:bg-white text-indigo-600 p-1.5 rounded backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow-sm" title="Swap Front Image">
+                       <Upload className="w-4 h-4" />
+                       <input disabled={card.status === 'saved' || card.status === 'scanning'} type="file" className="hidden" accept="image/*" onChange={e => { if (e.target.files?.[0]) swapCardImage(card.id, e.target.files[0], 'front') }} />
+                   </label>
                  </div>
                  {card.back_preview && (
                     <div className="w-32 h-44 bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm relative group">
                        <img src={card.back_preview} className="w-full h-full object-contain pointer-events-none" />
                        <div className="absolute inset-x-0 bottom-0 bg-black/60 text-white text-[10px] uppercase tracking-wider font-bold text-center py-1">Back</div>
+                       <label className="absolute top-1 left-1 bg-white/90 hover:bg-white text-indigo-600 p-1.5 rounded backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow-sm" title="Swap Back Image">
+                           <Upload className="w-4 h-4" />
+                           <input disabled={card.status === 'saved' || card.status === 'scanning'} type="file" className="hidden" accept="image/*" onChange={e => { if (e.target.files?.[0]) swapCardImage(card.id, e.target.files[0], 'back') }} />
+                       </label>
                        <button onClick={() => removePairedBack(card.id)} className="absolute top-1 right-1 bg-red-500/90 hover:bg-red-600 text-white p-1.5 rounded backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity" title="Unlink Back Image"><Unlink className="w-4 h-4" /></button>
                     </div>
                  )}
