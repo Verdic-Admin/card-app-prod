@@ -16,6 +16,8 @@ interface QueuedCard {
   back_preview?: string;
   status: 'queued' | 'scanning' | 'ready' | 'saving' | 'saved' | 'error';
   errorMsg?: string;
+  isFlaggedForRescan?: boolean;
+  rescanIdentifier?: string;
   data: {
     player_name: string;
     team_name: string;
@@ -397,7 +399,31 @@ export function BulkIngestionWizard() {
   const submitAllReady = async () => {
     setIsSubmittingAll(true)
     const readyCards = queue.filter(c => c.status === 'ready')
-    await Promise.allSettled(readyCards.map(c => saveCard(c)))
+    
+    const validCards = readyCards.filter(c => !c.isFlaggedForRescan)
+    const flaggedCards = readyCards.filter(c => c.isFlaggedForRescan)
+    
+    // Process Valid Cards naturally
+    await Promise.allSettled(validCards.map(c => saveCard(c)))
+    
+    // Process Flagged Cards natively to browser memory!
+    if (flaggedCards.length > 0) {
+       const textContent = "CARDS FLAGGED FOR RESCAN:\n\n" + flaggedCards.map((c, i) => `${i + 1}. ${c.rescanIdentifier || 'Unknown Item ID: ' + c.id}`).join('\n');
+       const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8;' });
+       const url = URL.createObjectURL(blob);
+       const link = document.createElement('a');
+       link.href = url;
+       link.download = `Rescan_List_${new Date().toISOString().split('T')[0]}.txt`;
+       document.body.appendChild(link);
+       link.click();
+       document.body.removeChild(link);
+       URL.revokeObjectURL(url);
+       
+       // Unmount the flagged cards instantly out of the UI
+       const flaggedIds = new Set(flaggedCards.map(c => c.id));
+       setQueue(prev => prev.filter(c => !flaggedIds.has(c.id)));
+    }
+    
     setIsSubmittingAll(false)
   }
 
@@ -573,11 +599,18 @@ export function BulkIngestionWizard() {
       {/* Staging Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6">
         {queue.map(card => (
-          <div key={card.id} className={`rounded-xl border flex flex-col overflow-hidden transition-all shadow-sm relative ${card.status === 'saved' ? 'opacity-50 grayscale border-slate-200 bg-slate-50' : card.status === 'error' ? 'border-red-300 ring-4 ring-red-100/50' : card.status === 'scanning' ? 'border-indigo-400 ring-4 ring-indigo-100/50' : card.status === 'ready' ? 'border-amber-300 ring-2 ring-amber-50' : 'border-slate-200'}`}>
+          <div key={card.id} className={`rounded-xl border flex flex-col overflow-hidden transition-all shadow-sm relative ${card.status === 'saved' ? 'opacity-50 grayscale border-slate-200 bg-slate-50' : card.isFlaggedForRescan ? 'opacity-90 bg-red-50/50 border-red-300 ring-4 ring-red-100/50' : card.status === 'error' ? 'border-red-300 ring-4 ring-red-100/50' : card.status === 'scanning' ? 'border-indigo-400 ring-4 ring-indigo-100/50' : card.status === 'ready' ? 'border-amber-300 ring-2 ring-amber-50' : 'border-slate-200'}`}>
+             <button onClick={() => updateCard(card.id, { isFlaggedForRescan: !card.isFlaggedForRescan })} 
+                     disabled={card.status === 'saving' || card.status === 'saved'}
+                     className={`absolute top-2 left-2 p-1.5 z-20 rounded-lg text-xs font-bold transition-all disabled:opacity-0 ${card.isFlaggedForRescan ? 'bg-red-500 text-white shadow-sm ring-2 ring-red-300' : 'bg-white/80 text-red-500 hover:bg-red-50 border border-red-100'} shadow-sm flex items-center gap-1`} 
+                     title="Flag for Rescan">
+               <AlertCircle className="w-3.5 h-3.5" />
+               {card.isFlaggedForRescan ? 'Quarantined' : 'Flag'}
+             </button>
              <button onClick={() => removeCard(card.id)} disabled={card.status === 'saving' || card.status === 'saved'} className="absolute top-2 right-2 p-1.5 z-20 bg-white/50 hover:bg-red-100 text-slate-400 hover:text-red-600 rounded-full transition-colors disabled:opacity-0" title="Delete from Queue">
                <Trash2 className="w-4 h-4 cursor-pointer" />
              </button>
-            <div className="flex items-stretch p-4 bg-slate-50 border-b border-slate-200/60 gap-4 relative">
+            <div className={`flex items-stretch p-4 bg-slate-50 border-b border-slate-200/60 gap-4 relative ${card.isFlaggedForRescan ? 'grayscale border-red-200' : ''}`}>
               <div className="flex gap-3 relative z-10 flex-shrink-0">
                  <div 
                     draggable={card.status === 'queued' && !card.back_file}
@@ -682,8 +715,8 @@ export function BulkIngestionWizard() {
                   </div>
                )}
 
-               {card.status !== 'queued' && card.status !== 'scanning' && card.data.side !== 'Back' && (
-               <div className="pt-3 mt-3 border-t border-slate-100">
+                {card.status !== 'queued' && card.status !== 'scanning' && card.data.side !== 'Back' && !card.isFlaggedForRescan && (
+                <div className="pt-3 mt-3 border-t border-slate-100">
                   <div className="flex justify-between items-center mb-2">
                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded">Pricing Setup</span>
                      <button onClick={() => fetchComps(card.id, card.data)} disabled={!card.data.player_name || card.status === 'saved' || !!card.data.isFetchingComps} className="text-xs text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 bg-indigo-50 px-2 py-1 rounded border border-indigo-100 transition-colors disabled:opacity-50 disabled:grayscale">
@@ -701,6 +734,26 @@ export function BulkIngestionWizard() {
                       </button>
                   )}
                </div>
+               )}
+
+               {card.isFlaggedForRescan && (
+                   <div className="mt-3 bg-red-50/50 border border-red-200 p-3 rounded-lg animate-in fade-in slide-in-from-top-2">
+                      <label className="text-[10px] font-bold text-red-700 uppercase tracking-widest block mb-2">Physical Identifier for Rescan List</label>
+                      <input 
+                         type="text" 
+                         value={card.rescanIdentifier || ''} 
+                         onChange={e => updateCard(card.id, { rescanIdentifier: e.target.value })} 
+                         className="w-full p-2.5 text-sm font-bold text-red-900 bg-white placeholder:text-red-300 border border-red-300 rounded focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none transition-colors shadow-sm mb-3"
+                         placeholder="e.g. Ohtani Base Card"
+                      />
+                      <button onClick={() => {
+                          const blob = new Blob([`CARDS FLAGGED FOR RESCAN:\n\n1. ${card.rescanIdentifier || 'Unknown Item ID: ' + card.id}`], { type: 'text/plain;charset=utf-8;' });
+                          const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download=`Rescan_List_${card.id}.txt`; document.body.appendChild(link); link.click(); document.body.removeChild(link);
+                          setQueue(prev => prev.filter(c => c.id !== card.id));
+                      }} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold text-sm py-2.5 rounded shadow-sm flex justify-center items-center gap-2 transition-colors">
+                         <Archive className="w-4 h-4"/> Eject & Download Note
+                      </button>
+                   </div>
                )}
             </div>
             {card.errorMsg && <div className="bg-red-50 py-2 px-4 text-xs text-red-700 font-bold break-words border-t border-red-200 flex items-start gap-2"><AlertCircle className="w-4 h-4 flex-shrink-0" />{card.errorMsg}</div>}
