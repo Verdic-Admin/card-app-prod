@@ -13,8 +13,8 @@ export default async function Home(props: { searchParams: Promise<{ [key: string
     .select('team_name, year')
     .eq('status', 'available')
   
-  const availableTeams = Array.from(new Set(filterData?.map(d => d.team_name).filter(Boolean) as string[])).sort()
-  const availableYears = Array.from(new Set(filterData?.map(d => d.year).filter(Boolean) as string[])).sort((a,b) => b.localeCompare(a))
+  const availableTeams = Array.from(new Set(filterData?.map((d: any) => d.team_name).filter(Boolean) as string[])).sort()
+  const availableYears = Array.from(new Set(filterData?.map((d: any) => d.year).filter(Boolean) as string[])).sort((a,b) => b.localeCompare(a))
 
   // 2. Base Query Builder using Next.js pure SearchParams to natively enable shareable Deep Links instantly
   let query = supabase.from('inventory').select('*').eq('status', 'available')
