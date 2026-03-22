@@ -3,6 +3,7 @@
 import { Database } from '@/types/database.types';
 import { useCart } from '@/context/CartContext';
 import { useState } from 'react';
+import { TradeModal } from '@/components/TradeModal';
 
 type InventoryItem = Database['public']['Tables']['inventory']['Row'];
 
@@ -15,6 +16,7 @@ export function ProductCard({ item }: ProductCardProps) {
   const { addToCart, cartItems } = useCart();
   const isInCart = cartItems.some(i => i.id === item.id);
   const [isFlipped, setIsFlipped] = useState(false);
+  const [isTradeModalOpen, setIsTradeModalOpen] = useState(false);
 
   return (
     <>
@@ -79,26 +81,44 @@ export function ProductCard({ item }: ProductCardProps) {
             {item.card_set} • <span className="text-cyan-400">{item.parallel_insert_type}</span>
           </p>
 
-          <div className="flex items-center justify-between mt-auto">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between mt-auto gap-3 sm:gap-0">
             <span className="font-black text-2xl text-white tracking-tighter">
               ${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}
             </span>
             {isAvailable && (
-              <button 
-                onClick={(e) => { e.stopPropagation(); addToCart(item); }}
-                disabled={isInCart}
-                className={`text-sm font-bold py-2.5 px-6 rounded-lg transition-all shadow-md active:scale-95 ${
-                  isInCart 
-                    ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-900 cursor-default shadow-none' 
-                    : 'bg-white hover:bg-cyan-500 hover:text-white text-zinc-950 border border-zinc-200 hover:border-cyan-500'
-                }`}
-              >
-                {isInCart ? 'In Cart' : 'Add to Cart'}
-              </button>
+              <div className="flex gap-2">
+                  {item.accepts_offers && (
+                     <button 
+                        onClick={(e) => { e.stopPropagation(); setIsTradeModalOpen(true); }}
+                        className="text-xs font-bold py-2.5 px-4 rounded-lg transition-all shadow-md active:scale-95 bg-transparent hover:bg-zinc-800 text-zinc-300 border border-zinc-700 hover:border-zinc-500 uppercase tracking-widest"
+                     >
+                        Offer/Trade
+                     </button>
+                  )}
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); addToCart(item); }}
+                    disabled={isInCart}
+                    className={`text-sm font-bold py-2.5 px-5 rounded-lg transition-all shadow-md active:scale-95 flex-grow sm:flex-grow-0 ${
+                      isInCart 
+                        ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-900 cursor-default shadow-none' 
+                        : 'bg-white hover:bg-cyan-500 hover:text-white text-zinc-950 border border-zinc-200 hover:border-cyan-500'
+                    }`}
+                  >
+                    {isInCart ? 'In Cart' : 'Add to Cart'}
+                  </button>
+              </div>
             )}
           </div>
         </div>
       </div>
+
+      <TradeModal 
+         isOpen={isTradeModalOpen} 
+         onClose={() => setIsTradeModalOpen(false)} 
+         cartItems={[]} 
+         onSuccess={() => setIsTradeModalOpen(false)} 
+         targetCard={item} 
+      />
 
       <style dangerouslySetInnerHTML={{__html: `
         .perspective-1000 { perspective: 1000px; }

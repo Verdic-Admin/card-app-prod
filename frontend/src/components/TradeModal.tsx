@@ -6,7 +6,7 @@ import { submitTradeOffer } from '@/app/actions/trades'
 
 
 
-export function TradeModal({ isOpen, onClose, cartItems, onSuccess }: { isOpen: boolean, onClose: () => void, cartItems: any[], onSuccess: () => void }) {
+export function TradeModal({ isOpen, onClose, cartItems, onSuccess, targetCard }: { isOpen: boolean, onClose: () => void, cartItems: any[], onSuccess: () => void, targetCard?: any }) {
   const [form, setForm] = useState({ name: '', email: '', notes: '' })
   
 
@@ -30,7 +30,12 @@ export function TradeModal({ isOpen, onClose, cartItems, onSuccess }: { isOpen: 
       const combinedOffer = form.notes ? `Buyer Offer/Notes: ${form.notes}` : `No additional text notes provided.`;
       
       data.append('offer', combinedOffer)
-      data.append('targetItems', JSON.stringify(cartItems))
+      
+      if (targetCard) {
+         data.append('targetItems', JSON.stringify([targetCard]))
+      } else {
+         data.append('targetItems', JSON.stringify(cartItems))
+      }
       
       const fileInput = eForm.querySelector('input[type="file"]') as HTMLInputElement
       if (fileInput?.files?.[0]) {
@@ -88,7 +93,11 @@ export function TradeModal({ isOpen, onClose, cartItems, onSuccess }: { isOpen: 
               <div className="space-y-4">
                 <h4 className="flex items-center justify-between text-sm font-black text-white border-b border-zinc-800 pb-2">
                    Trade Offer Attachment
-                   <span className="text-[10px] font-black text-cyan-400 bg-cyan-950/50 px-2 py-1 rounded-md tracking-widest uppercase border border-cyan-900/50">Targeting {cartItems.length} items</span>
+                   {targetCard ? (
+                      <span className="text-xs font-black text-cyan-300 bg-cyan-950/80 px-2.5 py-1 rounded-md tracking-wide border border-cyan-800 flex-shrink-0 ml-2 text-right">Targeting: {targetCard.year} {targetCard.player_name}</span>
+                   ) : (
+                      <span className="text-[10px] font-black text-cyan-400 bg-cyan-950/50 px-2 py-1 rounded-md tracking-widest uppercase border border-cyan-900/50 whitespace-nowrap ml-2">Targeting {cartItems.length} items</span>
+                   )}
                 </h4>
               </div>
 
