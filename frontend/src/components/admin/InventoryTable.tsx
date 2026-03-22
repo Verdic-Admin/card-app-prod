@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Database } from '@/types/database.types'
 import { toggleCardStatus, editCardAction, deleteCardAction, bulkDeleteCardsAction } from '@/app/actions/inventory'
-import { Loader2, Trash2, Edit2, Check, X } from 'lucide-react'
+import { Loader2, Trash2, Edit2, Check, X, Search } from 'lucide-react'
 
 type InventoryItem = Database['public']['Tables']['inventory']['Row']
 
@@ -19,12 +19,26 @@ export function InventoryTable({ initialItems }: { initialItems: InventoryItem[]
   
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isBulkDeleting, setIsBulkDeleting] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const filteredItems = items.filter(item => {
+     if (!searchQuery) return true;
+     const q = searchQuery.toLowerCase();
+     return (
+        (item.player_name || '').toLowerCase().includes(q) ||
+        (item.team_name || '').toLowerCase().includes(q) ||
+        (item.card_set || '').toLowerCase().includes(q) ||
+        (item.year || '').toLowerCase().includes(q) ||
+        (item.card_number || '').toLowerCase().includes(q) ||
+        (item.parallel_insert_type || '').toLowerCase().includes(q)
+     );
+  });
 
   const toggleSelectAll = () => {
-    if (selectedIds.size === items.length) {
+    if (selectedIds.size === filteredItems.length) {
       setSelectedIds(new Set())
     } else {
-      setSelectedIds(new Set(items.map(i => i.id)))
+      setSelectedIds(new Set(filteredItems.map(i => i.id)))
     }
   }
 
@@ -122,6 +136,19 @@ export function InventoryTable({ initialItems }: { initialItems: InventoryItem[]
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between">
+         <div className="relative w-full max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input 
+              type="text" 
+              placeholder="Search inventory database..." 
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2.5 text-sm bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-colors placeholder:text-slate-400 text-slate-900 font-medium shadow-sm"
+            />
+         </div>
+      </div>
+      
       {selectedIds.size > 0 && (
         <div className="flex items-center justify-between bg-indigo-50 border border-indigo-100 p-3 rounded-lg animate-in fade-in slide-in-from-top-2 shadow-sm">
           <span className="text-sm font-bold text-indigo-900">{selectedIds.size} cards selected</span>
@@ -136,7 +163,7 @@ export function InventoryTable({ initialItems }: { initialItems: InventoryItem[]
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
               <th className="px-4 py-3 text-center w-12">
-                <input type="checkbox" checked={items.length > 0 && selectedIds.size === items.length} onChange={toggleSelectAll} className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer" />
+                <input type="checkbox" checked={filteredItems.length > 0 && selectedIds.size === filteredItems.length} onChange={toggleSelectAll} className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer" />
               </th>
               <th className="px-4 py-3 font-semibold text-slate-900 w-16">Image</th>
             <th className="px-4 py-3 font-semibold text-slate-900">Card Details</th>
@@ -146,7 +173,7 @@ export function InventoryTable({ initialItems }: { initialItems: InventoryItem[]
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
-          {items.map(item => (
+          {filteredItems.map(item => (
             <tr key={item.id} className={`group hover:bg-slate-50/50 transition-colors ${selectedIds.has(item.id) ? 'bg-indigo-50/50' : ''}`}>
               <td className="px-4 py-3 text-center">
                 <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer transition-all" />
