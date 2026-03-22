@@ -6,8 +6,9 @@ import { X, ShoppingCart, Trash2, Handshake, Loader2, CheckCircle2 } from 'lucid
 import { generatePayPalCartUrl } from '@/utils/paypal'
 import { validateCartCompleteness } from '@/app/actions/trades'
 import { TradeModal } from '@/components/TradeModal'
+import { StoreSettings } from '@/app/actions/settings'
 
-export function CartDrawer() {
+export function CartDrawer({ settings }: { settings: StoreSettings }) {
   const { cartItems, isCartOpen, setIsCartOpen, removeFromCart, clearCart, cartTotal, kickItems } = useCart()
   const [isTradeModalOpen, setIsTradeModalOpen] = useState(false)
   const [checkoutLoading, setCheckoutLoading] = useState(false)
@@ -33,7 +34,7 @@ export function CartDrawer() {
       const url = generatePayPalCartUrl(cartItems.map(i => ({
         itemName: `${i.year} ${i.card_set} ${i.player_name} ${i.parallel_insert_type} ${i.card_number ? `#${i.card_number}` : ''}`.trim().replace(/\s+/g, ' '),
         amount: i.listed_price ?? i.avg_price ?? 0
-      })))
+      })), settings.paypal_email)
       window.location.href = url
     } catch (e: any) {
       setCartError("Failed to actively validate cart availability. Please refresh.")
@@ -102,34 +103,38 @@ export function CartDrawer() {
                   <span className="text-3xl font-black text-slate-900 tracking-tight">${cartTotal.toFixed(2)}</span>
                 </div>
 
-                {cartTotal < 20 && (
+                {cartTotal < settings.cart_minimum && (
                   <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100 shadow-sm relative overflow-hidden">
                     <div className="relative z-10">
                        <h4 className="text-xs font-bold text-indigo-800 uppercase tracking-widest mb-1.5 flex justify-between items-center">
-                         <span>Minimum Spend: $20.00</span>
-                         <span className="text-indigo-600 bg-white px-1.5 py-0.5 rounded shadow-sm text-[10px]">${(20 - cartTotal).toFixed(2)} Away</span>
+                         <span>Minimum Spend: ${settings.cart_minimum.toFixed(2)}</span>
+                         <span className="text-indigo-600 bg-white px-1.5 py-0.5 rounded shadow-sm text-[10px]">${(settings.cart_minimum - cartTotal).toFixed(2)} Away</span>
                        </h4>
                        <div className="w-full bg-indigo-200/50 rounded-full h-2.5 overflow-hidden">
-                          <div className="bg-indigo-500 h-2.5 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (cartTotal / 20) * 100)}%` }}></div>
+                          <div className="bg-indigo-500 h-2.5 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (cartTotal / settings.cart_minimum) * 100)}%` }}></div>
                        </div>
                        <p className="text-[10px] font-medium text-indigo-700 mt-2">Add more items to unlock secure checkout.</p>
                     </div>
                   </div>
                 )}
                 
-                <button onClick={handleCheckout} disabled={checkoutLoading || cartTotal < 20} className="w-full bg-[#FFC439] hover:bg-[#F4B82A] text-slate-900 font-black py-4 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-sm active:scale-[0.98] disabled:opacity-50 disabled:grayscale text-lg">
+                <button onClick={handleCheckout} disabled={checkoutLoading || cartTotal < settings.cart_minimum} className="w-full bg-[#FFC439] hover:bg-[#F4B82A] text-slate-900 font-black py-4 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-sm active:scale-[0.98] disabled:opacity-50 disabled:grayscale text-lg">
                   {checkoutLoading ? <Loader2 className="w-6 h-6 animate-spin"/> : 'Checkout with PayPal'}
                 </button>
                 
-                <div className="relative flex items-center py-1">
-                  <div className="flex-grow border-t border-slate-200"></div>
-                  <span className="flex-shrink-0 mx-4 text-slate-400 text-xs font-bold uppercase tracking-widest">OR</span>
-                  <div className="flex-grow border-t border-slate-200"></div>
-                </div>
+                {settings.allow_offers && (
+                  <>
+                    <div className="relative flex items-center py-1">
+                      <div className="flex-grow border-t border-slate-200"></div>
+                      <span className="flex-shrink-0 mx-4 text-slate-400 text-xs font-bold uppercase tracking-widest">OR</span>
+                      <div className="flex-grow border-t border-slate-200"></div>
+                    </div>
 
-                <button onClick={() => setIsTradeModalOpen(true)} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 px-4 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-sm text-lg">
-                  <Handshake className="w-6 h-6" /> Propose a Trade
-                </button>
+                    <button onClick={() => setIsTradeModalOpen(true)} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 px-4 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-sm text-lg">
+                      <Handshake className="w-6 h-6" /> Propose a Trade
+                    </button>
+                  </>
+                )}
               </div>
           </div>
         )}

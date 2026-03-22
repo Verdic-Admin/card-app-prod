@@ -3,12 +3,11 @@ export interface PayPalCartItem {
   amount: number;
 }
 
-export function generatePayPalCartUrl(items: PayPalCartItem[], currency = 'USD'): string {
+export function generatePayPalCartUrl(items: PayPalCartItem[], businessEmail: string, currency = 'USD'): string {
   const baseUrl = 'https://www.paypal.com/cgi-bin/webscr';
-  const businessEmail = process.env.NEXT_PUBLIC_PAYPAL_EMAIL;
   
   if (!businessEmail) {
-    throw new Error("PayPal business email is not configured in environment variables.");
+    throw new Error("PayPal business email is not configured in settings.");
   }
 
   const params = new URLSearchParams({

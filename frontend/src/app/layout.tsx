@@ -5,6 +5,7 @@ import { Navbar } from "@/components/Navbar";
 import { CartProvider } from "@/context/CartContext";
 import { CartDrawer } from "@/components/CartDrawer";
 import { FloatingCart } from "@/components/FloatingCart";
+import { getStoreSettings } from "@/app/actions/settings";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -21,11 +22,13 @@ export const metadata: Metadata = {
   description: "Zero-Fee Sports Card Storefront",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const settings = await getStoreSettings();
+
   return (
     <html
       lang="en"
@@ -33,11 +36,11 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-slate-50">
         <CartProvider>
-          <Navbar />
+          <Navbar settings={settings} />
           <main className="flex-grow flex flex-col">
             {children}
           </main>
-          <CartDrawer />
+          <CartDrawer settings={settings} />
           <FloatingCart />
         </CartProvider>
       </body>
