@@ -135,14 +135,23 @@ export function BulkIngestionWizard() {
        
        for (const front of fronts) {
           if (front.status === 'ready' && !front.back_file) {
-             const matchIndex = backs.findIndex(b => 
-                !matchedBackIds.has(b.id) &&
-                b.status === 'ready' &&
-                b.data.player_name === front.data.player_name &&
-                b.data.card_number === front.data.card_number &&
-                b.data.year === front.data.year &&
-                b.data.card_set === front.data.card_set
-             )
+             const matchIndex = backs.findIndex(b => {
+                if (matchedBackIds.has(b.id) || b.status !== 'ready') return false;
+                
+                // If they have the exact same player, or one couldn't read the player name at all
+                const playerMatch = (!b.data.player_name || !front.data.player_name || b.data.player_name === front.data.player_name);
+                const numberMatch = (!b.data.card_number || !front.data.card_number || b.data.card_number === front.data.card_number);
+                const yearMatch   = (!b.data.year || !front.data.year || b.data.year === front.data.year);
+                const setMatch    = (!b.data.card_set || !front.data.card_set || b.data.card_set === front.data.card_set);
+
+                // Ensure at least ONE meaningful metric actually matched to prevent random blank cards from merging
+                const hasSolidMatch = (
+                    (b.data.player_name && b.data.player_name === front.data.player_name) || 
+                    (b.data.card_number && b.data.card_number === front.data.card_number)
+                );
+
+                return playerMatch && numberMatch && yearMatch && setMatch && hasSolidMatch;
+             });
              
              if (matchIndex !== -1) {
                 const back = backs[matchIndex]

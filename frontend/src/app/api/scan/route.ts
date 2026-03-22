@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
 
-    const prompt = "Examine this baseball card image carefully. Return ONLY a valid JSON object with exactly these keys: 'player_name', 'year', 'card_set', 'parallel_insert_type', 'card_number', and 'side' (must exactly be 'Front', 'Back', or 'Dual'). It is absolutely critical that you correctly extract the 'card_number', as this is used for database joining. IMPORTANT: For the 'year', 'card_set' (e.g., Topps Chrome, Bowman, Box Set), and the 'parallel_insert_type' (e.g., Refractor, Prizm, numbered print runs like 10/99), look extremely closely at the fine print, logos, and stamped serial numbers on the back-side of the card to define the exact parallel or insert variation."
+    const prompt = "Examine this baseball card image carefully. Return ONLY a valid JSON object with exactly these keys: 'player_name', 'year', 'card_set', 'parallel_insert_type', 'card_number', and 'side' (must exactly be 'Front', 'Back', or 'Dual'). It is absolutely critical that you correctly extract the 'card_number', as this is used for database joining. IMPORTANT: For the 'parallel_insert_type' (e.g., Refractor, Prizm, Silver, colored borders, numbered print runs like 10/99), look extremely closely at BOTH the visual foil, sheen, and color styling on the FRONT of the card, and any stamped serial numbers on the BACK. Do NOT default to 'Base' if the card has a distinct colorful border or holographic visual style."
 
     const parts: any[] = [
       prompt,
