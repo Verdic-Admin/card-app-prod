@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Database } from '@/types/database.types'
 import { toggleCardStatus, editCardAction, deleteCardAction, bulkDeleteCardsAction } from '@/app/actions/inventory'
-import { Loader2, Trash2, Edit2, Check, X, Search } from 'lucide-react'
+import { Loader2, Trash2, Edit2, Check, X, Search, Download } from 'lucide-react'
 
 type InventoryItem = Database['public']['Tables']['inventory']['Row']
 
@@ -130,13 +130,42 @@ export function InventoryTable({ initialItems }: { initialItems: InventoryItem[]
     }
   }
 
+  const handleExportCSV = () => {
+    if (filteredItems.length === 0) return;
+    const headers = ['Card ID', 'Player Name', 'Team Name', 'Year', 'Set', 'Number', 'Parallel/Insert', 'Status', 'Cost Basis', 'Avg Price', 'Listed Price', 'Accepts Offers', 'Created At'];
+    
+    const rows = filteredItems.map(item => [
+      item.id,
+      `"${(item.player_name || '').replace(/"/g, '""')}"`,
+      `"${(item.team_name || '').replace(/"/g, '""')}"`,
+      item.year || '',
+      `"${(item.card_set || '').replace(/"/g, '""')}"`,
+      `"${(item.card_number || '').replace(/"/g, '""')}"`,
+      `"${(item.parallel_insert_type || '').replace(/"/g, '""')}"`,
+      item.status.toUpperCase(),
+      item.cost_basis || 0,
+      item.avg_price || 0,
+      item.listed_price || 0,
+      item.accepts_offers ? 'YES' : 'NO',
+      new Date(item.created_at).toLocaleDateString()
+    ]);
+    
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `Store_Inventory_Export_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
+
   if (items.length === 0) {
     return <div className="text-center text-slate-500 py-10 bg-slate-50 rounded-lg border border-dashed border-slate-200">No inventory found in database.</div>
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
          <div className="relative w-full max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input 
@@ -147,6 +176,10 @@ export function InventoryTable({ initialItems }: { initialItems: InventoryItem[]
               className="w-full pl-9 pr-4 py-2.5 text-sm bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-colors placeholder:text-slate-400 text-slate-900 font-medium shadow-sm"
             />
          </div>
+         <button onClick={handleExportCSV} className="whitespace-nowrap bg-zinc-800 hover:bg-zinc-900 text-white px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer">
+           <Download className="w-4 h-4" />
+           Export CSV
+         </button>
       </div>
       
       {selectedIds.size > 0 && (
