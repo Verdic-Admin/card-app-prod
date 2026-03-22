@@ -25,7 +25,15 @@ export async function POST(request: Request) {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
 
-    const prompt = "Examine this baseball card image carefully. Return ONLY a valid JSON object with exactly these keys: 'player_name', 'team_name', 'year', 'card_set', 'parallel_insert_type', 'card_number', and 'side' (must exactly be 'Front', 'Back', or 'Dual'). It is absolutely critical that you correctly extract the 'card_number', as this is used for database joining. IMPORTANT: For the 'parallel_insert_type' (e.g., Refractor, Prizm, Silver, colored borders, numbered print runs like 10/99), look extremely closely at BOTH the visual foil, sheen, and color styling on the FRONT of the card, and any stamped serial numbers on the BACK. Do NOT default to 'Base' if the card has a distinct colorful border or holographic visual style."
+    const prompt = `Examine this baseball card image meticulously. Return ONLY a valid JSON object with exactly these keys: 'player_name', 'team_name', 'year', 'card_set', 'parallel_insert_type', 'card_number', and 'side' (must exactly be 'Front', 'Back', or 'Dual'). It is absolutely critical that you correctly extract the 'card_number', as this is used for database joining. 
+
+*** CRITICAL INSTRUCTION FOR 'parallel_insert_type' ***
+Sports cards frequently have rare 'Parallel' or 'Insert' variations. You MUST look extremely closely at the card for ANY of the following:
+1. Words describing special variations printed directly on the card (like 'Refractor', 'Prizm', 'Holo', 'Chrome', 'Silver', 'Crystal').
+2. Unique or distinct colored borders/backgrounds (e.g. Red, Blue, Gold, Camo, Mojo, Wave).
+3. Stamped serial numbers indicating a limited print run (e.g. 10/99).
+4. Sub-set Insert names (e.g. 'Downtown', 'Kaboom', 'Home Run Challenge').
+If ANY of these visual styles, foil types, or names are present, you MUST populate 'parallel_insert_type' with a highly descriptive name (e.g. 'Blue Refractor', 'Silver Prizm', '#/99', 'Gold Border'). Never default to an empty string if the card is visually holographic or has a distinct color scheme! Only leave empty if it is a truly standard, non-holographic Base card.`
 
     const parts: any[] = [
       prompt,
