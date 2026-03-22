@@ -132,7 +132,7 @@ export function InventoryTable({ initialItems }: { initialItems: InventoryItem[]
 
   const handleExportCSV = () => {
     if (filteredItems.length === 0) return;
-    const headers = ['Card ID', 'Player Name', 'Team Name', 'Year', 'Set', 'Number', 'Parallel/Insert', 'Status', 'Cost Basis', 'Avg Price', 'Listed Price', 'Accepts Offers'];
+    const headers = ['Card ID', 'Player Name', 'Team Name', 'Year', 'Set', 'Number', 'Parallel/Insert', 'Status', 'Cost Basis', 'Avg Price', 'Listed Price', 'Accepts Offers', 'Image URL'];
     
     const rows = filteredItems.map(item => [
       item.id,
@@ -146,7 +146,8 @@ export function InventoryTable({ initialItems }: { initialItems: InventoryItem[]
       item.cost_basis || 0,
       item.avg_price || 0,
       item.listed_price || 0,
-      item.accepts_offers ? 'YES' : 'NO'
+      item.accepts_offers ? 'YES' : 'NO',
+      `"${item.image_url || ''}"`
     ]);
     
     const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
