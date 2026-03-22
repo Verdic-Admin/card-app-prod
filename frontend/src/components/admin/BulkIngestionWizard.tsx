@@ -257,12 +257,21 @@ export function BulkIngestionWizard() {
       }
       
       const { high, low, avg } = getAvg(card)
+      
+      // The user requested smart retail rounding to the nearest .09 cent to boost sales psychology!
+      // Example: 1.26 -> 12.6 -> 13 -> 1.30 -> 1.29.
+      let retailAvg = avg;
+      if (avg > 0) {
+        retailAvg = Number((Math.round(avg * 10) / 10 - 0.01).toFixed(2));
+        if (retailAvg <= 0) retailAvg = 0.99; // safe floor
+      }
+
       const payload = { 
         ...card.data, 
         high_price: high, 
         low_price: low, 
-        avg_price: avg,
-        listed_price: avg,
+        avg_price: retailAvg,
+        listed_price: retailAvg,
         cost_basis: parseFloat(defaultCostBasis) || 0,
         accepts_offers: defaultAcceptsOffers
       }
