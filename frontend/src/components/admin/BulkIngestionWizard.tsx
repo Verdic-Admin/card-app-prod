@@ -67,23 +67,6 @@ export function BulkIngestionWizard() {
     const fileArray = Array.from(files);
     const newCards: QueuedCard[] = [];
     
-    // 1. Smart Auto-Pairing logic
-    const getBaseName = (filename: string) => filename.replace(/\.[^/.]+$/, "").replace(/(_|-|\s)*(front|back|side_?a|side_?b|1|2)$/i, "");
-    const isBack = (filename: string) => /(_|-|\s)*(back|side_?b|2)\.[^/.]+$/i.test(filename);
-    const isFront = (filename: string) => /(_|-|\s)*(front|side_?a|1)\.[^/.]+$/i.test(filename);
-
-    const grouped = new Map<string, { front?: File, back?: File, unknown: File[] }>();
-    
-    fileArray.forEach(f => {
-       const base = getBaseName(f.name);
-       if (!grouped.has(base)) grouped.set(base, { unknown: [] });
-       const group = grouped.get(base)!;
-       
-       if (isFront(f.name) && !group.front) group.front = f;
-       else if (isBack(f.name) && !group.back) group.back = f;
-       else group.unknown.push(f);
-    });
-
     // 2. Zero-Touch Default Injection natively into payload
     const createData = (side: string) => ({
         player_name: '', team_name: '', year: '', card_set: '', parallel_insert_type: '', card_number: '',
@@ -92,24 +75,55 @@ export function BulkIngestionWizard() {
         accepts_offers: defaultAcceptsOffers
     });
 
-    grouped.forEach(group => {
-       if (group.front && group.back) {
-          newCards.push({
-             id: Math.random().toString(36).substring(7),
-             file: group.front, preview: URL.createObjectURL(group.front),
-             back_file: group.back, back_preview: URL.createObjectURL(group.back),
-             status: 'queued', data: createData('Dual')
-          });
-       } else {
-          [...(group.front ? [group.front] : []), ...(group.back ? [group.back] : []), ...group.unknown].forEach(f => {
-             newCards.push({
-               id: Math.random().toString(36).substring(7),
-               file: f, preview: URL.createObjectURL(f),
-               status: 'queued', data: createData(isBack(f.name) ? 'Back' : 'Front')
-             });
-          });
-       }
-    });
+    if (fileArray.length === 2) {
+       // Absolute Dual Override: If exactly two photos are dropped on the single target, assume they are Front and Back!
+        const isBackName = (filename: string) => /(_|-|\s)*(back|side_?b|2)\.[^/.]+$/i.test(filename);
+        let backFile = fileArray.find(f => isBackName(f.name)) || fileArray[1];
+        let frontFile = fileArray.find(f => f !== backFile) || fileArray[0];
+
+        newCards.push({
+            id: Math.random().toString(36).substring(7),
+            file: frontFile, preview: URL.createObjectURL(frontFile),
+            back_file: backFile, back_preview: URL.createObjectURL(backFile),
+            status: 'queued', data: createData('Dual')
+        });
+    } else {
+        // 1. Smart Auto-Pairing logic for massive disorderly lists based on filename suffixes
+        const getBaseName = (filename: string) => filename.replace(/\.[^/.]+$/, "").replace(/(_|-|\s)*(front|back|side_?a|side_?b|1|2)$/i, "");
+        const isBack = (filename: string) => /(_|-|\s)*(back|side_?b|2)\.[^/.]+$/i.test(filename);
+        const isFront = (filename: string) => /(_|-|\s)*(front|side_?a|1)\.[^/.]+$/i.test(filename);
+
+        const grouped = new Map<string, { front?: File, back?: File, unknown: File[] }>();
+        
+        fileArray.forEach(f => {
+           const base = getBaseName(f.name);
+           if (!grouped.has(base)) grouped.set(base, { unknown: [] });
+           const group = grouped.get(base)!;
+           
+           if (isFront(f.name) && !group.front) group.front = f;
+           else if (isBack(f.name) && !group.back) group.back = f;
+           else group.unknown.push(f);
+        });
+
+        grouped.forEach(group => {
+           if (group.front && group.back) {
+              newCards.push({
+                 id: Math.random().toString(36).substring(7),
+                 file: group.front, preview: URL.createObjectURL(group.front),
+                 back_file: group.back, back_preview: URL.createObjectURL(group.back),
+                 status: 'queued', data: createData('Dual')
+              });
+           } else {
+              [...(group.front ? [group.front] : []), ...(group.back ? [group.back] : []), ...group.unknown].forEach(f => {
+                 newCards.push({
+                   id: Math.random().toString(36).substring(7),
+                   file: f, preview: URL.createObjectURL(f),
+                   status: 'queued', data: createData(isBack(f.name) ? 'Back' : 'Front')
+                 });
+              });
+           }
+        });
+    }
 
     setQueue(prev => [...prev, ...newCards])
     
