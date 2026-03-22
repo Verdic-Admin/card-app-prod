@@ -33,12 +33,12 @@ export async function POST(request: Request) {
           type: SchemaType.OBJECT,
           properties: {
             player_name: { type: SchemaType.STRING },
-            team_name: { type: SchemaType.STRING, enum: PRO_TEAMS },
+            team_name: { type: SchemaType.STRING, format: 'enum', enum: PRO_TEAMS },
             year: { type: SchemaType.STRING },
             card_set: { type: SchemaType.STRING },
             parallel_insert_type: { type: SchemaType.STRING },
             card_number: { type: SchemaType.STRING },
-            side: { type: SchemaType.STRING, enum: ['Front', 'Back', 'Dual'] }
+            side: { type: SchemaType.STRING, format: 'enum', enum: ['Front', 'Back', 'Dual'] }
           },
           required: ['player_name', 'team_name', 'year', 'card_set', 'parallel_insert_type', 'card_number', 'side']
         }
