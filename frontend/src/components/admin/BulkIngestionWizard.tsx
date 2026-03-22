@@ -288,19 +288,32 @@ export function BulkIngestionWizard() {
       const searchString = parts.join(' ')
       
       const res = await fetch(`/api/ebay-comps?q=${encodeURIComponent(searchString)}`)
-      if (!res.ok) throw new Error('Failed to fetch comps')
+      
+      if (!res.ok) {
+        const errorText = await res.text()
+        throw new Error(`Server returned ${res.status}: ${errorText}`)
+      }
         
-      const { prices } = await res.json()
+      const { prices, error } = await res.json()
+      
+      if (error) {
+         throw new Error(`API Error: ${error}`)
+      }
       
       // Auto-fill top 3 prices
       if (prices && prices.length > 0) {
         if (prices[0]) updateCardData(card.id, 'comp1', prices[0].toFixed(2))
         if (prices[1]) updateCardData(card.id, 'comp2', prices[1].toFixed(2))
         if (prices[2]) updateCardData(card.id, 'comp3', prices[2].toFixed(2))
+        
+        // Clear any old error messages if it succeeded
+        updateCard(card.id, { errorMsg: undefined })
+      } else {
+        updateCard(card.id, { errorMsg: `Searched "${searchString}", but SerpApi found zero comp results!` })
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err)
-      // alert("Failed to fetch comps from eBay. Please try manual entry.")
+      updateCard(card.id, { errorMsg: 'Fetch Comps Failed: ' + err.message })
     } finally {
       updateCardData(card.id, 'isFetchingComps', '' as any)
     }
