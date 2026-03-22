@@ -87,14 +87,12 @@ export function ProductCard({ item }: ProductCardProps) {
             </span>
             {isAvailable && (
               <div className="flex gap-2">
-                  {item.accepts_offers && (
                      <button 
                         onClick={(e) => { e.stopPropagation(); setIsTradeModalOpen(true); }}
-                        className="text-xs font-bold py-2.5 px-4 rounded-lg transition-all shadow-md active:scale-95 bg-transparent hover:bg-zinc-800 text-zinc-300 border border-zinc-700 hover:border-zinc-500 uppercase tracking-widest"
+                        className="text-xs font-bold py-2.5 px-4 rounded-lg transition-all shadow-md active:scale-95 bg-zinc-950 hover:bg-zinc-800 text-zinc-300 border border-zinc-700 hover:border-zinc-500 uppercase tracking-widest"
                      >
                         Offer/Trade
                      </button>
-                  )}
                   <button 
                     onClick={(e) => { e.stopPropagation(); addToCart(item); }}
                     disabled={isInCart}
