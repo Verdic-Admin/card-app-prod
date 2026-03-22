@@ -45,7 +45,7 @@ export async function submitTradeOffer(formData: FormData) {
 
     // Pumping trade images into the exact same public bucket
     const { error: uploadError } = await supabaseAdmin.storage
-      .from('card-images')
+      .from('trade-images')
       .upload(filePath, imageFile, {
         cacheControl: '3600',
         upsert: false
@@ -57,7 +57,7 @@ export async function submitTradeOffer(formData: FormData) {
     }
 
     const { data: { publicUrl } } = supabaseAdmin.storage
-      .from('card-images')
+      .from('trade-images')
       .getPublicUrl(filePath)
 
     attached_image_url = publicUrl;
@@ -101,4 +101,54 @@ export async function submitTradeOffer(formData: FormData) {
   }
 
   return { success: true }
+}
+
+export async function clearTradeImageStorage(tradeOfferId: string, imageUrl: string) {
+  const supabaseAdmin = createAdminClient()
+  try {
+    const path = imageUrl.split('/trade-images/')[1]
+    if (path) {
+      await supabaseAdmin.storage.from('trade-images').remove([path])
+    }
+    const { error } = await (supabaseAdmin.from('trade_offers') as any)
+      .update({ attached_image_url: null })
+      .eq('id', tradeOfferId)
+      
+    if (error) throw error
+    return { success: true }
+  } catch (error: any) {
+    console.error("Failed to clear trade image storage:", error)
+    throw new Error(error.message)
+  }
+}
+
+export async function getAllTradeOffers() {
+  const supabaseAdmin = createAdminClient()
+  const { data, error } = await (supabaseAdmin.from('trade_offers') as any)
+    .select('*')
+    .order('created_at', { ascending: false })
+  
+  if (error) throw new Error(error.message)
+  return data
+}
+
+export async function deleteTradeOfferRecord(id: string, imageUrl: string | null) {
+  const supabaseAdmin = createAdminClient()
+  try {
+    if (imageUrl) {
+      const path = imageUrl.split('/trade-images/')[1]
+      if (path) {
+        await supabaseAdmin.storage.from('trade-images').remove([path])
+      }
+    }
+    const { error } = await (supabaseAdmin.from('trade_offers') as any)
+      .delete()
+      .eq('id', id)
+      
+    if (error) throw error
+    return { success: true }
+  } catch (error: any) {
+    console.error("Failed to delete trade offer:", error)
+    throw new Error(error.message)
+  }
 }

@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "The Gap Sportscards",
+  title: "Into the Gap Sportscards",
   description: "Zero-Fee Sports Card Storefront",
 };
 

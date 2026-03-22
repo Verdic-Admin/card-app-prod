@@ -4,6 +4,7 @@ import { BulkIngestionWizard } from '@/components/admin/BulkIngestionWizard'
 import { InventoryTable } from '@/components/admin/InventoryTable'
 import { SignOutButton } from '@/components/admin/SignOutButton'
 import { LedgerDashboard } from '@/components/admin/LedgerDashboard'
+import { TradeLeadsCRM } from '@/components/admin/TradeLeadsCRM'
 
 import Link from 'next/link'
 
@@ -45,6 +46,9 @@ export default async function AdminPage() {
         </div>
         <div>
           <BulkIngestionWizard />
+        </div>
+        <div>
+          <TradeLeadsCRM />
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           <h2 className="text-xl font-bold text-slate-900 mb-6 flex justify-between items-center">

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useCart } from '@/context/CartContext'
 import { X, ShoppingCart, Trash2, Handshake, Loader2, CheckCircle2 } from 'lucide-react'
 import { generatePayPalCartUrl } from '@/utils/paypal'
@@ -13,6 +13,23 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
   const [isTradeModalOpen, setIsTradeModalOpen] = useState(false)
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [cartError, setCartError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (isCartOpen && cartItems.length > 0) {
+      const runPreFlight = async () => {
+        try {
+          const check = await validateCartCompleteness(cartItems.map(i => i.id))
+          if (!check.valid) {
+            kickItems(check.unavailableIds)
+            setCartError("Heads up! Another collector just snagged an item while it was in your cart, but the rest of your stack is ready to go.")
+          }
+        } catch (e) {
+          console.warn("Silent pre-flight validation failed")
+        }
+      }
+      runPreFlight()
+    }
+  }, [isCartOpen])
 
   if (!isCartOpen) return null
 

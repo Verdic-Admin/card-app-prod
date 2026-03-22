@@ -19,7 +19,7 @@ export function Navbar({ settings }: { settings: StoreSettings }) {
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             <Link href="/" className="font-black text-xl tracking-tight text-white flex items-center gap-2">
-              The Gap Sportscards
+              Into the Gap Sportscards
             </Link>
             <div className="flex items-center gap-4 sm:gap-6">
               <Link href="/" className="text-sm font-bold text-zinc-400 hover:text-white transition-colors">

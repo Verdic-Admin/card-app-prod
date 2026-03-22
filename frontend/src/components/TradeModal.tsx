@@ -4,51 +4,19 @@ import { useState } from 'react'
 import { X, Handshake, Loader2, CheckCircle2, Plus, Trash2 } from 'lucide-react'
 import { submitTradeOffer } from '@/app/actions/trades'
 
-type CardOffer = {
-  id: string;
-  player: string;
-  year: string;
-  set: string;
-  variation: string;
-  isAutographed: boolean;
-  autoType: 'sticker' | 'on_card' | null;
-  isNumbered: boolean;
-  printRun: string;
-}
+
 
 export function TradeModal({ isOpen, onClose, cartItems, onSuccess }: { isOpen: boolean, onClose: () => void, cartItems: any[], onSuccess: () => void }) {
   const [form, setForm] = useState({ name: '', email: '', notes: '' })
   
-  const [cards, setCards] = useState<CardOffer[]>([{
-    id: 'initial',
-    player: '', year: '', set: '', variation: '',
-    isAutographed: false, autoType: null,
-    isNumbered: false, printRun: ''
-  }])
+
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [tradeSuccess, setTradeSuccess] = useState(false)
 
   if (!isOpen) return null
 
-  const updateCard = (id: string, field: keyof CardOffer, value: any) => {
-    setCards(cards.map(c => c.id === id ? { ...c, [field]: value } : c))
-  }
 
-  const addCard = () => {
-    setCards([...cards, {
-      id: Date.now().toString() + Math.random(),
-      player: '', year: '', set: '', variation: '',
-      isAutographed: false, autoType: null,
-      isNumbered: false, printRun: ''
-    }])
-  }
-
-  const removeCard = (id: string) => {
-    if (cards.length > 1) {
-      setCards(cards.filter(c => c.id !== id))
-    }
-  }
 
   const handleTradeSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -59,13 +27,7 @@ export function TradeModal({ isOpen, onClose, cartItems, onSuccess }: { isOpen: 
       data.append('name', form.name)
       data.append('email', form.email)
       
-      let cardsString = cards.map((c, i) => {
-         let autoString = c.isAutographed ? `\n   Autograph: Yes (${c.autoType === 'sticker' ? 'Sticker' : c.autoType === 'on_card' ? 'On-Card' : 'Unknown'})` : ''
-         let numberedString = c.isNumbered ? `\n   Numbered: Yes (${c.printRun})` : ''
-         return `Card ${i + 1}:\n   Player: ${c.player}\n   Year: ${c.year}\n   Set: ${c.set}\n   Variation: ${c.variation}${autoString}${numberedString}`
-      }).join('\n\n')
-      
-      const combinedOffer = `${cardsString}\n\nAdditional Notes: ${form.notes}`
+      const combinedOffer = form.notes ? `Buyer Offer/Notes: ${form.notes}` : `No additional text notes provided.`;
       
       data.append('offer', combinedOffer)
       data.append('targetItems', JSON.stringify(cartItems))
@@ -125,77 +87,9 @@ export function TradeModal({ isOpen, onClose, cartItems, onSuccess }: { isOpen: 
 
               <div className="space-y-4">
                 <h4 className="flex items-center justify-between text-sm font-black text-white border-b border-zinc-800 pb-2">
-                   Cards You Are Offering
+                   Trade Offer Attachment
                    <span className="text-[10px] font-black text-cyan-400 bg-cyan-950/50 px-2 py-1 rounded-md tracking-widest uppercase border border-cyan-900/50">Targeting {cartItems.length} items</span>
                 </h4>
-
-                {cards.map((card, index) => (
-                  <div key={card.id} className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-2xl relative animate-in fade-in slide-in-from-bottom-2 duration-300">
-                     {cards.length > 1 && (
-                        <button type="button" onClick={() => removeCard(card.id)} className="absolute top-4 right-4 text-zinc-500 hover:text-red-400 hover:bg-red-950 p-1.5 rounded-lg transition-colors">
-                           <Trash2 className="w-4 h-4" />
-                        </button>
-                     )}
-                     
-                     <h5 className="text-[10px] font-black text-cyan-500/80 uppercase tracking-widest mb-3">Incoming Card #{index + 1}</h5>
-                     
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                       <div className="md:col-span-2">
-                          <label className="text-xs font-bold text-zinc-500 ml-1 mb-1 block">Player Name</label>
-                          <input required type="text" placeholder="e.g. Shohei Ohtani" value={card.player} onChange={e => updateCard(card.id, 'player', e.target.value)} className="w-full p-2.5 text-sm font-medium border border-zinc-800 rounded-xl focus:ring-2 focus:ring-cyan-500 outline-none bg-zinc-950 text-white placeholder:text-zinc-600 transition-colors shadow-inner" />
-                       </div>
-                       <div>
-                          <label className="text-xs font-bold text-zinc-500 ml-1 mb-1 block">Year</label>
-                          <input required type="text" placeholder="e.g. 2018" value={card.year} onChange={e => updateCard(card.id, 'year', e.target.value)} className="w-full p-2.5 text-sm font-medium border border-zinc-800 rounded-xl focus:ring-2 focus:ring-cyan-500 outline-none bg-zinc-950 text-white placeholder:text-zinc-600 transition-colors shadow-inner" />
-                       </div>
-                       <div>
-                          <label className="text-xs font-bold text-zinc-500 ml-1 mb-1 block">Set</label>
-                          <input required type="text" placeholder="e.g. Topps Chrome" value={card.set} onChange={e => updateCard(card.id, 'set', e.target.value)} className="w-full p-2.5 text-sm font-medium border border-zinc-800 rounded-xl focus:ring-2 focus:ring-cyan-500 outline-none bg-zinc-950 text-white placeholder:text-zinc-600 transition-colors shadow-inner" />
-                       </div>
-                       <div className="md:col-span-2">
-                          <label className="text-xs font-bold text-zinc-500 ml-1 mb-1 block">Card Variation</label>
-                          <input required type="text" placeholder="e.g. Base, Refractor, Gold, etc." value={card.variation} onChange={e => updateCard(card.id, 'variation', e.target.value)} className="w-full p-2.5 text-sm font-medium border border-zinc-800 rounded-xl focus:ring-2 focus:ring-cyan-500 outline-none bg-zinc-950 text-white placeholder:text-zinc-600 transition-colors shadow-inner" />
-                       </div>
-                     </div>
-
-                     <div className="pt-4 mt-3 border-t border-zinc-800 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <label className="flex items-center gap-3 cursor-pointer group w-max">
-                                <input type="checkbox" checked={card.isAutographed} onChange={e => { updateCard(card.id, 'isAutographed', e.target.checked); if(!e.target.checked) updateCard(card.id, 'autoType', null); }} className="w-5 h-5 text-cyan-500 rounded border-zinc-700 bg-zinc-950 focus:ring-cyan-500 focus:ring-offset-zinc-900 cursor-pointer" />
-                                <span className="text-sm font-bold text-white select-none">Autographed</span>
-                            </label>
-                            {card.isAutographed && (
-                                <div className="flex items-center gap-4 pl-8 animate-in fade-in slide-in-from-top-2 duration-200">
-                                   <label className="flex items-center gap-2 cursor-pointer group">
-                                      <input type="radio" value="sticker" checked={card.autoType === 'sticker'} onChange={() => updateCard(card.id, 'autoType', 'sticker')} className="w-4 h-4 text-cyan-500 border-zinc-700 bg-zinc-950 focus:ring-cyan-500 focus:ring-offset-zinc-900 cursor-pointer" />
-                                      <span className="text-xs font-bold text-zinc-400 select-none group-hover:text-cyan-400 transition-colors">Sticker</span>
-                                   </label>
-                                   <label className="flex items-center gap-2 cursor-pointer group">
-                                      <input type="radio" value="on_card" checked={card.autoType === 'on_card'} onChange={() => updateCard(card.id, 'autoType', 'on_card')} className="w-4 h-4 text-cyan-500 border-zinc-700 bg-zinc-950 focus:ring-cyan-500 focus:ring-offset-zinc-900 cursor-pointer" />
-                                      <span className="text-xs font-bold text-zinc-400 select-none group-hover:text-cyan-400 transition-colors">On-Card</span>
-                                   </label>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="flex items-center gap-3 cursor-pointer group w-max">
-                                <input type="checkbox" checked={card.isNumbered} onChange={e => { updateCard(card.id, 'isNumbered', e.target.checked); if(!e.target.checked) updateCard(card.id, 'printRun', ''); }} className="w-5 h-5 text-cyan-500 rounded border-zinc-700 bg-zinc-950 focus:ring-cyan-500 focus:ring-offset-zinc-900 cursor-pointer" />
-                                <span className="text-sm font-bold text-white select-none">Numbered</span>
-                            </label>
-                            {card.isNumbered && (
-                                <div className="pl-8 animate-in fade-in slide-in-from-top-2 duration-200">
-                                   <input type="text" placeholder="e.g. 1/10" value={card.printRun} onChange={e => updateCard(card.id, 'printRun', e.target.value)} className="w-32 p-1.5 text-xs font-bold border border-zinc-800 bg-zinc-950 text-white placeholder:text-zinc-600 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none shadow-inner transition-colors text-center" />
-                                </div>
-                            )}
-                        </div>
-                     </div>
-                  </div>
-                ))}
-
-                <button type="button" onClick={addCard} className="w-full border-2 border-dashed border-zinc-800 hover:border-cyan-800 hover:bg-cyan-950/20 rounded-2xl p-4 text-sm font-bold text-zinc-500 hover:text-cyan-400 transition-colors flex items-center justify-center gap-2">
-                   <Plus className="w-5 h-5" /> Add Another Card to Trade
-                </button>
               </div>
 
               <div className="pt-4 border-t border-zinc-800">

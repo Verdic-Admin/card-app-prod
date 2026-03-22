@@ -24,6 +24,8 @@ interface QueuedCard {
     comp3: string;
     side: string;
     isFetchingComps?: boolean;
+    cost_basis?: number;
+    accepts_offers?: boolean;
   }
 }
 
@@ -56,19 +58,102 @@ export function BulkIngestionWizard() {
     }
   }
 
-  const handleFiles = (files: FileList | null) => {
+  const handleFiles = (files: FileList | File[] | null) => {
     if (!files) return;
-    const newCards: QueuedCard[] = Array.from(files).map(f => ({
-      id: Math.random().toString(36).substring(7),
-      file: f,
-      preview: URL.createObjectURL(f),
-      status: 'queued',
-      data: {
+    const fileArray = Array.from(files);
+    const newCards: QueuedCard[] = [];
+    
+    // 1. Smart Auto-Pairing logic
+    const getBaseName = (filename: string) => filename.replace(/\.[^/.]+$/, "").replace(/(_|-|\s)*(front|back|side_?a|side_?b|1|2)$/i, "");
+    const isBack = (filename: string) => /(_|-|\s)*(back|side_?b|2)\.[^/.]+$/i.test(filename);
+    const isFront = (filename: string) => /(_|-|\s)*(front|side_?a|1)\.[^/.]+$/i.test(filename);
+
+    const grouped = new Map<string, { front?: File, back?: File, unknown: File[] }>();
+    
+    fileArray.forEach(f => {
+       const base = getBaseName(f.name);
+       if (!grouped.has(base)) grouped.set(base, { unknown: [] });
+       const group = grouped.get(base)!;
+       
+       if (isFront(f.name) && !group.front) group.front = f;
+       else if (isBack(f.name) && !group.back) group.back = f;
+       else group.unknown.push(f);
+    });
+
+    // 2. Zero-Touch Default Injection natively into payload
+    const createData = (side: string) => ({
         player_name: '', team_name: '', year: '', card_set: '', parallel_insert_type: '', card_number: '',
-        comp1: '', comp2: '', comp3: '', side: '', isFetchingComps: false
-      }
-    }))
+        comp1: '', comp2: '', comp3: '', side, isFetchingComps: false,
+        cost_basis: parseFloat(defaultCostBasis) || 0,
+        accepts_offers: defaultAcceptsOffers
+    });
+
+    grouped.forEach(group => {
+       if (group.front && group.back) {
+          newCards.push({
+             id: Math.random().toString(36).substring(7),
+             file: group.front, preview: URL.createObjectURL(group.front),
+             back_file: group.back, back_preview: URL.createObjectURL(group.back),
+             status: 'queued', data: createData('Dual')
+          });
+       } else {
+          [...(group.front ? [group.front] : []), ...(group.back ? [group.back] : []), ...group.unknown].forEach(f => {
+             newCards.push({
+               id: Math.random().toString(36).substring(7),
+               file: f, preview: URL.createObjectURL(f),
+               status: 'queued', data: createData(isBack(f.name) ? 'Back' : 'Front')
+             });
+          });
+       }
+    });
+
     setQueue(prev => [...prev, ...newCards])
+  }
+
+  const [isHardwareSyncing, setIsHardwareSyncing] = useState(false);
+
+  const handleHardwareFiles = async (files: FileList | null) => {
+     if (!files || files.length !== 2) return alert("Hardware Sync requires exactly TWO massive flatbed images: A Fronts Scan and a Backs Scan.");
+     setIsHardwareSyncing(true);
+     
+     const fArray = Array.from(files);
+     const isBackScan = (f: File) => /back/i.test(f.name);
+     const backFile = fArray.find(isBackScan) || fArray[1];
+     const frontFile = fArray.find(f => f !== backFile) || fArray[0];
+
+     const formData = new FormData();
+     formData.append('fronts', frontFile);
+     formData.append('backs', backFile);
+
+     try {
+        const res = await fetch("http://localhost:8000/api/local-scan", {
+           method: "POST",
+           body: formData
+        });
+        if (!res.ok) throw new Error("Local Hardware Scanner failed to respond.");
+        const json = await res.json();
+        
+        if (json.success && json.cards) {
+           const b64toFile = async (dataURI: string, filename: string): Promise<File> => {
+              const res = await fetch(dataURI);
+              const blob = await res.blob();
+              return new File([blob], filename, { type: 'image/jpeg' });
+           }
+
+           const generatedFiles: File[] = [];
+           for (const card of json.cards) {
+              const f1 = await b64toFile(card.frontBase64, `${card.name}_SideA.jpg`);
+              const f2 = await b64toFile(card.backBase64, `${card.name}_SideB.jpg`);
+              generatedFiles.push(f1, f2);
+           }
+           
+           handleFiles(generatedFiles);
+        }
+     } catch(e: any) {
+        alert("Hardware Sync Pipeline Error: " + e.message + ". Ensure Python FastAPI sidecar is actively running on port 8000.");
+     } finally {
+        setIsHardwareSyncing(false);
+     }
   }
 
   const updateCard = (id: string, updates: Partial<QueuedCard>) => {
@@ -94,19 +179,26 @@ export function BulkIngestionWizard() {
       if (!res.ok) throw new Error('AI Scan failed')
       
       const json = await res.json()
+      const updatedData = {
+        ...card.data,
+        player_name: json.player_name || '',
+        team_name: json.team_name || '',
+        year: json.year || '',
+        card_set: json.card_set || '',
+        parallel_insert_type: json.parallel_insert_type || '',
+        card_number: json.card_number || '',
+        side: json.side || (card.back_file ? 'Dual' : 'Front')
+      };
+
       updateCard(card.id, {
         status: 'ready',
-        data: {
-          ...card.data,
-          player_name: json.player_name || '',
-          team_name: json.team_name || '',
-          year: json.year || '',
-          card_set: json.card_set || '',
-          parallel_insert_type: json.parallel_insert_type || '',
-          card_number: json.card_number || '',
-          side: json.side || 'Front'
-        }
-      })
+        data: updatedData
+      });
+      
+      // 4. Decoupled Async Pricing: Fire fetching right away without awaiting
+      if (updatedData.side !== 'Back') {
+          fetchComps(card.id, updatedData).catch(console.error);
+      }
       return true;
     } catch (err: any) {
       updateCard(card.id, { status: 'error', errorMsg: err.message })
@@ -115,77 +207,22 @@ export function BulkIngestionWizard() {
   }
 
   const processAllQueued = async () => {
-    setIsProcessingQueue(true)
-    const pending = queue.filter(c => c.status === 'queued')
+    setIsProcessingQueue(true);
+    const pending = queue.filter(c => c.status === 'queued');
     
-    for (let i = 0; i < pending.length; i++) {
-        await scanCard(pending[i])
+    // 3. Concurrent AI Processing (Batch size 3)
+    const BATCH_SIZE = 3;
+    for (let i = 0; i < pending.length; i += BATCH_SIZE) {
+        const batch = pending.slice(i, i + BATCH_SIZE);
+        await Promise.all(batch.map(card => scanCard(card)));
         
-        // Strict 4-second delay between scans to respect Google API quotas
-        if (i < pending.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 4000))
+        // Brief delay between concurrent batches to respect limits but vastly outpace strict seq
+        if (i + BATCH_SIZE < pending.length) {
+            await new Promise(resolve => setTimeout(resolve, 1500));
         }
     }
 
-    // Auto-Pairing Logic Post-Scan
-    setQueue(currentQueue => {
-       const fronts = currentQueue.filter(c => c.data.side !== 'Back')
-       const backs = currentQueue.filter(c => c.data.side === 'Back')
-       
-       const matchedBackIds = new Set<string>()
-       const newQueue: QueuedCard[] = []
-       
-       for (const front of fronts) {
-          if (front.status === 'ready' && !front.back_file) {
-             const matchIndex = backs.findIndex(b => {
-                if (matchedBackIds.has(b.id) || b.status !== 'ready') return false;
-                
-                // If they have the exact same player, or one couldn't read the player name at all
-                const playerMatch = (!b.data.player_name || !front.data.player_name || b.data.player_name === front.data.player_name);
-                const numberMatch = (!b.data.card_number || !front.data.card_number || b.data.card_number === front.data.card_number);
-                const yearMatch   = (!b.data.year || !front.data.year || b.data.year === front.data.year);
-                const setMatch    = (!b.data.card_set || !front.data.card_set || b.data.card_set === front.data.card_set);
-
-                // Ensure at least ONE meaningful metric actually matched to prevent random blank cards from merging
-                const hasSolidMatch = (
-                    (b.data.player_name && b.data.player_name === front.data.player_name) || 
-                    (b.data.card_number && b.data.card_number === front.data.card_number)
-                );
-
-                return playerMatch && numberMatch && yearMatch && setMatch && hasSolidMatch;
-             });
-             
-             if (matchIndex !== -1) {
-                const back = backs[matchIndex]
-                matchedBackIds.add(back.id)
-                newQueue.push({
-                   ...front,
-                   back_file: back.file,
-                   back_preview: back.preview,
-                   data: {
-                      ...front.data,
-                      year: front.data.year || back.data.year,
-                      card_number: front.data.card_number || back.data.card_number,
-                      card_set: front.data.card_set || back.data.card_set,
-                      side: 'Dual'
-                   }
-                })
-                continue;
-             }
-          }
-          newQueue.push(front)
-       }
-       
-       for (const back of backs) {
-          if (!matchedBackIds.has(back.id)) {
-             newQueue.push(back)
-          }
-       }
-       
-       return newQueue
-    })
-
-    setIsProcessingQueue(false)
+    setIsProcessingQueue(false);
   }
 
   const manuallyPairBack = (frontId: string, backId: string) => {
@@ -272,8 +309,8 @@ export function BulkIngestionWizard() {
         low_price: low, 
         avg_price: retailAvg,
         listed_price: retailAvg,
-        cost_basis: parseFloat(defaultCostBasis) || 0,
-        accepts_offers: defaultAcceptsOffers
+        cost_basis: card.data.cost_basis !== undefined ? card.data.cost_basis : (parseFloat(defaultCostBasis) || 0),
+        accepts_offers: card.data.accepts_offers !== undefined ? card.data.accepts_offers : defaultAcceptsOffers
       }
       
       data.append('data', JSON.stringify(payload))
@@ -292,10 +329,10 @@ export function BulkIngestionWizard() {
     setIsSubmittingAll(false)
   }
 
-  const fetchComps = async (card: QueuedCard) => {
-    updateCardData(card.id, 'isFetchingComps', 'true' as any)
+  const fetchComps = async (cardId: string, dataToUse: QueuedCard['data']) => {
+    updateCardData(cardId, 'isFetchingComps', 'true' as any)
     try {
-      const rawParts = [card.data.year, card.data.player_name, card.data.card_set, card.data.parallel_insert_type, card.data.card_number]
+      const rawParts = [dataToUse.year, dataToUse.player_name, dataToUse.card_set, dataToUse.parallel_insert_type, dataToUse.card_number]
       const parts = rawParts.map(p => String(p || '')).filter(p => p.trim() !== '')
       const searchString = parts.join(' ')
       
@@ -314,20 +351,20 @@ export function BulkIngestionWizard() {
       
       // Auto-fill top 3 prices
       if (prices && prices.length > 0) {
-        if (prices[0]) updateCardData(card.id, 'comp1', prices[0].toFixed(2))
-        if (prices[1]) updateCardData(card.id, 'comp2', prices[1].toFixed(2))
-        if (prices[2]) updateCardData(card.id, 'comp3', prices[2].toFixed(2))
+        if (prices[0]) updateCardData(cardId, 'comp1', prices[0].toFixed(2))
+        if (prices[1]) updateCardData(cardId, 'comp2', prices[1].toFixed(2))
+        if (prices[2]) updateCardData(cardId, 'comp3', prices[2].toFixed(2))
         
         // Clear any old error messages if it succeeded
-        updateCard(card.id, { errorMsg: undefined })
+        updateCard(cardId, { errorMsg: undefined })
       } else {
-        updateCard(card.id, { errorMsg: `Searched "${searchString}", but SerpApi found zero comp results!` })
+        updateCard(cardId, { errorMsg: `Searched "${searchString}", but SerpApi found zero comp results!` })
       }
     } catch (err: any) {
       console.error(err)
-      updateCard(card.id, { errorMsg: 'Fetch Comps Failed: ' + err.message })
+      updateCard(cardId, { errorMsg: 'Fetch Comps Failed: ' + err.message })
     } finally {
-      updateCardData(card.id, 'isFetchingComps', '' as any)
+      updateCardData(cardId, 'isFetchingComps', '' as any)
     }
   }
 
@@ -337,7 +374,7 @@ export function BulkIngestionWizard() {
     const readyCards = queue.filter(c => c.status === 'ready' && c.data.side !== 'Back' && !c.data.comp1)
     
     for (const card of readyCards) {
-        await fetchComps(card)
+        await fetchComps(card.id, card.data)
         // Respect eBay API Rate limits
         await new Promise(resolve => setTimeout(resolve, 1500))
     }
@@ -420,21 +457,36 @@ export function BulkIngestionWizard() {
       )}
 
       {/* Upload Zone */}
-      <div 
-        className="mb-8"
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-      >
-        <label className={`flex flex-col items-center justify-center w-full h-28 border-2 ${isDragging ? 'border-emerald-400 border-dashed bg-emerald-50 scale-[1.01]' : 'border-indigo-200 border-dashed bg-indigo-50/50 hover:bg-indigo-50'} rounded-xl cursor-pointer transition-all`}>
-          <div className="flex flex-col items-center justify-center gap-2">
-            <Upload className={`w-8 h-8 ${isDragging ? 'text-emerald-500' : 'text-indigo-400'}`} />
-            <span className={`text-sm font-bold ${isDragging ? 'text-emerald-700' : 'text-indigo-600'}`}>
-               {isDragging ? 'Drop images here!' : 'Drop multiple images here, or click to browse'}
-            </span>
-          </div>
-          <input type="file" multiple className="hidden" accept="image/*" ref={fileInputRef} onChange={e => handleFiles(e.target.files)} />
-        </label>
+      <div className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div 
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          <label className={`flex flex-col items-center justify-center w-full h-32 border-2 ${isDragging ? 'border-emerald-400 border-dashed bg-emerald-50 scale-[1.01]' : 'border-indigo-200 border-dashed bg-indigo-50/50 hover:bg-indigo-50'} rounded-xl cursor-pointer transition-all`}>
+            <div className="flex flex-col items-center justify-center gap-2">
+              <Upload className={`w-8 h-8 ${isDragging ? 'text-emerald-500' : 'text-indigo-400'}`} />
+              <span className={`text-sm font-bold ${isDragging ? 'text-emerald-700' : 'text-indigo-600'}`}>
+                 Standard Upload (Single Scans)
+              </span>
+              <span className="text-[10px] text-indigo-400/80 font-bold uppercase tracking-widest text-center px-4">Drop individual card images here, or click to browse</span>
+            </div>
+            <input type="file" multiple className="hidden" accept="image/*" ref={fileInputRef} onChange={e => handleFiles(e.target.files)} />
+          </label>
+        </div>
+
+        <div>
+          <label className={`flex flex-col items-center justify-center w-full h-32 border-2 border-emerald-400 hover:border-emerald-500 border-dashed bg-emerald-50 hover:bg-emerald-100 rounded-xl cursor-pointer transition-all ${isHardwareSyncing ? 'opacity-50 pointer-events-none' : ''}`}>
+            <div className="flex flex-col items-center justify-center gap-2">
+              {isHardwareSyncing ? <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" /> : <RefreshCw className="w-8 h-8 text-emerald-500" />}
+              <span className="text-sm font-bold text-emerald-700">
+                 {isHardwareSyncing ? 'Executing Python Sidecar Pipeline...' : 'Hardware Sync (Raw Flatbed Scans)'}
+              </span>
+              <span className="text-[10px] text-emerald-600/80 font-bold uppercase tracking-widest text-center px-4 mt-0.5">Select exactly 1 massive Fronts scan & 1 Backs scan to unleash full local automation</span>
+            </div>
+            <input type="file" multiple className="hidden" accept="image/*" disabled={isHardwareSyncing} onChange={e => handleHardwareFiles(e.target.files)} />
+          </label>
+        </div>
       </div>
 
       {/* Staging Grid */}
@@ -537,7 +589,7 @@ export function BulkIngestionWizard() {
                <div className="pt-3 mt-3 border-t border-slate-100">
                   <div className="flex justify-between items-center mb-2">
                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded">Pricing Setup</span>
-                     <button onClick={() => fetchComps(card)} disabled={!card.data.player_name || card.status === 'saved' || !!card.data.isFetchingComps} className="text-xs text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 bg-indigo-50 px-2 py-1 rounded border border-indigo-100 transition-colors disabled:opacity-50 disabled:grayscale">
+                     <button onClick={() => fetchComps(card.id, card.data)} disabled={!card.data.player_name || card.status === 'saved' || !!card.data.isFetchingComps} className="text-xs text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 bg-indigo-50 px-2 py-1 rounded border border-indigo-100 transition-colors disabled:opacity-50 disabled:grayscale">
                        {card.data.isFetchingComps ? <><Loader2 className="w-3 h-3 animate-spin"/> Fetching...</> : <>Auto-Fetch Comps <ExternalLink className="w-3 h-3" /></>}
                      </button>
                   </div>
