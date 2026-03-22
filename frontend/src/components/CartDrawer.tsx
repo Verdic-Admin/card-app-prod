@@ -142,23 +142,23 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
                     <span className="text-[10px] uppercase font-bold text-cyan-500 tracking-widest mt-1">{item.parallel_insert_type}</span>
                     
                     {item.isTradeProposal ? (
-                       <span className="mt-auto inline-block">
+                       <div className="mt-auto flex items-center gap-2 flex-wrap pt-1">
                           <span className="text-[9px] font-black text-white bg-cyan-700 px-2 py-0.5 rounded uppercase tracking-widest leading-none border border-cyan-500 shadow-sm">Trade Proposal</span>
-                       </span>
+                          
+                          {item.tradeDetails && item.tradeDetails.offerImageUrls.length > 0 && (
+                             <div className="flex items-center gap-1 opacity-90">
+                                {item.tradeDetails.offerImageUrls.map((url, idx) => (
+                                   <div key={idx} className="w-5 h-5 rounded hover:scale-150 transition-transform origin-left border border-zinc-700 overflow-hidden shadow-sm">
+                                      <img src={url} className="w-full h-full object-cover" />
+                                   </div>
+                                ))}
+                             </div>
+                          )}
+                       </div>
                     ) : (
-                       <span className="font-black text-white mt-auto tracking-tight">${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}</span>
+                       <span className="font-black text-white mt-auto tracking-tight pt-1">${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}</span>
                     )}
                   </div>
-
-                  {item.isTradeProposal && item.tradeDetails && item.tradeDetails.offerImageUrls.length > 0 && (
-                     <div className="absolute right-14 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-70">
-                        {item.tradeDetails.offerImageUrls.map((url, idx) => (
-                           <div key={idx} className="w-8 h-8 rounded border border-zinc-700 overflow-hidden shadow-inner hidden sm:block">
-                              <img src={url} className="w-full h-full object-cover" />
-                           </div>
-                        ))}
-                     </div>
-                  )}
 
                   <button onClick={() => removeFromCart(item.cartItemId!)} className="absolute top-1/2 -translate-y-1/2 right-3 p-2 text-zinc-600 hover:text-red-400 hover:bg-red-950 rounded-xl transition-colors">
                     <Trash2 className="w-5 h-5" />
