@@ -84,7 +84,12 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
                data.append('images', file);
             });
             
-            await submitTradeOffer(data);
+            const res = await submitTradeOffer(data);
+            if (!res.success) {
+               setCartError(res.error || "Unknown Server Rejection!")
+               setTradeSubmitting(false)
+               return;
+            }
             removeFromCart(trade.cartItemId!);
          }
       }
@@ -95,7 +100,7 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
       setTradeSubmitting(false)
     } catch (e: any) {
       console.error("Trade Execution Error:", e);
-      setCartError(e.message || "Failed to actively upload tradeoff images to the Supabase endpoint. Please refresh.")
+      setCartError(e.message || "An exception occurred inside the native React loop boundary.")
       setTradeSubmitting(false)
     }
   }

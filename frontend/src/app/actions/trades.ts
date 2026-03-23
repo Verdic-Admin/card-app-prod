@@ -54,7 +54,7 @@ export async function submitTradeOffer(formData: FormData) {
 
       if (uploadError) {
         console.error("Failed to upload trade image:", uploadError)
-        throw new Error(`Execution error dropping payload into DB: ${uploadError.message}`)
+        return { success: false, error: `Bucket Upload Fault: ${uploadError.message}. Make absolutely sure the 'trade-images' Storage Bucket exists and is Public!` }
       }
 
       const { data: { publicUrl } } = supabaseAdmin.storage
@@ -79,7 +79,7 @@ export async function submitTradeOffer(formData: FormData) {
 
   if (error) {
     console.error("Supabase Error Data:", error)
-    throw new Error(`Execution error dropping payload into DB: ${error.message}`)
+    return { success: false, error: `Database Insert Fault: ${error.message}. Is your attached_image_url column properly created as type Text?` }
   }
 
   // Instantly send a completely free email notification to your registered PayPal email!
