@@ -165,7 +165,7 @@ export default function SettingsPage() {
               <p className="text-[10px] text-slate-500 mt-1.5 font-medium">This text appears front and center on your main marketplace page.</p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 border-t border-slate-200/60 pt-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 border-t border-slate-200/60 pt-6">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Instagram URL</label>
                   <input type="url" value={settings.social_instagram} onChange={e => setSettings({...settings, social_instagram: e.target.value})} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm placeholder:text-slate-300" placeholder="https://instagram.com/..." />
@@ -177,6 +177,10 @@ export default function SettingsPage() {
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Facebook URL</label>
                   <input type="url" value={settings.social_facebook} onChange={e => setSettings({...settings, social_facebook: e.target.value})} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm placeholder:text-slate-300" placeholder="https://facebook.com/..." />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Discord Server URL</label>
+                  <input type="url" value={settings.social_discord} onChange={e => setSettings({...settings, social_discord: e.target.value})} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm placeholder:text-slate-300" placeholder="https://discord.gg/..." />
                 </div>
             </div>
             <p className="text-[10px] text-slate-500 font-medium p-3 bg-blue-50/50 rounded-lg border border-blue-100">Leave any social link securely blank if you want its icon to automatically hide from the storefront.</p>

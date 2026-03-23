@@ -12,6 +12,7 @@ export interface StoreSettings {
     social_instagram: string;
     social_twitter: string;
     social_facebook: string;
+    social_discord: string;
 }
 
 export async function getStoreSettings(): Promise<StoreSettings> {
@@ -34,7 +35,8 @@ export async function getStoreSettings(): Promise<StoreSettings> {
             store_description: 'Zero-Fee Sports Card Storefront. Prices reflect direct-to-buyer savings. No hidden buyer premiums, just high-quality cards shipped directly to you.',
             social_instagram: '',
             social_twitter: '',
-            social_facebook: ''
+            social_facebook: '',
+            social_discord: ''
         }
     }
     
