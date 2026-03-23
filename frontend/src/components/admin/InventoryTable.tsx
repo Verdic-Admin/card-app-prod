@@ -222,13 +222,24 @@ export function InventoryTable({ initialItems }: { initialItems: InventoryItem[]
               />
             </div>
 
-            {/* Card image */}
-            <div className="w-full aspect-[3/4] bg-slate-100 flex items-center justify-center border-b border-slate-200 overflow-hidden">
-              {item.image_url ? (
-                <img src={item.image_url} alt={item.player_name || ''} className="w-full h-full object-contain" />
-              ) : (
-                <span className="text-xs text-slate-400 font-medium">No Image</span>
-              )}
+            {/* Card images — front + back side by side */}
+            <div className="w-full flex border-b border-slate-200 bg-slate-100">
+              <div className="flex-1 h-36 flex items-center justify-center overflow-hidden border-r border-slate-200 relative">
+                {item.image_url ? (
+                  <img src={item.image_url} alt="Front" className="h-full w-full object-contain" />
+                ) : (
+                  <span className="text-[10px] text-slate-400 font-medium">No Front</span>
+                )}
+                <span className="absolute bottom-0 inset-x-0 text-center text-[9px] font-bold uppercase tracking-wider text-white bg-black/50 py-0.5">Front</span>
+              </div>
+              <div className="flex-1 h-36 flex items-center justify-center overflow-hidden relative">
+                {item.back_image_url ? (
+                  <img src={item.back_image_url} alt="Back" className="h-full w-full object-contain" />
+                ) : (
+                  <span className="text-[10px] text-slate-400 font-medium">No Back</span>
+                )}
+                <span className="absolute bottom-0 inset-x-0 text-center text-[9px] font-bold uppercase tracking-wider text-white bg-black/50 py-0.5">Back</span>
+              </div>
             </div>
 
             {/* Card body */}
@@ -277,23 +288,23 @@ export function InventoryTable({ initialItems }: { initialItems: InventoryItem[]
                 /* ── View Mode ── */
                 <>
                   <div>
-                    <div className="font-bold text-slate-900 text-sm leading-tight flex items-center gap-1.5 flex-wrap">
+                    <div className="font-black text-slate-900 text-base leading-tight flex items-center gap-1.5 flex-wrap">
                       {item.player_name}
-                      {item.back_image_url && <span className="text-[9px] font-black text-white bg-indigo-500 px-1.5 py-0.5 rounded shadow-sm uppercase tracking-wider">Dual</span>}
                     </div>
-                    {item.team_name && <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">{item.team_name}</div>}
-                    <div className="text-xs text-slate-600 mt-0.5 font-medium">
-                      {item.year} {item.card_set} {item.card_number ? `#${item.card_number}` : ''} {item.parallel_insert_type ? `• ${item.parallel_insert_type}` : ''}
+                    {item.team_name && <div className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-0.5">{item.team_name}</div>}
+                    <div className="text-sm text-slate-700 mt-1 font-semibold leading-snug">
+                      {item.year} {item.card_set}{item.card_number ? ` #${item.card_number}` : ''}
                     </div>
+                    {item.parallel_insert_type && <div className="text-xs text-indigo-600 font-bold mt-0.5">{item.parallel_insert_type}</div>}
                   </div>
 
                   {/* Pricing row */}
                   <div className="flex items-end justify-between mt-auto pt-1">
                     <div>
-                      <span className="text-base font-black text-slate-900">${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}</span>
-                      <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">AI Avg: ${item.avg_price?.toFixed(2) || '0.00'}</div>
-                      {item.cost_basis != null && <div className="text-[10px] text-emerald-600 font-bold uppercase">Cost: ${item.cost_basis.toFixed(2)}</div>}
-                      {item.accepts_offers && <div className="text-[10px] text-indigo-500 font-bold uppercase">Takes Offers</div>}
+                      <span className="text-xl font-black text-slate-900">${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}</span>
+                      <div className="text-xs text-slate-500 font-bold uppercase tracking-wider">AI Avg: ${item.avg_price?.toFixed(2) || '0.00'}</div>
+                      {item.cost_basis != null && <div className="text-xs text-emerald-600 font-bold uppercase">Cost: ${item.cost_basis.toFixed(2)}</div>}
+                      {item.accepts_offers && <div className="text-xs text-indigo-500 font-bold uppercase">Takes Offers</div>}
                     </div>
 
                     {/* Status + actions */}
