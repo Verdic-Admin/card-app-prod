@@ -326,6 +326,15 @@ export function InventoryTable({ initialItems }: { initialItems: InventoryItem[]
                         <button onClick={() => startEditing(item)} className="text-indigo-600 hover:text-indigo-800 hover:bg-indigo-100 bg-indigo-50 h-7 w-7 rounded flex items-center justify-center transition-colors" title="Edit">
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
+                        <a
+                          href={`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent([item.year, item.player_name, item.card_set, item.parallel_insert_type, item.card_number].filter(Boolean).join(' '))}&LH_Sold=1&LH_Complete=1`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sky-600 hover:text-sky-800 hover:bg-sky-100 bg-sky-50 h-7 w-7 rounded flex items-center justify-center transition-colors"
+                          title="Check eBay Comps"
+                        >
+                          <Search className="w-3.5 h-3.5" />
+                        </a>
                         <button onClick={() => handleDelete(item.id, item.image_url)} disabled={isDeleting === item.id} className="text-red-600 hover:text-red-800 hover:bg-red-100 bg-red-50 h-7 w-7 rounded disabled:opacity-50 flex items-center justify-center transition-colors" title="Delete">
                           {isDeleting === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                         </button>
