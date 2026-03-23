@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Upload, Loader2, CheckCircle2, AlertCircle, Play, Save, Check, ExternalLink, Link2, Unlink, RefreshCw, Archive, Trash2 } from 'lucide-react'
+import { Upload, Loader2, CheckCircle2, AlertCircle, Play, Save, Check, ExternalLink, Link2, Unlink, RefreshCw, Archive, Trash2, RotateCw } from 'lucide-react'
 import { addCardAction } from '@/app/actions/inventory'
 import { PRO_TEAMS } from '@/lib/constants/teams'
 import JSZip from 'jszip'
@@ -33,6 +33,25 @@ interface QueuedCard {
     cost_basis?: number;
     accepts_offers?: boolean;
   }
+}
+
+/** Rotates a File 90° clockwise on an offscreen canvas and returns a new File + objectURL. */
+async function rotateImage(file: File): Promise<{ file: File; url: string }> {
+  const bitmap = await createImageBitmap(file);
+  const canvas = document.createElement('canvas');
+  // Swap width/height for 90° rotation
+  canvas.width  = bitmap.height;
+  canvas.height = bitmap.width;
+  const ctx = canvas.getContext('2d')!;
+  ctx.translate(canvas.width / 2, canvas.height / 2);
+  ctx.rotate(Math.PI / 2);
+  ctx.drawImage(bitmap, -bitmap.width / 2, -bitmap.height / 2);
+  bitmap.close();
+  const blob = await new Promise<Blob>((res, rej) =>
+    canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), 'image/jpeg', 0.95)
+  );
+  const newFile = new File([blob], file.name, { type: 'image/jpeg' });
+  return { file: newFile, url: URL.createObjectURL(newFile) };
 }
 
 export function BulkIngestionWizard() {
@@ -208,6 +227,21 @@ export function BulkIngestionWizard() {
 
   const updateCard = (id: string, updates: Partial<QueuedCard>) => {
     setQueue(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c))
+  }
+
+  const rotateCard = async (id: string, side: 'front' | 'back') => {
+    const card = queue.find(c => c.id === id);
+    if (!card) return;
+    if (side === 'front') {
+      const { file: newFile, url: newUrl } = await rotateImage(card.file);
+      URL.revokeObjectURL(card.preview);
+      updateCard(id, { file: newFile, preview: newUrl });
+    } else {
+      if (!card.back_file || !card.back_preview) return;
+      const { file: newFile, url: newUrl } = await rotateImage(card.back_file);
+      URL.revokeObjectURL(card.back_preview);
+      updateCard(id, { back_file: newFile, back_preview: newUrl });
+    }
   }
 
   const updateCardData = (id: string, field: keyof QueuedCard['data'], val: string) => {
@@ -642,6 +676,14 @@ export function BulkIngestionWizard() {
                        <Upload className="w-4 h-4" />
                        <input disabled={card.status === 'saved' || card.status === 'scanning'} type="file" className="hidden" accept="image/*" onChange={e => { if (e.target.files?.[0]) swapCardImage(card.id, e.target.files[0], 'front') }} />
                    </label>
+                    <button
+                      onClick={() => rotateCard(card.id, 'front')}
+                      disabled={card.status === 'saved' || card.status === 'scanning'}
+                      className="absolute bottom-7 left-1 bg-white/90 hover:bg-amber-50 text-amber-600 p-1.5 rounded backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity shadow-sm disabled:hidden"
+                      title="Rotate Front 90°"
+                    >
+                      <RotateCw className="w-4 h-4" />
+                    </button>
                  </div>
                  {card.back_preview && (
                     <div className="w-32 h-44 bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm relative group">
@@ -651,6 +693,14 @@ export function BulkIngestionWizard() {
                            <Upload className="w-4 h-4" />
                            <input disabled={card.status === 'saved' || card.status === 'scanning'} type="file" className="hidden" accept="image/*" onChange={e => { if (e.target.files?.[0]) swapCardImage(card.id, e.target.files[0], 'back') }} />
                        </label>
+                        <button
+                          onClick={() => rotateCard(card.id, 'back')}
+                          disabled={card.status === 'saved' || card.status === 'scanning'}
+                          className="absolute bottom-7 left-1 bg-white/90 hover:bg-amber-50 text-amber-600 p-1.5 rounded backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity shadow-sm disabled:hidden"
+                          title="Rotate Back 90°"
+                        >
+                          <RotateCw className="w-4 h-4" />
+                        </button>
                        <button onClick={() => removePairedBack(card.id)} className="absolute top-1 right-1 bg-red-500/90 hover:bg-red-600 text-white p-1.5 rounded backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity" title="Unlink Back Image"><Unlink className="w-4 h-4" /></button>
                     </div>
                  )}
@@ -764,3 +814,4 @@ export function BulkIngestionWizard() {
     </div>
   )
 }
+
