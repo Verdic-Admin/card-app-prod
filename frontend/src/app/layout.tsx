@@ -18,8 +18,17 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Into the Gap Sportscards",
-  description: "Zero-Fee Sports Card Storefront",
+  title: "The Gap Sportscards",
+  description: "Zero-fee sports card storefront — buy, sell and trade cards.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Gap Cards",
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
+  },
 };
 
 export default async function RootLayout({

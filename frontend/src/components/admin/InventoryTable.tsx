@@ -322,7 +322,7 @@ export function InventoryTable({ initialItems }: { initialItems: InventoryItem[]
                         {item.status === 'available' ? 'Available' : 'Sold'}
                       </button>
                       {errorId === item.id && <div className="text-[10px] text-red-500 font-medium">Failed</div>}
-                      <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex gap-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                         <button onClick={() => startEditing(item)} className="text-indigo-600 hover:text-indigo-800 hover:bg-indigo-100 bg-indigo-50 h-7 w-7 rounded flex items-center justify-center transition-colors" title="Edit">
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
