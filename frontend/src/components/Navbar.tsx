@@ -18,8 +18,13 @@ export function Navbar({ settings }: { settings: StoreSettings }) {
       <nav className="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-md relative z-50">
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
-            <Link href="/" className="font-black text-xl tracking-tight text-white flex items-center gap-2">
-              Into the Gap Sportscards
+            <Link href="/" className="flex flex-col justify-center">
+              <span className="font-black text-xl tracking-tight text-white leading-tight">
+                Into the Gap Sportscards
+              </span>
+              <span className="text-xs text-zinc-500 tracking-wide leading-tight">
+                by logic_in_the_gap
+              </span>
             </Link>
             <div className="flex items-center gap-4 sm:gap-6">
               <Link href="/" className="text-sm font-bold text-zinc-400 hover:text-white transition-colors">
@@ -27,6 +32,9 @@ export function Navbar({ settings }: { settings: StoreSettings }) {
               </Link>
               <Link href="/sold" className="text-sm font-bold text-zinc-400 hover:text-white transition-colors">
                 Past Sales
+              </Link>
+              <Link href="/faq" className="text-sm font-bold text-zinc-400 hover:text-white transition-colors">
+                FAQ
               </Link>
               <div className="h-6 w-px bg-zinc-800 mx-1"></div>
               <button onClick={() => setIsCartOpen(true)} className="relative p-2 text-zinc-400 hover:bg-zinc-900 hover:text-cyan-400 rounded-full transition-all group">

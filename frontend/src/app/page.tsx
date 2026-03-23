@@ -1,8 +1,64 @@
+import type { Metadata } from "next";
 import { Hero } from "@/components/Hero";
 import { CardGrid } from "@/components/CardGrid";
 import { createClient } from "@/utils/supabase/server";
 import { StoreFilters } from "@/components/StoreFilters";
 import { getStoreSettings } from "@/app/actions/settings";
+
+const SITE_NAME = "Into the Gap Sportscards";
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://intothegapsportscards.com";
+/** Builds the URL for our dynamic /api/og edge route */
+function buildOgImageUrl(base: string, params: { q?: string; team?: string; year?: string }) {
+  const url = new URL(`${base}/api/og`);
+  if (params.q)    url.searchParams.set('q',    params.q);
+  if (params.team) url.searchParams.set('team', params.team);
+  if (params.year) url.searchParams.set('year', params.year);
+  return url.toString();
+}
+const DEFAULT_DESCRIPTION =
+  "Zero-Fee Sports Card Storefront. Prices reflect direct-to-buyer savings — no hidden buyer premiums, just high-quality cards shipped straight to you.";
+
+type PageProps = { searchParams: Promise<{ [key: string]: string | undefined }> | any };
+
+export async function generateMetadata({ searchParams }: PageProps): Promise<Metadata> {
+  const params = await searchParams;
+
+  // Build a human-readable label from whatever filter is active
+  const query = params?.q;
+  const team  = params?.team;
+  const year  = params?.year;
+
+  let label: string | null = null;
+  if (query) label = query.trim();
+  else if (team && year) label = `${year} ${team}`;
+  else if (team) label = team;
+  else if (year) label = year;
+
+  const title = label ? `Shop ${label} Cards | ${SITE_NAME}` : SITE_NAME;
+  const description = label
+    ? `Browse ${label} sports cards at Into the Gap Sportscards — zero fees, direct to you.`
+    : DEFAULT_DESCRIPTION;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      url: BASE_URL,
+      siteName: SITE_NAME,
+      images: [{ url: buildOgImageUrl(BASE_URL, { q: query, team, year }), width: 1200, height: 630, alt: title }],
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [buildOgImageUrl(BASE_URL, { q: query, team, year })],
+    },
+  };
+}
+
 
 export default async function Home(props: { searchParams: Promise<{ [key: string]: string | undefined }> | any }) {
   const searchParams = await props.searchParams;

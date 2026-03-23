@@ -22,8 +22,19 @@ export function generatePayPalCartUrl(items: PayPalCartItem[], businessEmail: st
     cancel_return: `${typeof window !== 'undefined' ? window.location.origin : ''}/`,
   });
 
+  // --- Flat-rate shipping tier ---
+  // Calculate the raw item subtotal to decide whether to charge for shipping.
+  const subtotal = items.reduce((sum, item) => sum + item.amount, 0);
+  const SHIPPING_THRESHOLD = 25.00;
+  const SHIPPING_FEE = 4.00;
+
+  const lineItems: PayPalCartItem[] = [...items];
+  if (subtotal < SHIPPING_THRESHOLD) {
+    lineItems.push({ itemName: 'Standard Shipping (BMWT)', amount: SHIPPING_FEE });
+  }
+
   // Dynamically map an infinite array of bundled items into PayPal's precise API standard
-  items.forEach((item, index) => {
+  lineItems.forEach((item, index) => {
     params.append(`item_name_${index + 1}`, item.itemName);
     params.append(`amount_${index + 1}`, item.amount.toFixed(2));
   });
