@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { Database } from '@/types/database.types'
-import { toggleCardStatus, editCardAction, deleteCardAction, bulkDeleteCardsAction } from '@/app/actions/inventory'
-import { Loader2, Trash2, Edit2, Check, X, Search, Download } from 'lucide-react'
+import { toggleCardStatus, editCardAction, deleteCardAction, bulkDeleteCardsAction, rotateCardImageAction } from '@/app/actions/inventory'
+import { Loader2, Trash2, Edit2, Check, X, Search, Download, RotateCw } from 'lucide-react'
 
 type InventoryItem = Database['public']['Tables']['inventory']['Row']
 
@@ -13,6 +13,40 @@ export function InventoryTable({ initialItems }: { initialItems: InventoryItem[]
   const [errorId, setErrorId] = useState<string | null>(null)
   
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [rotatingId, setRotatingId] = useState<string | null>(null)
+
+  const rotateInventoryImage = async (item: InventoryItem, side: 'front' | 'back') => {
+    const url = side === 'front' ? item.image_url : item.back_image_url
+    if (!url) return
+    setRotatingId(`${item.id}-${side}`)
+    try {
+      const res = await fetch(url)
+      const blob = await res.blob()
+      const bitmap = await createImageBitmap(blob)
+      const canvas = document.createElement('canvas')
+      canvas.width = bitmap.height
+      canvas.height = bitmap.width
+      const ctx = canvas.getContext('2d')!
+      ctx.translate(canvas.width / 2, canvas.height / 2)
+      ctx.rotate(Math.PI / 2)
+      ctx.drawImage(bitmap, -bitmap.width / 2, -bitmap.height / 2)
+      bitmap.close()
+      const rotatedBlob = await new Promise<Blob>((res, rej) =>
+        canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), 'image/jpeg', 0.95)
+      )
+      const fd = new FormData()
+      fd.append('image', new File([rotatedBlob], 'rotated.jpg', { type: 'image/jpeg' }))
+      const { newUrl } = await rotateCardImageAction(item.id, side, fd)
+      setItems(prev => prev.map(i => {
+        if (i.id !== item.id) return i
+        return side === 'front' ? { ...i, image_url: newUrl } : { ...i, back_image_url: newUrl }
+      }))
+    } catch (e) {
+      console.error('Rotate failed:', e)
+    } finally {
+      setRotatingId(null)
+    }
+  }
   const [editForm, setEditForm] = useState<Partial<InventoryItem>>({})
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
@@ -224,19 +258,43 @@ export function InventoryTable({ initialItems }: { initialItems: InventoryItem[]
 
             {/* Card images — front + back side by side */}
             <div className="w-full flex border-b border-slate-200 bg-slate-100">
-              <div className="flex-1 h-36 flex items-center justify-center overflow-hidden border-r border-slate-200 relative">
+              <div className="flex-1 h-36 flex items-center justify-center overflow-hidden border-r border-slate-200 relative group/img">
                 {item.image_url ? (
                   <img src={item.image_url} alt="Front" className="h-full w-full object-contain" />
                 ) : (
                   <span className="text-[10px] text-slate-400 font-medium">No Front</span>
                 )}
+                {item.image_url && (
+                  <button
+                    onClick={() => rotateInventoryImage(item, 'front')}
+                    disabled={rotatingId === `${item.id}-front`}
+                    className="absolute top-1 right-1 bg-black/50 hover:bg-black/70 text-white p-1 rounded opacity-0 group-hover/img:opacity-100 transition-opacity shadow disabled:opacity-60"
+                    title="Rotate Front 90°"
+                  >
+                    {rotatingId === `${item.id}-front`
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <RotateCw className="w-3.5 h-3.5" />}
+                  </button>
+                )}
                 <span className="absolute bottom-0 inset-x-0 text-center text-[9px] font-bold uppercase tracking-wider text-white bg-black/50 py-0.5">Front</span>
               </div>
-              <div className="flex-1 h-36 flex items-center justify-center overflow-hidden relative">
+              <div className="flex-1 h-36 flex items-center justify-center overflow-hidden relative group/img">
                 {item.back_image_url ? (
                   <img src={item.back_image_url} alt="Back" className="h-full w-full object-contain" />
                 ) : (
                   <span className="text-[10px] text-slate-400 font-medium">No Back</span>
+                )}
+                {item.back_image_url && (
+                  <button
+                    onClick={() => rotateInventoryImage(item, 'back')}
+                    disabled={rotatingId === `${item.id}-back`}
+                    className="absolute top-1 right-1 bg-black/50 hover:bg-black/70 text-white p-1 rounded opacity-0 group-hover/img:opacity-100 transition-opacity shadow disabled:opacity-60"
+                    title="Rotate Back 90°"
+                  >
+                    {rotatingId === `${item.id}-back`
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <RotateCw className="w-3.5 h-3.5" />}
+                  </button>
                 )}
                 <span className="absolute bottom-0 inset-x-0 text-center text-[9px] font-bold uppercase tracking-wider text-white bg-black/50 py-0.5">Back</span>
               </div>

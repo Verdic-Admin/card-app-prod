@@ -165,3 +165,54 @@ export async function bulkDeleteCardsAction(items: {id: string, image_url: strin
   revalidatePath('/admin')
   revalidatePath('/sold')
 }
+
+export async function rotateCardImageAction(
+  id: string,
+  side: 'front' | 'back',
+  formData: FormData
+): Promise<{ newUrl: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  const admin = createAdminClient()
+  const newFile = formData.get('image') as File
+  if (!newFile) throw new Error('Missing rotated image file')
+
+  // Fetch the current record so we can delete the old storage file
+  const { data: record } = await (admin.from('inventory') as any)
+    .select('image_url, back_image_url')
+    .eq('id', id)
+    .single()
+
+  const oldUrl: string | null = side === 'front' ? record?.image_url : record?.back_image_url
+
+  // Delete old file from storage (best-effort)
+  if (oldUrl) {
+    try {
+      const parts = new URL(oldUrl).pathname.split('/')
+      const oldName = parts[parts.length - 1]
+      if (oldName) await admin.storage.from('card-images').remove([oldName])
+    } catch { /* ignore */ }
+  }
+
+  // Upload rotated file
+  const ext = newFile.name.split('.').pop() || 'jpg'
+  const prefix = side === 'back' ? 'back-rotated' : 'rotated'
+  const newName = `${prefix}-${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`
+  const { error: uploadError } = await admin.storage.from('card-images').upload(newName, newFile)
+  if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`)
+
+  const { data: urlData } = admin.storage.from('card-images').getPublicUrl(newName)
+  const newUrl = urlData.publicUrl
+
+  const field = side === 'front' ? 'image_url' : 'back_image_url'
+  const { error: dbError } = await (admin.from('inventory') as any)
+    .update({ [field]: newUrl })
+    .eq('id', id)
+  if (dbError) throw new Error(`DB update failed: ${dbError.message}`)
+
+  revalidatePath('/')
+  revalidatePath('/admin')
+  return { newUrl }
+}
