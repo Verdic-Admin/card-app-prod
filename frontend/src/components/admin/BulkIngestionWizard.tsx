@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Upload, Loader2, CheckCircle2, AlertCircle, Play, Save, Check, ExternalLink, Link2, Unlink, RefreshCw, Archive, Trash2, RotateCw } from 'lucide-react'
+import { Upload, Loader2, CheckCircle2, AlertCircle, Play, Save, Check, ExternalLink, Link2, Unlink, RefreshCw, Archive, Trash2, RotateCw, Crop as CropIcon, ArrowLeftRight } from 'lucide-react'
+import { CropModal } from './CropModal'
 import { addCardAction } from '@/app/actions/inventory'
 import { PRO_TEAMS } from '@/lib/constants/teams'
 import JSZip from 'jszip'
@@ -62,7 +63,13 @@ export function BulkIngestionWizard() {
   const [isDragging, setIsDragging] = useState(false)
   const [defaultCostBasis, setDefaultCostBasis] = useState<string>('0')
   const [defaultAcceptsOffers, setDefaultAcceptsOffers] = useState(false)
-  
+
+  // Re-Crop tool state
+  const [cropTarget, setCropTarget] = useState<{ cardId: string; side: 'front' | 'back' } | null>(null)
+
+  // Swap-Back tool state: the card whose back is being swapped
+  const [swapSourceId, setSwapSourceId] = useState<string | null>(null)
+
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -377,6 +384,41 @@ export function BulkIngestionWizard() {
     }))
   }
 
+  /** Re-Crop: replaces a card's tight crop with the freshly canvas-cropped file. */
+  const applyCrop = (cardId: string, side: 'front' | 'back', newFile: File) => {
+    setQueue(prev => prev.map(c => {
+      if (c.id !== cardId) return c;
+      if (side === 'front') {
+        URL.revokeObjectURL(c.preview);
+        return { ...c, file: newFile, preview: URL.createObjectURL(newFile) };
+      } else {
+        if (c.back_preview) URL.revokeObjectURL(c.back_preview);
+        return { ...c, back_file: newFile, back_preview: URL.createObjectURL(newFile) };
+      }
+    }));
+    setCropTarget(null);
+  }
+
+  /** Swap-Back: atomically exchanges back_file + back_preview between two cards. */
+  const swapBacksBetweenCards = (idA: string, idB: string) => {
+    setQueue(prev => {
+      const cardA = prev.find(c => c.id === idA);
+      const cardB = prev.find(c => c.id === idB);
+      if (!cardA || !cardB) return prev;
+      const aBack = cardA.back_file;
+      const aBackPreview = cardA.back_preview;
+      const bBack = cardB.back_file;
+      const bBackPreview = cardB.back_preview;
+      // URLs don't need revoking — they stay alive in the other card.
+      return prev.map(c => {
+        if (c.id === idA) return { ...c, back_file: bBack, back_preview: bBackPreview };
+        if (c.id === idB) return { ...c, back_file: aBack, back_preview: aBackPreview };
+        return c;
+      });
+    });
+    setSwapSourceId(null);
+  }
+
   const getAvg = (card: QueuedCard) => {
     const prices = [parseFloat(card.data.comp1), parseFloat(card.data.comp2), parseFloat(card.data.comp3)].filter(p => !isNaN(p) && p > 0)
     if (prices.length === 0) return { high: 0, low: 0, avg: 0 }
@@ -594,6 +636,25 @@ export function BulkIngestionWizard() {
              <div className="text-xs text-indigo-500 font-bold uppercase tracking-widest">Estimated Time left</div>
              <div className="text-xl font-black text-indigo-900 font-mono">~{etaSeconds}s</div>
           </div>
+        </div>
+      )}
+
+      {/* Swap-mode banner */}
+      {swapSourceId && (
+        <div className="mb-6 bg-violet-50 border border-violet-200 rounded-lg p-4 flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-3">
+            <ArrowLeftRight className="w-5 h-5 text-violet-600" />
+            <div>
+              <div className="text-sm font-bold text-violet-900">Swap Mode Active</div>
+              <div className="text-xs text-violet-700 font-medium">Hover over another card and click “Swap Here” to exchange its back image with the selected card.</div>
+            </div>
+          </div>
+          <button
+            onClick={() => setSwapSourceId(null)}
+            className="px-3 py-1.5 bg-violet-200 hover:bg-violet-300 text-violet-900 font-bold text-xs rounded-lg transition-colors"
+          >
+            Cancel Swap
+          </button>
         </div>
       )}
 
@@ -816,6 +877,22 @@ export function BulkIngestionWizard() {
         ))}
       </div>
       
+      {/* Re-Crop Modal */}
+      {cropTarget && queue.find(c => c.id === cropTarget.cardId) && (
+        (() => {
+          const card = queue.find(c => c.id === cropTarget.cardId)!;
+          const rawFile = cropTarget.side === 'front' ? card.padded_file : card.back_padded_file;
+          if (!rawFile) return null;
+          return (
+            <CropModal
+              imageFile={rawFile}
+              side={cropTarget.side}
+              onConfirm={newFile => applyCrop(cropTarget.cardId, cropTarget.side, newFile)}
+              onClose={() => setCropTarget(null)}
+            />
+          );
+        })()
+      )}
     </div>
   )
 }
