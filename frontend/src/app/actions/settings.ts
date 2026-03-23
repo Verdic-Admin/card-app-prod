@@ -13,6 +13,7 @@ export interface StoreSettings {
     social_twitter: string;
     social_facebook: string;
     social_discord: string;
+    social_threads: string;
 }
 
 export async function getStoreSettings(): Promise<StoreSettings> {
@@ -36,7 +37,8 @@ export async function getStoreSettings(): Promise<StoreSettings> {
             social_instagram: '',
             social_twitter: '',
             social_facebook: '',
-            social_discord: ''
+            social_discord: '',
+            social_threads: ''
         }
     }
     
