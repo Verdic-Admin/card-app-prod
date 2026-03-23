@@ -82,25 +82,31 @@ export async function submitTradeOffer(formData: FormData) {
     return { success: false, error: `Database Insert Fault: ${error.message}. Is your attached_image_url column properly created as type Text?` }
   }
 
-  // Instantly send a completely free email notification to your registered PayPal email!
-  if (process.env.NEXT_PUBLIC_PAYPAL_EMAIL) {
+  // Instantly send a Discord notification via webhook
+  if (process.env.DISCORD_WEBHOOK_URL) {
     try {
-      await fetch(`https://formsubmit.co/ajax/${process.env.NEXT_PUBLIC_PAYPAL_EMAIL}`, {
+      const embed: any = {
+        title: `New Trade Offer from ${buyer_name}`,
+        color: 3447003, // Blue embed color
+        description: `**Email:** ${buyer_email}\n**Offer:** ${offer_text || "*No offer text provided*"}\n\n**Action Required:** Login to your secure Supabase Dashboard to instantly review exactly what items they requested from your store!`,
+        timestamp: new Date().toISOString(),
+      };
+
+      if (final_image_urls) {
+        const urls = final_image_urls.split(',');
+        embed.image = { url: urls[0] }; // Display the first attached image
+        if (urls.length > 1) {
+          embed.description += `\n\n**Additional Images:**\n${urls.slice(1).map((u, i) => `[Image ${i + 2}](${u})`).join('\n')}`;
+        }
+      }
+
+      await fetch(process.env.DISCORD_WEBHOOK_URL, {
         method: "POST",
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          _subject: `New Database Trade Offer from ${buyer_name}!`,
-          Email: buyer_email,
-          Offer: offer_text,
-          Attached_Image: final_image_urls || "User did not attach an image",
-          Message: "Login to your secure Supabase Dashboard to instantly review exactly what items they requested from your store!"
-        })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: null, embeds: [embed] })
       });
     } catch(e) {
-      console.warn("Failed to dispatch free email notification:", e)
+      console.warn("Failed to dispatch Discord webhook notification:", e)
     }
   }
 
