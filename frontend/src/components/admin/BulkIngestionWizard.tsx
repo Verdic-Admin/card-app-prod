@@ -634,16 +634,21 @@ export function BulkIngestionWizard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6">
         {queue.map(card => (
           <div key={card.id} className={`rounded-xl border flex flex-col overflow-hidden transition-all shadow-sm relative ${card.status === 'saved' ? 'opacity-50 grayscale border-slate-200 bg-slate-50' : card.isFlaggedForRescan ? 'opacity-90 bg-red-50/50 border-red-300 ring-4 ring-red-100/50' : card.status === 'error' ? 'border-red-300 ring-4 ring-red-100/50' : card.status === 'scanning' ? 'border-indigo-400 ring-4 ring-indigo-100/50' : card.status === 'ready' ? 'border-amber-300 ring-2 ring-amber-50' : 'border-slate-200'}`}>
-             <button onClick={() => updateCard(card.id, { isFlaggedForRescan: !card.isFlaggedForRescan })} 
-                     disabled={card.status === 'saving' || card.status === 'saved'}
-                     className={`absolute top-2 left-2 p-1.5 z-20 rounded-lg text-xs font-bold transition-all disabled:opacity-0 ${card.isFlaggedForRescan ? 'bg-red-500 text-white shadow-sm ring-2 ring-red-300' : 'bg-white/80 text-red-500 hover:bg-red-50 border border-red-100'} shadow-sm flex items-center gap-1`} 
-                     title="Flag for Rescan">
-               <AlertCircle className="w-3.5 h-3.5" />
-               {card.isFlaggedForRescan ? 'Quarantined' : 'Flag'}
-             </button>
-             <button onClick={() => removeCard(card.id)} disabled={card.status === 'saving' || card.status === 'saved'} className="absolute top-2 right-2 p-1.5 z-20 bg-white/50 hover:bg-red-100 text-slate-400 hover:text-red-600 rounded-full transition-colors disabled:opacity-0" title="Delete from Queue">
-               <Trash2 className="w-4 h-4 cursor-pointer" />
-             </button>
+             <div className="absolute top-2 right-2 z-20 flex items-center gap-2">
+               <label className={`flex items-center gap-1.5 cursor-pointer px-2 py-1 rounded-lg text-xs font-bold transition-all ${card.status === 'saving' || card.status === 'saved' ? 'opacity-0 pointer-events-none' : ''} ${card.isFlaggedForRescan ? 'bg-red-500 text-white ring-2 ring-red-300 shadow-sm' : 'bg-white/80 text-red-500 border border-red-100 hover:bg-red-50'}`} title="Flag for Rescan">
+                 <input
+                   type="checkbox"
+                   checked={!!card.isFlaggedForRescan}
+                   onChange={() => updateCard(card.id, { isFlaggedForRescan: !card.isFlaggedForRescan })}
+                   disabled={card.status === 'saving' || card.status === 'saved'}
+                   className="w-3.5 h-3.5 accent-red-500 cursor-pointer"
+                 />
+                 {card.isFlaggedForRescan ? 'Quarantined' : 'Flag'}
+               </label>
+               <button onClick={() => removeCard(card.id)} disabled={card.status === 'saving' || card.status === 'saved'} className="p-1.5 bg-white/50 hover:bg-red-100 text-slate-400 hover:text-red-600 rounded-full transition-colors disabled:opacity-0" title="Delete from Queue">
+                 <Trash2 className="w-4 h-4 cursor-pointer" />
+               </button>
+             </div>
             <div className={`flex items-stretch p-4 bg-slate-50 border-b border-slate-200/60 gap-4 relative ${card.isFlaggedForRescan ? 'grayscale border-red-200' : ''}`}>
               <div className="flex gap-3 relative z-10 flex-shrink-0">
                  <div 
