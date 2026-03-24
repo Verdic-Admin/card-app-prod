@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og';
 import { createClient } from '@supabase/supabase-js';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 const SITE_NAME = 'Into the Gap Sportscards';
 const HANDLE   = 'by logic_in_the_gap';
