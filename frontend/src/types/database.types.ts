@@ -67,6 +67,47 @@ export interface Database {
           status?: 'available' | 'sold'
         }
       }
+      alpha_projections: {
+        Row: {
+          id: string
+          card_id: string
+          is_hub: boolean
+          pbi_target: number | null
+          c_set: number | null
+          m_parallel: number | null
+          alpha_f: number | null
+          alpha_s: number | null
+          afv: number | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          card_id: string
+          is_hub?: boolean
+          pbi_target?: number | null
+          c_set?: number | null
+          m_parallel?: number | null
+          alpha_f?: number | null
+          alpha_s?: number | null
+          afv?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          card_id?: string
+          is_hub?: boolean
+          pbi_target?: number | null
+          c_set?: number | null
+          m_parallel?: number | null
+          alpha_f?: number | null
+          alpha_s?: number | null
+          afv?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
       trade_offers: {
         Row: {
           id: string
