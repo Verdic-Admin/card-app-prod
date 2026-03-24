@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
 import { getShadowBookData } from '@/app/actions/alpha'
+import { ExportCsvButton } from '@/components/admin/ExportCsvButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,6 +28,7 @@ export default async function AlphaDashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-4">
+          <ExportCsvButton data={shadowBookData} filename="Alpha_Tracker_Projections.csv" />
           <Link href="/admin" className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-lg hover:bg-slate-200 transition-colors">
             Back to Admin
           </Link>
@@ -72,10 +74,17 @@ export default async function AlphaDashboardPage() {
                 shadowBookData.map((item) => {
                   const assetName = `${item.player_name || 'Unknown'} - ${item.card_set || ''} ${item.parallel_insert_type || ''}`.trim()
                   
+                  // Fix Numeric typing strictness for SSR (Supabase may parse Postgres numerics as strings)
+                  const afv = item.afv != null ? Number(item.afv) : null;
+                  const listedPrice = item.listed_price != null ? Number(item.listed_price) : null;
+                  const alphaF = item.alpha_f != null ? Number(item.alpha_f) : null;
+                  const alphaS = item.alpha_s != null ? Number(item.alpha_s) : null;
+                  const mParallel = item.m_parallel != null ? Number(item.m_parallel) : null;
+
                   // Calculate Arbitrage Delta Percentage
                   let deltaPercent = 0;
-                  if (item.afv != null && item.listed_price != null && item.listed_price > 0) {
-                    deltaPercent = ((item.afv - item.listed_price) / item.listed_price) * 100;
+                  if (afv != null && listedPrice != null && listedPrice > 0) {
+                    deltaPercent = ((afv - listedPrice) / listedPrice) * 100;
                   }
 
                   // Determine conditional styling for Arbitrage Delta
@@ -88,12 +97,12 @@ export default async function AlphaDashboardPage() {
                   } else if (deltaPercent < -15) {
                     deltaColor = "text-red-700 font-bold";
                     deltaBg = "bg-red-50 px-2 py-1 rounded-md"; // Strong Sell
-                  } else if (item.afv != null && item.listed_price != null) {
+                  } else if (afv != null && listedPrice != null) {
                      // For items mapped but within bounds
                      deltaColor = "text-slate-600";
                   }
 
-                  const hasProjections = item.afv !== null;
+                  const hasProjections = afv !== null;
 
                   return (
                     <tr key={item.id} className="hover:bg-slate-50 transition-colors">
@@ -108,19 +117,19 @@ export default async function AlphaDashboardPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-slate-900 font-medium">
-                        {item.listed_price != null ? `$${item.listed_price.toFixed(2)}` : '-'}
+                        {listedPrice != null ? `$${listedPrice.toFixed(2)}` : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-slate-900 font-semibold bg-slate-50/50">
-                        {item.afv != null ? `$${item.afv.toFixed(2)}` : <span className="text-slate-300">Unmapped</span>}
+                        {afv != null ? `$${afv.toFixed(2)}` : <span className="text-slate-300">Unmapped</span>}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-slate-500">
-                        {item.m_parallel != null ? `${item.m_parallel}x` : '-'}
+                        {mParallel != null ? `${mParallel}x` : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-slate-500">
-                        {item.alpha_f != null ? `${(item.alpha_f * 100).toFixed(1)}%` : '-'}
+                        {alphaF != null ? `${(alphaF * 100).toFixed(1)}%` : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-slate-500">
-                        {item.alpha_s != null ? `${(item.alpha_s * 100).toFixed(1)}%` : '-'}
+                        {alphaS != null ? `${(alphaS * 100).toFixed(1)}%` : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                         {hasProjections ? (

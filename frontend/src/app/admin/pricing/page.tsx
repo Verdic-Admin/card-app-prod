@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { calculateBasePBI, executeShadowBookUpsert, PbiEntity } from '@/app/actions/pricing';
+import { ExportCsvButton } from '@/components/admin/ExportCsvButton';
 
 export default function PricingEngineDashboard() {
   const [engineResults, setEngineResults] = useState<PbiEntity[] | null>(null);
@@ -92,9 +93,12 @@ export default function PricingEngineDashboard() {
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
             <h2 className="text-lg font-bold text-slate-800">Engine Simulation Output</h2>
-            <span className="text-sm font-medium text-slate-500">
-              Total Entities Matched: <span className="font-bold text-slate-800">{engineResults.length}</span>
-            </span>
+            <div className="flex items-center gap-4">
+              <span className="text-sm font-medium text-slate-500">
+                Total Entities Matched: <span className="font-bold text-slate-800">{engineResults.length}</span>
+              </span>
+              <ExportCsvButton data={engineResults} filename="Pricing_Engine_Dry_Run.csv" />
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200">
