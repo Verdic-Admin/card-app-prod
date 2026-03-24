@@ -33,6 +33,12 @@ export default async function AdminPage() {
           <p className="text-slate-500 mt-1 font-medium">Manage inventory, perform massive bulk scans, and track sales.</p>
         </div>
         <div className="flex items-center gap-4">
+          <Link href="/admin/pricing" className="px-4 py-2 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition-colors shadow-sm">
+            Pricing Engine
+          </Link>
+          <Link href="/admin/alpha" className="px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 transition-colors shadow-sm">
+            Alpha Tracker
+          </Link>
           <Link href="/admin/settings" className="px-4 py-2 bg-indigo-50 text-indigo-700 font-bold rounded-lg hover:bg-indigo-100 transition-colors">
             Site Settings
           </Link>
