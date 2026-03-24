@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "node build_taxonomy.js && next dev",
     "prebuild": "node build_taxonomy.js",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint"
   },
