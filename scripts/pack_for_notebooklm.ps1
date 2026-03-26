@@ -1,27 +1,24 @@
 # ---------------------------------------------------------
-# NotebookLM Packer Script (Refined Paths)
+# NotebookLM Packer Script (Entire Workspace - Unbundled)
 # ---------------------------------------------------------
-# Copies files to .txt with path-encoded filenames.
-# Now supports explicit file/folder inclusion lists.
+# Scans all active workspace folders and copies files 
+# to individual .txt files with path-encoded filenames.
 # ---------------------------------------------------------
 
-$SourceRoot = Get-Location
-$OutputDir = Join-Path $SourceRoot "notebooklm_sources"
+$OutputDir = "d:\notebooklm_sources"
 
-# --- CONFIGURATION ---
-# Specific paths to include (File or Directory)
-$IncludePaths = @(
-    "."
+$Workspaces = @(
+    "d:\card-app-prod",
+    "d:\fintech-api",
+    "d:\player-index-prod",
+    "d:\scan-api"
 )
 
-$IncludeExtensions = @(".ts", ".tsx", ".js", ".css", ".py", ".md", ".txt", ".json", ".yaml", ".env", ".gitignore", ".sql")
+$IncludeExtensions = @(".md", ".txt", ".yaml", ".json", ".sql", ".ps1", ".ts", ".tsx", ".js", ".cjs", ".mjs", ".css", ".py", ".dart")
 $IgnorePatterns = @(
-    "*venv*", "*__pycache__*", "*.git*", "*node_modules*", "*.next*",
-    "*.csv", "*.png", "*.jpg", "*.svg", "mock_*", "build", "dist", 
-    "*.ico", "*.cur", "*notebooklm_sources*"
+    "*.git*", "*notebooklm_sources*", "*node_modules*", "*.next*", "*__pycache__*", "*.venv*", "*.env*", "*dist*", "*build*", "*.supabase*", "*.dart_tool*"
 )
 
-# --- RESET & EXECUTE ---
 Write-Host "Resetting $OutputDir..."
 if (Test-Path $OutputDir) { Remove-Item $OutputDir -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
@@ -31,39 +28,27 @@ function Test-IsIgnored ($Path) {
     return $false
 }
 
-function Get-DisplayPath ($FullPath) {
-    return $FullPath.Replace($SourceRoot.Path + "\", "").Replace("\", "/")
-}
+$TotalFilesProcessed = 0
 
-$TotalFiles = 0
-
-foreach ($RelPath in $IncludePaths) {
-    $FullPath = Join-Path $SourceRoot $RelPath
-    
-    if (-not (Test-Path $FullPath)) {
-        Write-Warning "Path not found: $RelPath"
+foreach ($Workspace in $Workspaces) {
+    if (-not (Test-Path $Workspace)) {
+        Write-Warning "Workspace not found: $Workspace"
         continue
     }
 
-    if ((Get-Item $FullPath).PSIsContainer) {
-
-        Write-Host "Scanning Dir: $RelPath..."
-        $Files = Get-ChildItem -Path $FullPath -Recurse -File
-    }
-    else {
-        Write-Host "Processing File: $RelPath..."
-        $Files = @((Get-Item $FullPath))
-    }
+    $WorkspaceName = (Get-Item $Workspace).Name
+    Write-Host "Scanning Workspace: $Workspace..."
+    
+    $Files = Get-ChildItem -Path $Workspace -Recurse -File
 
     foreach ($File in $Files) {
-        $DisplayPath = Get-DisplayPath $File.FullName
+        $DisplayPath = $File.FullName.Substring($Workspace.Length + 1).Replace("\", "/")
+        $RelPath = "$WorkspaceName/$DisplayPath"
         
         # 1. Check Ignore Patterns
-        if (Test-IsIgnored $DisplayPath) { continue }
+        if (Test-IsIgnored $RelPath) { continue }
 
-        # 2. Check Extension (only if directory scan, implicit for explicit file)
-        # Actually, let's enforce extension check for everything to be safe, 
-        # unless it is the explicit pubspec.yaml which is in extensions list anyway.
+        # 2. Check Extension
         $Ext = $File.Extension
         if ($Ext) { 
             if ($IncludeExtensions -notcontains $Ext) { continue } 
@@ -73,23 +58,24 @@ foreach ($RelPath in $IncludePaths) {
         }
 
         # 3. Generate Flattened Name
-        $SafeName = $DisplayPath -replace '[\\/]', '__'
+        $SafeName = $RelPath -replace '[\\/]', '__'
         $DestName = "$SafeName.txt"
         $DestPath = Join-Path $OutputDir $DestName
 
         try {
             # 4. Copy Content
             $Content = Get-Content -LiteralPath $File.FullName -Raw -ErrorAction Stop
-            $ContentWithHeader = "--- SOURCE: $DisplayPath ---`n`n$Content"
             
+            $ContentWithHeader = "--- SOURCE: $RelPath ---`n`n$Content"
             Set-Content -Path $DestPath -Value $ContentWithHeader -Encoding UTF8
-            $TotalFiles++
+            
+            $TotalFilesProcessed++
         }
         catch {
-            Write-Warning "Failed to process $DisplayPath : $_"
+            # Silently ignore permission errors
         }
     }
 }
 
 Write-Host "✅ Processing Complete!"
-Write-Host "Generated $TotalFiles files in $OutputDir"
+Write-Host "Generated $TotalFilesProcessed individual txt files in $OutputDir"

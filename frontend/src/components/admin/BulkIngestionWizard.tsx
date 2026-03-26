@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Upload, Loader2, CheckCircle2, AlertCircle, Play, Save, Check, ExternalLink, Link2, Unlink, RefreshCw, Archive, Trash2, RotateCw, Crop as CropIcon, ArrowLeftRight } from 'lucide-react'
-import { CropModal } from './CropModal'
+import { Upload, Loader2, CheckCircle2, AlertCircle, Play, Save, Check, Link2, Unlink, Archive, Trash2, RotateCw, ArrowLeftRight } from 'lucide-react'
 import { addCardAction } from '@/app/actions/inventory'
 import { PRO_TEAMS } from '@/lib/constants/teams'
 import JSZip from 'jszip'
@@ -59,13 +58,9 @@ export function BulkIngestionWizard() {
   const [queue, setQueue] = useState<QueuedCard[]>([])
   const [isProcessingQueue, setIsProcessingQueue] = useState(false)
   const [isSubmittingAll, setIsSubmittingAll] = useState(false)
-  const [isFetchingAllComps, setIsFetchingAllComps] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [defaultCostBasis, setDefaultCostBasis] = useState<string>('0')
   const [defaultAcceptsOffers, setDefaultAcceptsOffers] = useState(false)
-
-  // Re-Crop tool state
-  const [cropTarget, setCropTarget] = useState<{ cardId: string; side: 'front' | 'back' } | null>(null)
 
   // Swap-Back tool state: the card whose back is being swapped
   const [swapSourceId, setSwapSourceId] = useState<string | null>(null)
@@ -127,91 +122,7 @@ export function BulkIngestionWizard() {
     newCards.forEach(c => scanCard(c))
   }
 
-  const [isHardwareSyncing, setIsHardwareSyncing] = useState(false);
-
-  const handleHardwareFiles = async (files: FileList | null) => {
-     if (!files || files.length !== 2) return alert("Hardware Sync requires exactly TWO massive flatbed images: A Fronts Scan and a Backs Scan.");
-     setIsHardwareSyncing(true);
-     
-     const fArray = Array.from(files);
-     const isBackScan = (f: File) => /back/i.test(f.name);
-     const backFile = fArray.find(isBackScan) || fArray[1];
-     const frontFile = fArray.find(f => f !== backFile) || fArray[0];
-
-     try {
-        const getImgData = async (file: File) => {
-           const img = await createImageBitmap(file);
-           const canvas = document.createElement('canvas');
-           canvas.width = img.width;
-           canvas.height = img.height;
-           const ctx = canvas.getContext('2d');
-           if (!ctx) throw new Error("Canvas 2D context not available");
-           ctx.drawImage(img, 0, 0);
-           return ctx.getImageData(0, 0, img.width, img.height);
-        };
-
-        const frontsData = await getImgData(frontFile);
-        const backsData = await getImgData(backFile);
-
-        const worker = new Worker('/opencv_worker.js');
-
-        worker.onmessage = async (e) => {
-            if (e.data.type === 'SUCCESS') {
-                const json = e.data;
-                const generatedFiles: File[] = [];
-                
-                for (const card of json.cards) {
-                    const toFile = async (data: ImageData, name: string): Promise<File> => {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = data.width;
-                        canvas.height = data.height;
-                        const ctx = canvas.getContext('2d');
-                        if (!ctx) throw new Error("Canvas 2D context not available");
-                        ctx.putImageData(data, 0, 0);
-                        
-                        const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/jpeg', 0.95));
-                        return new File([blob!], name, { type: 'image/jpeg' });
-                    };
-                    
-                    const f1Tight = await toFile(card.frontTightData, `${card.name}_SideA_Tight.jpg`);
-                    const f1Padded = await toFile(card.frontPaddedData, `${card.name}_SideA_Padded.jpg`);
-                    const f2Tight = await toFile(card.backTightData, `${card.name}_SideB_Tight.jpg`);
-                    const f2Padded = await toFile(card.backPaddedData, `${card.name}_SideB_Padded.jpg`);
-                    
-                    // Directly scaffold the QueuedCard with the hidden Padded backup strings
-                    const newCard: QueuedCard = {
-                       id: Math.random().toString(36).substring(7),
-                       file: f1Tight,
-                       padded_file: f1Padded,
-                       preview: URL.createObjectURL(f1Tight),
-                       back_file: f2Tight,
-                       back_padded_file: f2Padded,
-                       back_preview: URL.createObjectURL(f2Tight),
-                       status: 'queued',
-                       data: { player_name: '', team_name: '', year: '', card_set: '', parallel_insert_type: '', card_number: '', comp1: '', comp2: '', comp3: '', side: 'Dual', isFetchingComps: false, cost_basis: parseFloat(defaultCostBasis) || 0, accepts_offers: defaultAcceptsOffers }
-                    }
-                    setQueue(prev => [...prev, newCard])
-                }
-                setIsHardwareSyncing(false);
-                worker.terminate();
-            } else if (e.data.type === 'ERROR') {
-                setIsHardwareSyncing(false);
-                alert("WASM OpenCV Target Error: " + e.data.message);
-                worker.terminate();
-            }
-        };
-
-        worker.postMessage({
-            type: 'PROCESS_HARDWARE_SCANS',
-            frontsObj: { imageData: frontsData.data.buffer, width: frontsData.width, height: frontsData.height },
-            backsObj: { imageData: backsData.data.buffer, width: backsData.width, height: backsData.height }
-        }, [frontsData.data.buffer, backsData.data.buffer]);
-        
-     } catch(e: any) {
-        setIsHardwareSyncing(false);
-        alert("Hardware WebWorker Pipeline Crash: " + e.message);
-     }
-  }
+  // Temporarily disabled: Hardware Sync (OpenCV WASM) logic migrating to external B2B Microservices.
 
   const handleDownloadBackupZip = async () => {
     if (queue.length === 0) return;
@@ -290,10 +201,7 @@ export function BulkIngestionWizard() {
         data: updatedData
       });
       
-      // 4. Decoupled Async Pricing: Fire fetching right away without awaiting
-      if (updatedData.side !== 'Back') {
-          fetchComps(card.id, updatedData).catch(console.error);
-      }
+      // TODO: Pricing will be hydrated externally via the B2B Oracle API.
       return true;
     } catch (err: any) {
       updateCard(card.id, { status: 'error', errorMsg: err.message })
@@ -384,20 +292,7 @@ export function BulkIngestionWizard() {
     }))
   }
 
-  /** Re-Crop: replaces a card's tight crop with the freshly canvas-cropped file. */
-  const applyCrop = (cardId: string, side: 'front' | 'back', newFile: File) => {
-    setQueue(prev => prev.map(c => {
-      if (c.id !== cardId) return c;
-      if (side === 'front') {
-        URL.revokeObjectURL(c.preview);
-        return { ...c, file: newFile, preview: URL.createObjectURL(newFile) };
-      } else {
-        if (c.back_preview) URL.revokeObjectURL(c.back_preview);
-        return { ...c, back_file: newFile, back_preview: URL.createObjectURL(newFile) };
-      }
-    }));
-    setCropTarget(null);
-  }
+  // Temporarily disabled: applyCrop — Logic migrating to external B2B Microservices (Python CV microservice).
 
   /** Swap-Back: atomically exchanges back_file + back_preview between two cards. */
   const swapBacksBetweenCards = (idA: string, idB: string) => {
@@ -503,62 +398,18 @@ export function BulkIngestionWizard() {
     setIsSubmittingAll(false)
   }
 
-  const fetchComps = async (cardId: string, dataToUse: QueuedCard['data']) => {
-    updateCardData(cardId, 'isFetchingComps', 'true' as any)
-    try {
-      const rawParts = [dataToUse.year, dataToUse.player_name, dataToUse.card_set, dataToUse.parallel_insert_type, dataToUse.card_number]
-      const parts = rawParts.map(p => String(p || '')).filter(p => p.trim() !== '')
-      const searchString = parts.join(' ')
-      
-      const res = await fetch(`/api/ebay-comps?q=${encodeURIComponent(searchString)}`)
-      
-      if (!res.ok) {
-        const errorText = await res.text()
-        throw new Error(`Server returned ${res.status}: ${errorText}`)
-      }
-        
-      const { prices, error } = await res.json()
-      
-      if (error) {
-         throw new Error(`API Error: ${error}`)
-      }
-      
-      // Auto-fill top 3 prices
-      if (prices && prices.length > 0) {
-        if (prices[0]) updateCardData(cardId, 'comp1', prices[0].toFixed(2))
-        if (prices[1]) updateCardData(cardId, 'comp2', prices[1].toFixed(2))
-        if (prices[2]) updateCardData(cardId, 'comp3', prices[2].toFixed(2))
-        
-        // Clear any old error messages if it succeeded
-        updateCard(cardId, { errorMsg: undefined })
-      } else {
-        updateCard(cardId, { errorMsg: `Searched "${searchString}", but SerpApi found zero comp results!` })
-      }
-    } catch (err: any) {
-      console.error(err)
-      updateCard(cardId, { errorMsg: 'Fetch Comps Failed: ' + err.message })
-    } finally {
-      updateCardData(cardId, 'isFetchingComps', '' as any)
-    }
-  }
-
-  const fetchAllComps = async () => {
-    setIsFetchingAllComps(true)
-    // Only attempt on ready fronts/duals that don't already have comp1 filled
-    const readyCards = queue.filter(c => c.status === 'ready' && c.data.side !== 'Back' && !c.data.comp1)
-    
-    for (const card of readyCards) {
-        await fetchComps(card.id, card.data)
-        // Respect eBay API Rate limits
-        await new Promise(resolve => setTimeout(resolve, 1500))
-    }
-    setIsFetchingAllComps(false)
+  // TODO: Pricing will be hydrated externally via the B2B Oracle API.
+  // fetchComps and fetchAllComps removed — /api/ebay-comps route has been deleted.
+  const fetchComps = async (_cardId: string, _dataToUse: QueuedCard['data']) => {
+    // Temporarily disabled: Logic migrating to external B2B Microservices.
+    console.warn('fetchComps is disabled. Pricing will be supplied by the B2B Oracle API.');
   }
 
   const queuedCount = queue.filter(c => c.status === 'queued').length;
   const etaSeconds = queuedCount * 4;
   const availableBacks = queue.filter(c => c.status === 'ready' && c.data.side === 'Back')
   const availableQueuedBacks = queue.filter(c => c.status === 'queued')
+  // Temporarily disabled: isFetchingAllComps removed with fetchAllComps migration.
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 border-t-4 border-t-indigo-500">
@@ -600,16 +451,7 @@ export function BulkIngestionWizard() {
                 Backup Local ZIP
              </button>
           )}
-          {queue.filter(c => c.status === 'ready' && c.data.side !== 'Back').length > 0 && (
-             <button 
-                onClick={fetchAllComps} 
-                disabled={isFetchingAllComps}
-                className="bg-sky-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-sky-700 disabled:opacity-50 flex items-center gap-2 transition shadow-sm"
-             >
-                {isFetchingAllComps ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                Fetch All Comps
-             </button>
-          )}
+          {/* Temporarily disabled: Fetch All Comps — Logic migrating to external B2B Microservices. */}
           {queue.filter(c => c.status === 'ready').length > 0 && (
              <button 
                 onClick={submitAllReady} 
@@ -659,7 +501,7 @@ export function BulkIngestionWizard() {
       )}
 
       {/* Upload Zone */}
-      <div className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="mb-8">
         <div 
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -669,26 +511,14 @@ export function BulkIngestionWizard() {
             <div className="flex flex-col items-center justify-center gap-2">
               <Upload className={`w-8 h-8 ${isDragging ? 'text-emerald-500' : 'text-indigo-400'}`} />
               <span className={`text-sm font-bold ${isDragging ? 'text-emerald-700' : 'text-indigo-600'}`}>
-                 Standard Upload (Single Scans)
+                 Standard Upload (Front & Back)
               </span>
-              <span className="text-[10px] text-indigo-400/80 font-bold uppercase tracking-widest text-center px-4">Drop individual card images here, or click to browse</span>
+              <span className="text-[10px] text-indigo-400/80 font-bold uppercase tracking-widest text-center px-4">Drop 2 pre-cropped images (Front + Back) here, or click to browse</span>
             </div>
             <input type="file" multiple className="hidden" accept="image/*" ref={fileInputRef} onChange={e => handleFiles(e.target.files)} />
           </label>
         </div>
-
-        <div>
-          <label className={`flex flex-col items-center justify-center w-full h-32 border-2 border-emerald-400 hover:border-emerald-500 border-dashed bg-emerald-50 hover:bg-emerald-100 rounded-xl cursor-pointer transition-all ${isHardwareSyncing ? 'opacity-50 pointer-events-none' : ''}`}>
-            <div className="flex flex-col items-center justify-center gap-2">
-              {isHardwareSyncing ? <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" /> : <RefreshCw className="w-8 h-8 text-emerald-500" />}
-              <span className="text-sm font-bold text-emerald-700">
-                 {isHardwareSyncing ? 'Executing Native WebAssembly Processor...' : 'Hardware Sync (Native Browser WASM)'}
-              </span>
-              <span className="text-[10px] text-emerald-600/80 font-bold uppercase tracking-widest text-center px-4 mt-0.5">Select exactly 1 massive Fronts scan & 1 Backs scan to unleash full local edge-automation</span>
-            </div>
-            <input type="file" multiple className="hidden" accept="image/*" disabled={isHardwareSyncing} onChange={e => handleHardwareFiles(e.target.files)} />
-          </label>
-        </div>
+        {/* Temporarily disabled: Hardware Sync (OpenCV WASM) — Logic migrating to external B2B Microservices. */}
       </div>
 
       {/* Staging Grid */}
@@ -835,9 +665,7 @@ export function BulkIngestionWizard() {
                 <div className="pt-3 mt-3 border-t border-slate-100">
                   <div className="flex justify-between items-center mb-2">
                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded">Pricing Setup</span>
-                     <button onClick={() => fetchComps(card.id, card.data)} disabled={!card.data.player_name || card.status === 'saved' || !!card.data.isFetchingComps} className="text-xs text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 bg-indigo-50 px-2 py-1 rounded border border-indigo-100 transition-colors disabled:opacity-50 disabled:grayscale">
-                       {card.data.isFetchingComps ? <><Loader2 className="w-3 h-3 animate-spin"/> Fetching...</> : <>Auto-Fetch Comps <ExternalLink className="w-3 h-3" /></>}
-                     </button>
+                     {/* Temporarily disabled: Auto-Fetch Comps — Logic migrating to external B2B Microservices. */}
                   </div>
                   <div className="flex gap-2 mb-3">
                     <input disabled={card.status === 'saved'} inputMode="decimal" type="text" value={card.data.comp1} onChange={e => updateCardData(card.id, 'comp1', e.target.value)} className="w-1/3 p-2 text-sm font-mono font-bold text-slate-900 placeholder:text-slate-400 placeholder:font-normal border border-slate-300 rounded focus:bg-indigo-50 focus:border-indigo-500 outline-none disabled:opacity-50 text-center transition-colors shadow-sm" placeholder="C1 $" title="Comp 1" />
@@ -877,22 +705,7 @@ export function BulkIngestionWizard() {
         ))}
       </div>
       
-      {/* Re-Crop Modal */}
-      {cropTarget && queue.find(c => c.id === cropTarget.cardId) && (
-        (() => {
-          const card = queue.find(c => c.id === cropTarget.cardId)!;
-          const rawFile = cropTarget.side === 'front' ? card.padded_file : card.back_padded_file;
-          if (!rawFile) return null;
-          return (
-            <CropModal
-              imageFile={rawFile}
-              side={cropTarget.side}
-              onConfirm={newFile => applyCrop(cropTarget.cardId, cropTarget.side, newFile)}
-              onClose={() => setCropTarget(null)}
-            />
-          );
-        })()
-      )}
+      {/* Temporarily disabled: CropModal — Logic migrating to external B2B Microservices (Python CV microservice). */}
     </div>
   )
 }

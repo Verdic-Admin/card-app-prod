@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Loader2, Upload, ScanLine, DollarSign, Save, Image as ImageIcon } from 'lucide-react'
+import { Loader2, Upload, ScanLine, DollarSign, Save, Image as ImageIcon, RefreshCw } from 'lucide-react'
 import { addCardAction } from '@/app/actions/inventory'
+import { syncInventoryWithOracle } from '@/app/actions/oracleSync'
 
 export function AdminDashboard() {
   const [file, setFile] = useState<File | null>(null)
@@ -10,6 +11,7 @@ export function AdminDashboard() {
   const [isScanning, setIsScanning] = useState(false)
   const [isPricing, setIsPricing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isSyncing, setIsSyncing] = useState(false)
   const [error, setError] = useState('')
 
   const [formData, setFormData] = useState({
@@ -116,12 +118,39 @@ export function AdminDashboard() {
     }
   }
 
+  const handleSyncWithOracle = async () => {
+    setIsSyncing(true)
+    setError('')
+    try {
+      const result = await syncInventoryWithOracle()
+      if (result.success) {
+        alert(`Oracle Sync Complete! Repriced ${result.count} active listings.`)
+      } else {
+        setError(result.message || 'Oracle Sync Failed.')
+      }
+    } catch (err: any) {
+      setError(err.message || 'Error occurred during Oracle Sync')
+    } finally {
+      setIsSyncing(false)
+    }
+  }
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col h-full">
-      <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-        <ScanLine className="h-5 w-5 text-indigo-600" />
-        Ingestion Wizard
-      </h2>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+          <ScanLine className="h-5 w-5 text-indigo-600" />
+          Ingestion Wizard
+        </h2>
+        <button
+          onClick={handleSyncWithOracle}
+          disabled={isSyncing}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold py-2 px-4 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50 shadow-sm"
+        >
+          {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          Sync with Oracle
+        </button>
+      </div>
 
       {error && (
         <div className="mb-6 bg-red-50 text-red-600 p-3 rounded-lg text-sm font-medium border border-red-100">

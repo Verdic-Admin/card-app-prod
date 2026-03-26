@@ -27,6 +27,11 @@ export function ProductCard({ item }: ProductCardProps) {
            className="relative aspect-[2.5/3.5] w-full bg-zinc-950 perspective-1000 cursor-pointer"
            onClick={() => { if (item.back_image_url) setIsFlipped(!isFlipped) }}
         >
+          {isAvailable && (
+            <div className="absolute top-2 left-2 z-20 bg-indigo-900 text-indigo-300 text-xs px-2.5 py-1 rounded-full border border-indigo-700 font-bold shadow-[0_0_12px_rgba(79,70,229,0.4)] pointer-events-none flex items-center gap-1">
+              🔥 Oracle Verified: 5% Below Market
+            </div>
+          )}
           <div className={`w-full h-full relative transition-transform duration-700 transform-style-3d ${item.back_image_url ? 'lg:group-hover:rotate-y-180' : ''} ${isFlipped ? 'rotate-y-180' : ''}`}>
             
             {/* FRONT */}
