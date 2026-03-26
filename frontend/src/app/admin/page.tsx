@@ -33,9 +33,6 @@ export default async function AdminPage() {
           <p className="text-slate-500 mt-1 font-medium">Manage inventory, perform massive bulk scans, and track sales.</p>
         </div>
         <div className="flex items-center gap-4">
-          {/* Temporarily disabled: Logic migrating to external B2B Microservices. */}
-          {/* <Link href="/admin/pricing">Pricing Engine</Link> */}
-          {/* <Link href="/admin/alpha">Alpha Tracker</Link> */}
           <Link href="/admin/settings" className="px-4 py-2 bg-indigo-50 text-indigo-700 font-bold rounded-lg hover:bg-indigo-100 transition-colors">
             Site Settings
           </Link>

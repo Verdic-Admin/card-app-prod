@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import { Database } from '@/types/database.types'
 import { toggleCardStatus, editCardAction, deleteCardAction, bulkDeleteCardsAction, rotateCardImageAction } from '@/app/actions/inventory'
-import { Loader2, Trash2, Edit2, Check, X, Search, Download, RotateCw } from 'lucide-react'
+import { syncSingleItemWithOracle, syncInventoryWithOracle } from '@/app/actions/oracleSync'
+import { Loader2, Trash2, Edit2, Check, X, Search, Download, RotateCw, RefreshCw } from 'lucide-react'
 
 type InventoryItem = Database['public']['Tables']['inventory']['Row']
 
@@ -14,6 +15,8 @@ export function InventoryTable({ initialItems }: { initialItems: InventoryItem[]
   
   const [editingId, setEditingId] = useState<string | null>(null)
   const [rotatingId, setRotatingId] = useState<string | null>(null)
+  const [syncingId, setSyncingId] = useState<string | null>(null)
+  const [isMasterSyncing, setIsMasterSyncing] = useState(false)
 
   const rotateInventoryImage = async (item: InventoryItem, side: 'front' | 'back') => {
     const url = side === 'front' ? item.image_url : item.back_image_url
@@ -164,6 +167,40 @@ export function InventoryTable({ initialItems }: { initialItems: InventoryItem[]
     }
   }
 
+  const handleSingleSync = async (id: string) => {
+    setSyncingId(id)
+    try {
+      const result = await syncSingleItemWithOracle(id)
+      if (result.success) {
+        setItems(items.map(i => i.id === id ? { ...i, listed_price: result.new_price ?? null } : i))
+      } else {
+        alert(result.message)
+      }
+    } catch (e: any) {
+      alert("Sync failed: " + e.message)
+    } finally {
+      setSyncingId(null)
+    }
+  }
+
+  const handleMasterSync = async () => {
+    setIsMasterSyncing(true)
+    try {
+      const result = await syncInventoryWithOracle()
+      if (result.success) {
+        alert(`Master Sync Complete! Repriced ${result.count} active listings.`)
+        // The table items don't automatically refresh unless we reload page, but alert verifies it.
+        window.location.reload()
+      } else {
+        alert(result.message)
+      }
+    } catch (e: any) {
+      alert("Sync failed: " + e.message)
+    } finally {
+      setIsMasterSyncing(false)
+    }
+  }
+
   const handleExportCSV = () => {
     if (filteredItems.length === 0) return;
     const headers = ['Card ID', 'Player Name', 'Team Name', 'Year', 'Set', 'Number', 'Parallel/Insert', 'Status', 'Cost Basis', 'Avg Price', 'Listed Price', 'Accepts Offers', 'Image URL'];
@@ -211,10 +248,16 @@ export function InventoryTable({ initialItems }: { initialItems: InventoryItem[]
               className="w-full pl-9 pr-4 py-2.5 text-sm bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-colors placeholder:text-slate-400 text-slate-900 font-medium shadow-sm"
             />
          </div>
-         <button onClick={handleExportCSV} className="whitespace-nowrap bg-zinc-800 hover:bg-zinc-900 text-white px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer">
-           <Download className="w-4 h-4" />
-           Export CSV
-         </button>
+         <div className="flex items-center gap-2">
+           <button onClick={handleMasterSync} disabled={isMasterSyncing} className="whitespace-nowrap bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer disabled:opacity-50">
+             {isMasterSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+             Sync All Inventory
+           </button>
+           <button onClick={handleExportCSV} className="whitespace-nowrap bg-zinc-800 hover:bg-zinc-900 text-white px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer">
+             <Download className="w-4 h-4" />
+             Export CSV
+           </button>
+         </div>
       </div>
 
       {/* Select all + bulk bar */}
@@ -383,6 +426,9 @@ export function InventoryTable({ initialItems }: { initialItems: InventoryItem[]
                       <div className="flex gap-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                         <button onClick={() => startEditing(item)} className="text-indigo-600 hover:text-indigo-800 hover:bg-indigo-100 bg-indigo-50 h-7 w-7 rounded flex items-center justify-center transition-colors" title="Edit">
                           <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => handleSingleSync(item.id)} disabled={syncingId === item.id} className="text-purple-600 hover:text-purple-800 hover:bg-purple-100 bg-purple-50 h-7 w-7 rounded disabled:opacity-50 flex items-center justify-center transition-colors" title="Sync with Oracle">
+                          {syncingId === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
                         </button>
                         <a
                           href={`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent([item.year, item.player_name, item.card_set, item.parallel_insert_type, item.card_number].filter(Boolean).join(' '))}&LH_Sold=1&LH_Complete=1`}

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Loader2, Upload, ScanLine, DollarSign, Save, Image as ImageIcon, RefreshCw } from 'lucide-react'
 import { addCardAction } from '@/app/actions/inventory'
-import { syncInventoryWithOracle } from '@/app/actions/oracleSync'
+import { evaluateItemWithOracle } from '@/app/actions/oracleSync'
 
 export function AdminDashboard() {
   const [file, setFile] = useState<File | null>(null)
@@ -20,9 +20,7 @@ export function AdminDashboard() {
     card_set: '',
     parallel_insert_type: '',
     card_number: '',
-    comp1: '',
-    comp2: '',
-    comp3: '',
+    oracle_price: '',
   })
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -62,24 +60,21 @@ export function AdminDashboard() {
     }
   }
 
-  const handleFetchPricing = () => {
-    if (!formData.player_name) return setError('Need card details to search eBay.')
+  const handleEvaluateOracle = async () => {
+    if (!formData.player_name) return setError('Need card details to evaluate.')
+    setIsPricing(true)
     setError('')
-    
-    const searchString = `${formData.year} ${formData.card_set} ${formData.player_name} ${formData.parallel_insert_type} ${formData.card_number}`.trim().replace(/\s+/g, '+')
-    const ebayUrl = `https://www.ebay.com/sch/i.html?_nkw=${searchString}&LH_Sold=1&LH_Complete=1`
-    
-    // Passing window dimensions forces modern browsers to spawn a physical new window instead of a tab
-    window.open(ebayUrl, '_blank', 'width=1100,height=800,left=100,top=100')
-  }
-
-  const getPrices = () => {
-    const prices = [parseFloat(formData.comp1), parseFloat(formData.comp2), parseFloat(formData.comp3)].filter(p => !isNaN(p) && p > 0)
-    if (prices.length === 0) return { high: 0, low: 0, avg: 0 }
-    return {
-      high: Math.max(...prices),
-      low: Math.min(...prices),
-      avg: prices.reduce((a, b) => a + b, 0) / prices.length
+    try {
+      const result = await evaluateItemWithOracle(formData)
+      if (result.success) {
+        setFormData(prev => ({ ...prev, oracle_price: result.price!.toFixed(2) }))
+      } else {
+        setError(result.message || 'Oracle evaluation failed.')
+      }
+    } catch (err: any) {
+      setError(err.message || 'Error communicating with Oracle.')
+    } finally {
+      setIsPricing(false)
     }
   }
 
@@ -92,12 +87,13 @@ export function AdminDashboard() {
       const data = new FormData()
       data.append('image', file)
       
-      const { high, low, avg } = getPrices()
+      const price = parseFloat(formData.oracle_price) || 0
       const payload = {
         ...formData,
-        low_price: low,
-        high_price: high,
-        avg_price: avg,
+        low_price: price,
+        high_price: price,
+        avg_price: price,
+        listed_price: price
       }
       data.append('data', JSON.stringify(payload))
       
@@ -108,7 +104,7 @@ export function AdminDashboard() {
       setPreview('')
       setFormData({
         player_name: '', year: '', card_set: '', parallel_insert_type: '', card_number: '',
-        comp1: '', comp2: '', comp3: '',
+        oracle_price: '',
       })
       alert('Card saved successfully!')
     } catch (err: any) {
@@ -118,39 +114,12 @@ export function AdminDashboard() {
     }
   }
 
-  const handleSyncWithOracle = async () => {
-    setIsSyncing(true)
-    setError('')
-    try {
-      const result = await syncInventoryWithOracle()
-      if (result.success) {
-        alert(`Oracle Sync Complete! Repriced ${result.count} active listings.`)
-      } else {
-        setError(result.message || 'Oracle Sync Failed.')
-      }
-    } catch (err: any) {
-      setError(err.message || 'Error occurred during Oracle Sync')
-    } finally {
-      setIsSyncing(false)
-    }
-  }
-
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col h-full">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-          <ScanLine className="h-5 w-5 text-indigo-600" />
-          Ingestion Wizard
-        </h2>
-        <button
-          onClick={handleSyncWithOracle}
-          disabled={isSyncing}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold py-2 px-4 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50 shadow-sm"
-        >
-          {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          Sync with Oracle
-        </button>
-      </div>
+      <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+        <ScanLine className="h-5 w-5 text-indigo-600" />
+        Ingestion Wizard
+      </h2>
 
       {error && (
         <div className="mb-6 bg-red-50 text-red-600 p-3 rounded-lg text-sm font-medium border border-red-100">
@@ -223,45 +192,15 @@ export function AdminDashboard() {
       <div className="mb-8 p-4 bg-slate-50 rounded-lg border border-slate-200">
         <label className="block text-sm font-semibold text-slate-700 mb-3 flex items-center justify-between">
           3. Determine Value
-          <button onClick={handleFetchPricing} disabled={!formData.player_name} className="bg-slate-900 text-white text-xs px-3 py-1.5 rounded-md hover:bg-slate-800 disabled:opacity-50 flex items-center gap-1 transition-colors">
-            <DollarSign className="h-3 w-3" />
-            View eBay Comps
+          <button onClick={handleEvaluateOracle} disabled={isPricing || !formData.player_name} className="bg-purple-600 text-white text-xs font-bold px-3 py-1.5 rounded-md hover:bg-purple-700 disabled:opacity-50 flex items-center gap-1 transition-colors">
+            {isPricing ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+            Evaluate with Oracle
           </button>
         </label>
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Comp 1 ($)</label>
-            <input type="text" inputMode="decimal" value={formData.comp1} onChange={e => setFormData({...formData, comp1: e.target.value})} className="w-full p-2.5 text-sm font-bold text-slate-900 bg-white border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 font-mono" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Comp 2 ($)</label>
-            <input type="text" inputMode="decimal" value={formData.comp2} onChange={e => setFormData({...formData, comp2: e.target.value})} className="w-full p-2.5 text-sm font-bold text-slate-900 bg-white border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 font-mono" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Comp 3 ($)</label>
-            <input type="text" inputMode="decimal" value={formData.comp3} onChange={e => setFormData({...formData, comp3: e.target.value})} className="w-full p-2.5 text-sm font-bold text-slate-900 bg-white border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 font-mono" />
-          </div>
+        <div className="mb-4">
+          <label className="block text-xs font-medium text-slate-500 mb-1">Target Price ($)</label>
+          <input type="text" inputMode="decimal" value={formData.oracle_price} onChange={e => setFormData({...formData, oracle_price: e.target.value})} className="w-full p-2.5 text-sm font-bold text-slate-900 bg-white border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400 font-mono" />
         </div>
-
-        {(() => {
-           const { high, low, avg } = getPrices();
-           return (
-             <div className="flex justify-between items-center bg-indigo-50 p-3 rounded-lg border border-indigo-100">
-                <div className="flex flex-col">
-                  <span className="text-[10px] text-indigo-500 font-bold uppercase tracking-wider">Low</span>
-                  <span className="font-bold font-mono text-sm text-indigo-900">${low.toFixed(2)}</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[10px] text-indigo-500 font-bold uppercase tracking-wider">High</span>
-                  <span className="font-bold font-mono text-sm text-indigo-900">${high.toFixed(2)}</span>
-                </div>
-                <div className="flex flex-col items-end">
-                  <span className="text-[10px] text-indigo-500 font-bold uppercase tracking-wider">Average</span>
-                  <span className="font-black font-mono text-xl text-indigo-900 bg-white px-2 py-0.5 rounded shadow-sm border border-indigo-100">${avg.toFixed(2)}</span>
-                </div>
-             </div>
-           )
-        })()}
       </div>
 
       {/* Step 4: Save */}
