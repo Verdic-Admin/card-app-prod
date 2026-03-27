@@ -14,6 +14,7 @@ export interface StoreSettings {
     social_facebook: string;
     social_discord: string;
     social_threads: string;
+    oracle_discount_percentage: number;
 }
 
 export async function getStoreSettings(): Promise<StoreSettings> {
@@ -38,7 +39,8 @@ export async function getStoreSettings(): Promise<StoreSettings> {
             social_twitter: '',
             social_facebook: '',
             social_discord: '',
-            social_threads: ''
+            social_threads: '',
+            oracle_discount_percentage: 0.0
         }
     }
     

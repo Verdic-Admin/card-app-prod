@@ -87,9 +87,20 @@ export function ProductCard({ item }: ProductCardProps) {
           </p>
 
           <div className="flex flex-col mt-auto gap-3">
-            <span className="font-black text-3xl text-white tracking-tighter">
-              ${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}
-            </span>
+            {item.oracle_projection && item.oracle_projection > 0 ? (
+              <div className="flex flex-col">
+                <span className="text-[10px] uppercase tracking-widest font-bold text-indigo-400 mb-0.5 flex items-center gap-1">
+                   🔮 AI Target: <span className={`${(item.listed_price && item.listed_price < item.oracle_projection) ? 'line-through opacity-60' : ''}`}>${item.oracle_projection.toFixed(2)}</span>
+                </span>
+                <span className="font-black text-3xl text-white tracking-tighter">
+                  ${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}
+                </span>
+              </div>
+            ) : (
+              <span className="font-black text-3xl text-white tracking-tighter">
+                ${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}
+              </span>
+            )}
             {isAvailable && (
               <div className="grid grid-cols-2 gap-2 w-full">
                      <button 

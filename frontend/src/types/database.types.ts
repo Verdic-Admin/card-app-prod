@@ -24,6 +24,7 @@ export interface Database {
           avg_price: number | null
           listed_price: number | null
           cost_basis: number | null
+          oracle_projection: number | null
           accepts_offers: boolean | null
           image_url: string | null
           back_image_url: string | null
@@ -44,6 +45,7 @@ export interface Database {
           avg_price?: number | null
           listed_price?: number | null
           cost_basis?: number | null
+          oracle_projection?: number | null
           accepts_offers?: boolean | null
           image_url?: string | null
           status?: 'available' | 'sold'

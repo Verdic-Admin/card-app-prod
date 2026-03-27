@@ -5,13 +5,10 @@
 # to individual .txt files with path-encoded filenames.
 # ---------------------------------------------------------
 
-$OutputDir = "d:\notebooklm_sources"
+$OutputDir = "d:\notebooklm_sources_card_app"
 
 $Workspaces = @(
-    "d:\card-app-prod",
-    "d:\fintech-api",
-    "d:\player-index-prod",
-    "d:\scan-api"
+    "d:\card-app-prod"
 )
 
 $IncludeExtensions = @(".md", ".txt", ".yaml", ".json", ".sql", ".ps1", ".ts", ".tsx", ".js", ".cjs", ".mjs", ".css", ".py", ".dart")

@@ -128,6 +128,23 @@ export default function SettingsPage() {
               <p className="text-[10px] text-slate-500 mt-1.5 font-medium">Displays a highly visible banner at the very top of the store. Leave totally blank to hide the banner.</p>
             </div>
 
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Oracle Undercut Percentage (%)</label>
+              <div className="relative">
+                <input 
+                  type="number" 
+                  step="0.1"
+                  required
+                  value={settings.oracle_discount_percentage} 
+                  onChange={e => setSettings({...settings, oracle_discount_percentage: parseFloat(e.target.value) || 0})}
+                  className="w-full pl-3 pr-8 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-900 font-mono font-bold focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none shadow-sm transition-all"
+                  placeholder="5.0"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">%</span>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1.5 font-medium">How far below the Oracle's fair value do you want to auto-price? (e.g., 5 for 5% off).</p>
+            </div>
+
             <div className="flex items-center justify-between p-4 bg-white border border-emerald-200/60 rounded-lg shadow-sm">
                 <div>
                     <h4 className="text-sm font-bold text-slate-900">Accept Trade Offers Platform-wide</h4>

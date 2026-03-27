@@ -13,10 +13,15 @@ export async function syncInventoryWithOracle() {
     throw new Error('Oracle API credentials not configured in settings (.env.local).')
   }
 
+  // Fetch discount percentage
+  const { data: settings } = await (supabase as any).from('store_settings').select('oracle_discount_percentage').eq('id', 1).single()
+  const discountRate = settings?.oracle_discount_percentage || 0;
+
   // 2. Fetch Inventory
+  console.log("-> Fetching active inventory...");
   const { data: inventory, error: inventoryError } = await supabase
     .from('inventory')
-    .select('id, player_name, card_set, parallel_insert_type, print_run, is_auto, is_relic, is_rookie, is_one_of_one, grade')
+    .select('*')
     .eq('status', 'available')
 
   if (inventoryError) {
@@ -24,27 +29,35 @@ export async function syncInventoryWithOracle() {
   }
 
   if (!inventory || inventory.length === 0) {
+    console.log("-> 0 items found, aborting.");
     return { success: true, count: 0, message: 'No available inventory to sync.' }
   }
 
+  console.log(`-> Found ${inventory.length} items to sync!`);
   let successCount = 0
 
   // 3. The Sync Loop
   for (const item of (inventory as any[])) {
     try {
+      console.log(`-> Processing ${item.player_name}...`);
+      const rawFuzzyString = [
+        item.card_set, 
+        item.card_number, 
+        item.parallel_insert_type, 
+        item.grade, 
+        item.attributes 
+      ].filter(Boolean).join(" ");
+
       const payload = {
         player_name: item.player_name,
-        card_set: item.card_set,
-        parallel_name: item.parallel_insert_type,
-        print_run: item.print_run,
-        is_auto: item.is_auto,
-        is_relic: item.is_relic,
-        is_rookie: item.is_rookie,
-        is_one_of_one: item.is_one_of_one,
-        grade: item.grade
+        card_number: item.card_number || "",
+        attributes: rawFuzzyString,
+        storefront_id: item.id
       }
+      
+      console.log(`-> Sending payload to ${oracle_api_url}/api/v1/b2b/calculate:`, payload);
 
-      const res = await fetch(`${oracle_api_url}/api/v1/calculate`, {
+      const res = await fetch(`${oracle_api_url}/api/v1/b2b/calculate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -61,12 +74,12 @@ export async function syncInventoryWithOracle() {
       const data = await res.json()
       
       if (data.projected_target && data.projected_target > 0) {
-        const new_price = data.projected_target * 0.95
+        const new_price = data.projected_target * (1 - (discountRate / 100))
 
         const { error: updateError } = await supabase
           .from('inventory')
           // @ts-ignore
-          .update({ listed_price: new_price })
+          .update({ listed_price: new_price, oracle_projection: data.projected_target })
           .eq('id', item.id)
 
         if (!updateError) {
@@ -94,9 +107,13 @@ export async function syncSingleItemWithOracle(id: string) {
     throw new Error('Oracle API credentials not configured in settings (.env.local).')
   }
 
+  // Fetch discount percentage
+  const { data: settings } = await (supabase as any).from('store_settings').select('oracle_discount_percentage').eq('id', 1).single()
+  const discountRate = settings?.oracle_discount_percentage || 0;
+
   const { data: item, error: inventoryError } = await supabase
     .from('inventory')
-    .select('id, player_name, card_set, parallel_insert_type, print_run, is_auto, is_relic, is_rookie, is_one_of_one, grade')
+    .select('*')
     .eq('id', id)
     .single()
 
@@ -105,19 +122,22 @@ export async function syncSingleItemWithOracle(id: string) {
   }
 
   try {
+    const rawFuzzyString = [
+      (item as any).card_set, 
+      (item as any).card_number, 
+      (item as any).parallel_insert_type, 
+      (item as any).grade, 
+      (item as any).attributes 
+    ].filter(Boolean).join(" ");
+
     const payload = {
       player_name: (item as any).player_name,
-      card_set: (item as any).card_set,
-      parallel_name: (item as any).parallel_insert_type,
-      print_run: (item as any).print_run,
-      is_auto: (item as any).is_auto,
-      is_relic: (item as any).is_relic,
-      is_rookie: (item as any).is_rookie,
-      is_one_of_one: (item as any).is_one_of_one,
-      grade: (item as any).grade
+      card_number: (item as any).card_number || "",
+      attributes: rawFuzzyString,
+      storefront_id: (item as any).id
     }
 
-    const res = await fetch(`${oracle_api_url}/api/v1/calculate`, {
+    const res = await fetch(`${oracle_api_url}/api/v1/b2b/calculate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -133,12 +153,12 @@ export async function syncSingleItemWithOracle(id: string) {
     const data = await res.json()
     
     if (data.projected_target && data.projected_target > 0) {
-      const new_price = data.projected_target * 0.95
+      const new_price = data.projected_target * (1 - (discountRate / 100))
 
       const { error: updateError } = await supabase
         .from('inventory')
         // @ts-ignore
-        .update({ listed_price: new_price })
+        .update({ listed_price: new_price, oracle_projection: data.projected_target })
         .eq('id', (item as any).id)
 
       if (!updateError) {
@@ -156,6 +176,7 @@ export async function syncSingleItemWithOracle(id: string) {
 }
 
 export async function evaluateItemWithOracle(payload: any) {
+  const supabase = await createClient()
   const oracle_api_url = process.env.ORACLE_API_URL
   const oracle_api_key = process.env.ORACLE_API_KEY
 
@@ -163,20 +184,29 @@ export async function evaluateItemWithOracle(payload: any) {
     throw new Error('Oracle API credentials not configured.')
   }
 
+  // Fetch discount percentage
+  const { data: settings } = await (supabase as any).from('store_settings').select('oracle_discount_percentage').eq('id', 1).single()
+  const discountRate = settings?.oracle_discount_percentage || 0;
+
   try {
+    const rawFuzzyString = [
+      payload.card_set, 
+      payload.card_number, 
+      payload.parallel_insert_type, 
+      payload.grade, 
+      payload.attributes 
+    ].filter(Boolean).join(" ");
+
     const formattedPayload = {
       player_name: payload.player_name,
-      card_set: payload.card_set,
-      parallel_name: payload.parallel_insert_type,
-      print_run: payload.print_run,
-      is_auto: payload.is_auto,
-      is_relic: payload.is_relic,
-      is_rookie: payload.is_rookie,
-      is_one_of_one: payload.is_one_of_one,
-      grade: payload.grade
+      card_number: payload.card_number || "",
+      attributes: rawFuzzyString,
+      storefront_id: payload.id || "eval"
     }
+    
+    console.log(`-> Evaluate payload going to ${oracle_api_url}/api/v1/b2b/calculate:`, formattedPayload);
 
-    const res = await fetch(`${oracle_api_url}/api/v1/calculate`, {
+    const res = await fetch(`${oracle_api_url}/api/v1/b2b/calculate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -192,7 +222,7 @@ export async function evaluateItemWithOracle(payload: any) {
     const data = await res.json()
     
     if (data.projected_target && data.projected_target > 0) {
-      const new_price = data.projected_target * 0.95
+      const new_price = data.projected_target * (1 - (discountRate / 100))
       return { success: true, price: new_price }
     } else {
       return { success: false, message: `Oracle returned invalid projected_target.` }
