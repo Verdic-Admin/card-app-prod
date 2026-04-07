@@ -6,10 +6,9 @@ import { Filter, Search, X } from 'lucide-react'
 
 interface StoreFiltersProps {
   availableTeams: string[]
-  availableYears: string[]
 }
 
-export function StoreFilters({ availableTeams, availableYears }: StoreFiltersProps) {
+export function StoreFilters({ availableTeams }: StoreFiltersProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -49,7 +48,6 @@ export function StoreFilters({ availableTeams, availableYears }: StoreFiltersPro
   }
 
   const activeTeam = searchParams.get('team') || ''
-  const activeYear = searchParams.get('year') || ''
   const minPrice = searchParams.get('minPrice') || ''
   const maxPrice = searchParams.get('maxPrice') || ''
 
@@ -111,19 +109,7 @@ export function StoreFilters({ availableTeams, availableYears }: StoreFiltersPro
         </div>
       </div>
 
-      <div className="space-y-3">
-        <label className="text-sm font-bold text-zinc-400 tracking-wide uppercase">Year</label>
-        <select 
-          value={activeYear}
-          onChange={e => setFilter('year', e.target.value)}
-          className="w-full p-2.5 text-sm bg-zinc-900 border border-zinc-800 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none transition-colors cursor-pointer text-white font-medium"
-        >
-          <option value="">Any Year</option>
-          {availableYears.map(y => (
-            <option key={y} value={y}>{y}</option>
-          ))}
-        </select>
-      </div>
+
 
       <div className="space-y-3">
         <label className="text-sm font-bold text-zinc-400 tracking-wide uppercase">Price Range</label>

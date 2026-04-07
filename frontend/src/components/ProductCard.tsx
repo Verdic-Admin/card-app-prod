@@ -27,9 +27,9 @@ export function ProductCard({ item }: ProductCardProps) {
            className="relative aspect-[2.5/3.5] w-full bg-zinc-950 perspective-1000 cursor-pointer"
            onClick={() => { if (item.back_image_url) setIsFlipped(!isFlipped) }}
         >
-          {isAvailable && (
+          {isAvailable && (item as any).oracle_projection && (item as any).oracle_projection > 0 && item.listed_price && item.listed_price < (item as any).oracle_projection && (
             <div className="absolute top-2 left-2 z-20 bg-indigo-900 text-indigo-300 text-xs px-2.5 py-1 rounded-full border border-indigo-700 font-bold shadow-[0_0_12px_rgba(79,70,229,0.4)] pointer-events-none flex items-center gap-1">
-              🔥 Oracle Verified: 5% Below Market
+              🔥 {((1 - item.listed_price / (item as any).oracle_projection) * 100).toFixed(0)}% Below Market
             </div>
           )}
           <div className={`w-full h-full relative transition-transform duration-700 transform-style-3d ${item.back_image_url ? 'lg:group-hover:rotate-y-180' : ''} ${isFlipped ? 'rotate-y-180' : ''}`}>
@@ -80,21 +80,33 @@ export function ProductCard({ item }: ProductCardProps) {
             {item.player_name}
           </h3>
           <span className="text-xs font-bold text-zinc-500 mt-1 uppercase tracking-widest">
-            {item.year} • #{item.card_number}
+            {item.card_set} • #{item.card_number}
           </span>
           <p className="text-sm text-zinc-400 mt-2 mb-4 flex-grow font-semibold">
-            {item.card_set} • <span className="text-cyan-400">{item.parallel_insert_type}</span>
+            <span className="text-cyan-400">{item.parallel_insert_type}</span>
           </p>
 
           <div className="flex flex-col mt-auto gap-3">
-            {item.oracle_projection && item.oracle_projection > 0 ? (
+            {(item as any).oracle_projection && (item as any).oracle_projection > 0 ? (
               <div className="flex flex-col">
-                <span className="text-[10px] uppercase tracking-widest font-bold text-indigo-400 mb-0.5 flex items-center gap-1">
-                   🔮 AI Target: <span className={`${(item.listed_price && item.listed_price < item.oracle_projection) ? 'line-through opacity-60' : ''}`}>${item.oracle_projection.toFixed(2)}</span>
-                </span>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="text-[10px] uppercase tracking-widest font-bold text-indigo-400 flex items-center gap-1">
+                     🔮 Market Value: <span className="line-through opacity-60">${(item as any).oracle_projection.toFixed(2)}</span>
+                  </span>
+                  {(item as any).oracle_trend_percentage != null && (
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${(item as any).oracle_trend_percentage >= 0 ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800' : 'bg-red-950/60 text-red-400 border border-red-800'}`}>
+                      {(item as any).oracle_trend_percentage >= 0 ? '↑' : '↓'} {Math.abs((item as any).oracle_trend_percentage).toFixed(1)}%
+                    </span>
+                  )}
+                </div>
                 <span className="font-black text-3xl text-white tracking-tighter">
                   ${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}
                 </span>
+                {item.listed_price && item.listed_price < (item as any).oracle_projection && (
+                  <span className="text-xs font-bold text-emerald-400 mt-0.5">
+                    You save ${((item as any).oracle_projection - item.listed_price).toFixed(2)}
+                  </span>
+                )}
               </div>
             ) : (
               <span className="font-black text-3xl text-white tracking-tighter">

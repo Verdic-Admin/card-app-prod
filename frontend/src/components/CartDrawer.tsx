@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useCart } from '@/context/CartContext'
 import { X, ShoppingCart, Trash2, Handshake, Loader2, CheckCircle2 } from 'lucide-react'
-import { generatePayPalCartUrl } from '@/utils/paypal'
+import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js'
+import { createPayPalOrder, capturePayPalOrder } from '@/app/actions/checkout'
 import { validateCartCompleteness, submitTradeOffer } from '@/app/actions/trades'
 import { TradeModal } from '@/components/TradeModal'
 import { StoreSettings } from '@/app/actions/settings'
@@ -39,30 +40,7 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
 
   if (!isCartOpen) return null
 
-  const handleCashCheckout = async () => {
-    setCartError(null)
-    setCheckoutLoading(true)
-    try {
-      const check = await validateCartCompleteness(cashItems.map(i => i.id))
-      
-      if (!check.valid) {
-        kickItems(check.unavailableIds)
-        setCartError("Whoops! Some items in your bundle just sold to a competitive buyer, so we removed them. Please review your updated cart total.")
-        setCheckoutLoading(false)
-        return
-      }
 
-      const url = generatePayPalCartUrl(cashItems.map(i => ({
-        itemName: `${i.year} ${i.card_set} ${i.player_name} ${i.parallel_insert_type} ${i.card_number ? `#${i.card_number}` : ''}`.trim().replace(/\s+/g, ' '),
-        amount: i.listed_price ?? i.avg_price ?? 0
-      })), settings.paypal_email)
-      window.location.href = url
-    } catch (e: any) {
-      console.error("Cart Checkout Execution Error:", e);
-      setCartError(e.message || "Failed to actively submit payload or validate availability. Please refresh.")
-      setCheckoutLoading(false)
-    }
-  }
 
   const handleTradeCheckout = async () => {
     setCartError(null)
@@ -112,7 +90,7 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
       </div>
       <div className="flex flex-col flex-1 py-1 pr-1">
         <span className="font-extrabold text-sm text-white leading-tight">{item.player_name}</span>
-        <span className="text-xs font-semibold text-zinc-400 mt-0.5 line-clamp-1">{item.year} {item.card_set}</span>
+        <span className="text-xs font-semibold text-zinc-400 mt-0.5 line-clamp-1">{item.card_set}</span>
         <span className="text-[10px] uppercase font-bold text-cyan-500 tracking-widest mt-1">{item.parallel_insert_type}</span>
         
         {item.isTradeProposal ? (
@@ -217,9 +195,45 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
                      </div>
                   )}
                   
-                  <button onClick={handleCashCheckout} disabled={checkoutLoading || cartTotal < settings.cart_minimum} className="w-full bg-[#FFC439] hover:bg-[#F4B82A] text-zinc-950 font-black py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md active:scale-[0.98] disabled:opacity-50 disabled:grayscale text-[15px]">
-                    {checkoutLoading ? <Loader2 className="w-5 h-5 animate-spin"/> : 'Checkout with PayPal'}
-                  </button>
+                  <div className="mt-4 relative z-0">
+                    <PayPalScriptProvider options={{ clientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "test" }}>
+                      <PayPalButtons 
+                        disabled={cartTotal < settings.cart_minimum || checkoutLoading}
+                        style={{ layout: "vertical", shape: "rect", color: "gold" }}
+                        createOrder={async () => {
+                          setCartError(null);
+                          const check = await validateCartCompleteness(cashItems.map(i => i.id));
+                          
+                          if (!check.valid) {
+                            kickItems(check.unavailableIds);
+                            setCartError("Whoops! Some items in your bundle just sold to a competitive buyer. Please review your updated cart.");
+                            throw new Error("Cart items unavailable");
+                          }
+
+                          const { orderId } = await createPayPalOrder(cashItems.map(i => i.id));
+                          return orderId;
+                        }}
+                        onApprove={async (data) => {
+                          try {
+                            const res = await capturePayPalOrder(data.orderID);
+                            if (res.success) {
+                               clearCart();
+                               setIsCartOpen(false);
+                               setCartError(null);
+                               alert("Payment Successful! Thank you for your purchase.");
+                            }
+                          } catch (err: any) {
+                            console.error(err);
+                            setCartError("Failed to capture funds. Please contact support.");
+                          }
+                        }}
+                        onError={(err) => {
+                          console.error(err);
+                          setCartError("PayPal Checkout failed or was aborted.");
+                        }}
+                      />
+                    </PayPalScriptProvider>
+                  </div>
                 </div>
              )}
 

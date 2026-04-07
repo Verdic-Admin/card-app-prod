@@ -102,7 +102,7 @@ export function TradeModal({ isOpen, onClose, cartItems, onSuccess, targetCard }
                 <h4 className="flex items-center justify-between text-sm font-black text-white border-b border-zinc-800 pb-2">
                    Trade Offer Attachment
                    {targetCard ? (
-                      <span className="text-xs font-black text-cyan-300 bg-cyan-950/80 px-2.5 py-1 rounded-md tracking-wide border border-cyan-800 flex-shrink-0 ml-2 text-right">Targeting: {targetCard.year} {targetCard.player_name}</span>
+                      <span className="text-xs font-black text-cyan-300 bg-cyan-950/80 px-2.5 py-1 rounded-md tracking-wide border border-cyan-800 flex-shrink-0 ml-2 text-right">Targeting: {targetCard.card_set} {targetCard.player_name}</span>
                    ) : (
                       <span className="text-[10px] font-black text-cyan-400 bg-cyan-950/50 px-2 py-1 rounded-md tracking-widest uppercase border border-cyan-900/50 whitespace-nowrap ml-2">Targeting {cartItems.length} items</span>
                    )}

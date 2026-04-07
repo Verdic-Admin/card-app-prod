@@ -5,13 +5,13 @@
 # to individual .txt files with path-encoded filenames.
 # ---------------------------------------------------------
 
-$OutputDir = "d:\notebooklm_sources_card_app"
+$OutputDir = "d:\card-app-prod\notebooklm_sources"
 
 $Workspaces = @(
     "d:\card-app-prod"
 )
 
-$IncludeExtensions = @(".md", ".txt", ".yaml", ".json", ".sql", ".ps1", ".ts", ".tsx", ".js", ".cjs", ".mjs", ".css", ".py", ".dart")
+$IncludeExtensions = @(".md", ".txt", ".yaml", ".yml", ".json", ".sql", ".ps1", ".ts", ".tsx", ".js", ".jsx", ".cjs", ".mjs", ".css", ".py", ".dart", ".html", ".sh", ".bat", ".csv", ".xml", "Dockerfile", ".gitignore", ".dockerignore", ".env.example")
 $IgnorePatterns = @(
     "*.git*", "*notebooklm_sources*", "*node_modules*", "*.next*", "*__pycache__*", "*.venv*", "*.env*", "*dist*", "*build*", "*.supabase*", "*.dart_tool*"
 )

@@ -29,11 +29,19 @@ export async function createClient() {
   )
 }
 
-// Bypasses RLS for secure admin mutations
+// Bypasses RLS for secure admin mutations — NEVER expose this client to the browser
 export function createAdminClient() {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!serviceRoleKey) {
+    throw new Error(
+      '[createAdminClient] SUPABASE_SERVICE_ROLE_KEY is not set. ' +
+      'Admin operations require this key — do not fall back to the anon key.'
+    )
+  }
+
   return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    serviceRoleKey,
     {
       cookies: {
         getAll() { return [] },

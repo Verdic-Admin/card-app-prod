@@ -3,6 +3,9 @@ export interface PayPalCartItem {
   amount: number;
 }
 
+/**
+ * @deprecated Use the Server-Side checkout with PayPal Orders API instead.
+ */
 export function generatePayPalCartUrl(items: PayPalCartItem[], businessEmail: string, currency = 'USD'): string {
   const baseUrl = 'https://www.paypal.com/cgi-bin/webscr';
   

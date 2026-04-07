@@ -1,9 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Loader2, Upload, ScanLine, DollarSign, Save, Image as ImageIcon, RefreshCw } from 'lucide-react'
+import { Loader2, Upload, ScanLine, DollarSign, Save, Image as ImageIcon, RefreshCw, Wand2 } from 'lucide-react'
 import { addCardAction } from '@/app/actions/inventory'
-import { evaluateItemWithOracle } from '@/app/actions/oracleSync'
+import { getSingleOraclePrice } from '@/app/actions/oracleSync'
 
 export function AdminDashboard() {
   const [file, setFile] = useState<File | null>(null)
@@ -16,7 +16,6 @@ export function AdminDashboard() {
 
   const [formData, setFormData] = useState({
     player_name: '',
-    year: '',
     card_set: '',
     parallel_insert_type: '',
     card_number: '',
@@ -48,7 +47,6 @@ export function AdminDashboard() {
       setFormData(prev => ({
         ...prev,
         player_name: json.player_name || '',
-        year: json.year || '',
         card_set: json.card_set || '',
         parallel_insert_type: json.parallel_insert_type || '',
         card_number: json.card_number || '',
@@ -65,11 +63,16 @@ export function AdminDashboard() {
     setIsPricing(true)
     setError('')
     try {
-      const result = await evaluateItemWithOracle(formData)
-      if (result.success) {
-        setFormData(prev => ({ ...prev, oracle_price: result.price!.toFixed(2) }))
+      const price = await getSingleOraclePrice({
+        player_name: formData.player_name,
+        card_set: formData.card_set,
+        insert_name: formData.parallel_insert_type,
+        parallel_name: formData.parallel_insert_type
+      })
+      if (price !== null) {
+        setFormData(prev => ({ ...prev, oracle_price: price.toFixed(2) }))
       } else {
-        setError(result.message || 'Oracle evaluation failed.')
+        setError('Oracle evaluation returned no comps.')
       }
     } catch (err: any) {
       setError(err.message || 'Error communicating with Oracle.')
@@ -103,7 +106,7 @@ export function AdminDashboard() {
       setFile(null)
       setPreview('')
       setFormData({
-        player_name: '', year: '', card_set: '', parallel_insert_type: '', card_number: '',
+        player_name: '', card_set: '', parallel_insert_type: '', card_number: '',
         oracle_price: '',
       })
       alert('Card saved successfully!')
@@ -169,11 +172,7 @@ export function AdminDashboard() {
             <label className="block text-xs font-medium text-slate-500 mb-1">Player Name</label>
             <input type="text" value={formData.player_name} onChange={e => setFormData({...formData, player_name: e.target.value})} className="w-full p-2.5 text-sm font-bold text-slate-900 bg-white border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400" />
           </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Year</label>
-            <input type="text" value={formData.year} onChange={e => setFormData({...formData, year: e.target.value})} className="w-full p-2.5 text-sm font-bold text-slate-900 bg-white border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400" />
-          </div>
-          <div>
+          <div className="col-span-1">
             <label className="block text-xs font-medium text-slate-500 mb-1">Card Set</label>
             <input type="text" value={formData.card_set} onChange={e => setFormData({...formData, card_set: e.target.value})} className="w-full p-2.5 text-sm font-bold text-slate-900 bg-white border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400" />
           </div>
@@ -193,8 +192,8 @@ export function AdminDashboard() {
         <label className="block text-sm font-semibold text-slate-700 mb-3 flex items-center justify-between">
           3. Determine Value
           <button onClick={handleEvaluateOracle} disabled={isPricing || !formData.player_name} className="bg-purple-600 text-white text-xs font-bold px-3 py-1.5 rounded-md hover:bg-purple-700 disabled:opacity-50 flex items-center gap-1 transition-colors">
-            {isPricing ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-            Evaluate with Oracle
+            {isPricing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
+            Auto-Price with Oracle
           </button>
         </label>
         <div className="mb-4">

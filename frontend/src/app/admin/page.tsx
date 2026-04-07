@@ -5,6 +5,7 @@ import { InventoryTable } from '@/components/admin/InventoryTable'
 import { SignOutButton } from '@/components/admin/SignOutButton'
 import { LedgerDashboard } from '@/components/admin/LedgerDashboard'
 import { TradeLeadsCRM } from '@/components/admin/TradeLeadsCRM'
+import { AuctionManager } from '@/components/admin/AuctionManager'
 
 import Link from 'next/link'
 
@@ -22,6 +23,15 @@ export default async function AdminPage() {
     .from('inventory')
     .select('*')
     .order('player_name', { ascending: true })
+
+  // Fetch Oracle discount percentage and stream settings
+  const { data: settings } = await (supabase as any)
+    .from('store_settings')
+    .select('oracle_discount_percentage, live_stream_url')
+    .eq('id', 1)
+    .single()
+  const discountRate = settings?.oracle_discount_percentage || 0
+  const liveStreamUrl = settings?.live_stream_url || null
 
   const soldItems = (inventory as any[] || []).filter(item => item.status === 'sold')
 
@@ -52,9 +62,15 @@ export default async function AdminPage() {
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           <h2 className="text-xl font-bold text-slate-900 mb-6 flex justify-between items-center">
+             <span>Auction Manager 🔴</span>
+          </h2>
+          <AuctionManager initialItems={inventory || []} initialStreamUrl={liveStreamUrl} />
+        </div>
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <h2 className="text-xl font-bold text-slate-900 mb-6 flex justify-between items-center">
              <span>Live Inventory Database</span>
           </h2>
-          <InventoryTable initialItems={inventory || []} />
+          <InventoryTable initialItems={inventory || []} discountRate={discountRate} />
         </div>
       </div>
     </div>

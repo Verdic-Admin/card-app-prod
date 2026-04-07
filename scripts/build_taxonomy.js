@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const mdPath = path.join(__dirname, '..', 'docs', 'topps_taxonomy.md');
-const outPath = path.join(__dirname, 'src', 'utils', 'taxonomy.ts');
+const outPath = path.join(__dirname, '..', 'frontend', 'src', 'utils', 'taxonomy.ts');
 
 const md = fs.readFileSync(mdPath, 'utf8');
 const escapedMd = md.replace(/`/g, '\\`').replace(/\$/g, '\\$');

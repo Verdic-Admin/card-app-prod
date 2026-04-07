@@ -1,712 +1,318 @@
 'use client'
 
-import { useState, useRef } from 'react'
-import { Upload, Loader2, CheckCircle2, AlertCircle, Play, Save, Check, Link2, Unlink, Archive, Trash2, RotateCw, ArrowLeftRight } from 'lucide-react'
-import { addCardAction } from '@/app/actions/inventory'
-import { PRO_TEAMS } from '@/lib/constants/teams'
-import JSZip from 'jszip'
-
-interface QueuedCard {
-  id: string;
-  file: File;
-  padded_file?: File;
-  preview: string;
-  back_file?: File;
-  back_padded_file?: File;
-  back_preview?: string;
-  status: 'queued' | 'scanning' | 'ready' | 'saving' | 'saved' | 'error';
-  errorMsg?: string;
-  isFlaggedForRescan?: boolean;
-  rescanIdentifier?: string;
-  data: {
-    player_name: string;
-    team_name: string;
-    year: string;
-    card_set: string;
-    parallel_insert_type: string;
-    card_number: string;
-    comp1: string;
-    comp2: string;
-    comp3: string;
-    side: string;
-    isFetchingComps?: boolean;
-    cost_basis?: number;
-    accepts_offers?: boolean;
-  }
-}
-
-/** Rotates a File 90° clockwise on an offscreen canvas and returns a new File + objectURL. */
-async function rotateImage(file: File): Promise<{ file: File; url: string }> {
-  const bitmap = await createImageBitmap(file);
-  const canvas = document.createElement('canvas');
-  // Swap width/height for 90° rotation
-  canvas.width  = bitmap.height;
-  canvas.height = bitmap.width;
-  const ctx = canvas.getContext('2d')!;
-  ctx.translate(canvas.width / 2, canvas.height / 2);
-  ctx.rotate(Math.PI / 2);
-  ctx.drawImage(bitmap, -bitmap.width / 2, -bitmap.height / 2);
-  bitmap.close();
-  const blob = await new Promise<Blob>((res, rej) =>
-    canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), 'image/jpeg', 0.95)
-  );
-  const newFile = new File([blob], file.name, { type: 'image/jpeg' });
-  return { file: newFile, url: URL.createObjectURL(newFile) };
-}
+import { useState } from 'react'
+import { Upload, Loader2, Play, Save, CheckCircle2, ChevronRight, Wand2, DollarSign } from 'lucide-react'
+import { uploadImagesToScanner, identifyCardPair } from '@/app/actions/visionSync'
+import { getBatchOraclePrices } from '@/app/actions/oracleSync'
+import { batchCommitAction } from '@/app/actions/inventory'
 
 export function BulkIngestionWizard() {
-  const [queue, setQueue] = useState<QueuedCard[]>([])
-  const [isProcessingQueue, setIsProcessingQueue] = useState(false)
-  const [isSubmittingAll, setIsSubmittingAll] = useState(false)
-  const [isDragging, setIsDragging] = useState(false)
-  const [defaultCostBasis, setDefaultCostBasis] = useState<string>('0')
-  const [defaultAcceptsOffers, setDefaultAcceptsOffers] = useState(false)
+  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1)
+  const [frontImages, setFrontImages] = useState<File[]>([])
+  const [backImages, setBackImages] = useState<File[]>([])
+  const [jobId, setJobId] = useState<string | null>(null)
+  
+  // Step 2 & 3 results
+  const [croppedPairs, setCroppedPairs] = useState<{ side_a_url: string, side_b_url: string }[]>([])
+  const [identifiedResults, setIdentifiedResults] = useState<any[]>([])
+  
+  // States for UX
+  const [isUploading, setIsUploading] = useState(false)
+  const [isProcessingSSE, setIsProcessingSSE] = useState(false)
+  const [isIdentifying, setIsIdentifying] = useState(false)
+  const [isPricing, setIsPricing] = useState(false)
+  const [isCommitting, setIsCommitting] = useState(false)
 
-  // Swap-Back tool state: the card whose back is being swapped
-  const [swapSourceId, setSwapSourceId] = useState<string | null>(null)
-
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleFrontsDrop = (e: React.DragEvent) => {
     e.preventDefault()
-    setIsDragging(true)
+    if (e.dataTransfer.files) setFrontImages(Array.from(e.dataTransfer.files))
   }
-
-  const handleDragLeave = (e: React.DragEvent) => {
+  const handleBacksDrop = (e: React.DragEvent) => {
     e.preventDefault()
-    setIsDragging(false)
+    if (e.dataTransfer.files) setBackImages(Array.from(e.dataTransfer.files))
   }
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragging(false)
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      handleFiles(e.dataTransfer.files)
+  const handleUpload = async () => {
+    if (frontImages.length === 0 || backImages.length === 0 || frontImages.length !== backImages.length) {
+      alert("Please upload an equal number of Fronts and Backs")
+      return
     }
-  }
-
-  const handleFiles = (files: FileList | File[] | null) => {
-    if (!files) return;
-    const fileArray = Array.from(files);
-    
-    if (fileArray.length !== 2) {
-       alert("Standard Uploads now cleanly bypass OpenCV but strictly require exactly TWO pre-cropped photos: one Front and one Back for a single card.");
-       return;
-    }
-
-    const newCards: QueuedCard[] = [];
-    
-    // 2. Zero-Touch Default Injection natively into payload
-    const createData = (side: string) => ({
-        player_name: '', team_name: '', year: '', card_set: '', parallel_insert_type: '', card_number: '',
-        comp1: '', comp2: '', comp3: '', side, isFetchingComps: false,
-        cost_basis: parseFloat(defaultCostBasis) || 0,
-        accepts_offers: defaultAcceptsOffers
-    });
-
-    // Absolute Dual Override: If exactly two photos are dropped on the single target, assume they are Front and Back!
-    const isBackName = (filename: string) => /(_|-|\s)*(back|side_?b|2)\.[^/.]+$/i.test(filename);
-    let backFile = fileArray.find(f => isBackName(f.name)) || fileArray[1];
-    let frontFile = fileArray.find(f => f !== backFile) || fileArray[0];
-
-    newCards.push({
-        id: Math.random().toString(36).substring(7),
-        file: frontFile, preview: URL.createObjectURL(frontFile),
-        back_file: backFile, back_preview: URL.createObjectURL(backFile),
-        status: 'queued', data: createData('Dual')
-    });
-
-    setQueue(prev => [...prev, ...newCards])
-    
-    // Natively trigger Gemini directly on the raw perfectly cropped photos without OpenCV looping!
-    newCards.forEach(c => scanCard(c))
-  }
-
-  // Temporarily disabled: Hardware Sync (OpenCV WASM) logic migrating to external B2B Microservices.
-
-  const handleDownloadBackupZip = async () => {
-    if (queue.length === 0) return;
-    const zip = new JSZip();
-    queue.forEach(card => {
-       const safeName = card.data.player_name ? `${card.data.player_name}-${card.data.year}-${card.id}` : `raw_crop_${card.id}`;
-       zip.file(`Tight_Crops/${safeName}_SideA_Tight.jpg`, card.file);
-       if (card.padded_file) zip.file(`Manual_Backups/${safeName}_SideA_Padded.jpg`, card.padded_file);
-       if (card.back_file) zip.file(`Tight_Crops/${safeName}_SideB_Tight.jpg`, card.back_file);
-       if (card.back_padded_file) zip.file(`Manual_Backups/${safeName}_SideB_Padded.jpg`, card.back_padded_file);
-    });
-    const blob = await zip.generateAsync({ type: 'blob' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `WASM_OpenCV_Backup_${new Date().toISOString().split('T')[0]}.zip`;
-    link.click();
-    URL.revokeObjectURL(url);
-  }
-
-  const updateCard = (id: string, updates: Partial<QueuedCard>) => {
-    setQueue(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c))
-  }
-
-  const rotateCard = async (id: string, side: 'front' | 'back') => {
-    const card = queue.find(c => c.id === id);
-    if (!card) return;
-    if (side === 'front') {
-      const { file: newFile, url: newUrl } = await rotateImage(card.file);
-      URL.revokeObjectURL(card.preview);
-      updateCard(id, { file: newFile, preview: newUrl });
-    } else {
-      if (!card.back_file || !card.back_preview) return;
-      const { file: newFile, url: newUrl } = await rotateImage(card.back_file);
-      URL.revokeObjectURL(card.back_preview);
-      updateCard(id, { back_file: newFile, back_preview: newUrl });
-    }
-  }
-
-  const updateCardData = (id: string, field: keyof QueuedCard['data'], val: string) => {
-    setQueue(prev => prev.map(c => c.id === id ? { ...c, data: { ...c.data, [field]: val } } : c))
-  }
-
-  const removeCard = (id: string) => {
-    setQueue(prev => prev.filter(c => c.id !== id))
-  }
-
-  const scanCard = async (card: QueuedCard) => {
-    updateCard(card.id, { status: 'scanning', errorMsg: undefined })
+    setIsUploading(true)
     try {
-      const data = new FormData()
-      data.append('image', card.file)
+      const formData = new FormData()
+      frontImages.forEach(f => formData.append('images_a', f))
+      backImages.forEach(f => formData.append('images_b', f))
       
-      // If manually paired BEFORE scan, inject the back_image right now
-      if (card.back_file) {
-         data.append('back_image', card.back_file)
-      }
-      
-      const res = await fetch('/api/scan', { method: 'POST', body: data })
-      if (!res.ok) throw new Error('AI Scan failed')
-      
-      const json = await res.json()
-      const updatedData = {
-        ...card.data,
-        player_name: json.player_name || '',
-        team_name: json.team_name || '',
-        year: json.year || '',
-        card_set: json.card_set || '',
-        parallel_insert_type: json.parallel_insert_type || '',
-        card_number: json.card_number || '',
-        side: json.side || (card.back_file ? 'Dual' : 'Front')
-      };
-
-      updateCard(card.id, {
-        status: 'ready',
-        data: updatedData
-      });
-      
-      // TODO: Pricing will be hydrated externally via the B2B Oracle API.
-      return true;
-    } catch (err: any) {
-      updateCard(card.id, { status: 'error', errorMsg: err.message })
-      return false;
+      const returnedJobId = await uploadImagesToScanner(formData)
+      setJobId(returnedJobId)
+      setStep(2)
+      startSSE(returnedJobId)
+    } catch (e: any) {
+      alert("Upload failed: " + e.message)
+    } finally {
+      setIsUploading(false)
     }
   }
 
-  const processAllQueued = async () => {
-    setIsProcessingQueue(true);
-    const pending = queue.filter(c => c.status === 'queued');
+  const startSSE = (id: string) => {
+    setIsProcessingSSE(true)
+    const eventSource = new EventSource(`https://api.playerindexdata.com/api/proxy/scan/scanner/stream/${id}`)
     
-    // 3. Concurrent AI Processing (Batch size 3)
-    const BATCH_SIZE = 3;
-    for (let i = 0; i < pending.length; i += BATCH_SIZE) {
-        const batch = pending.slice(i, i + BATCH_SIZE);
-        await Promise.all(batch.map(card => scanCard(card)));
-        
-        // Brief delay between concurrent batches to respect limits but vastly outpace strict seq
-        if (i + BATCH_SIZE < pending.length) {
-            await new Promise(resolve => setTimeout(resolve, 1500));
-        }
-    }
-
-    setIsProcessingQueue(false);
-  }
-
-  const manuallyPairBack = (frontId: string, backId: string) => {
-    setQueue(prev => {
-       const backItem = prev.find(c => c.id === backId)
-       if (!backItem) return prev;
-       
-       return prev.map(c => {
-          if (c.id === frontId) {
-             return { 
-                ...c, 
-                back_file: backItem.file, 
-                back_preview: backItem.preview,
-                data: {
-                   ...c.data,
-                   year: c.data.year || backItem.data.year,
-                   card_number: c.data.card_number || backItem.data.card_number,
-                   card_set: c.data.card_set || backItem.data.card_set,
-                   side: c.status === 'ready' ? 'Dual' : c.data.side
-                }
-             }
-          }
-          return c
-       }).filter(c => c.id !== backId)
-    })
-  }
-
-  const removePairedBack = (frontId: string) => {
-     setQueue(prev => {
-        const frontItem = prev.find(c => c.id === frontId)
-        if (!frontItem || !frontItem.back_file) return prev;
-        
-        const extractedBack: QueuedCard = {
-           id: Math.random().toString(36).substring(7),
-           file: frontItem.back_file,
-           preview: frontItem.back_preview!,
-           status: frontItem.status === 'queued' ? 'queued' : 'ready',
-           data: { ...frontItem.data, side: 'Back' }
-        }
-
-        return prev.map(c => {
-           if (c.id === frontId) {
-              const { back_file, back_preview, ...rest } = c;
-              rest.data = { ...rest.data, side: rest.status === 'queued' ? '' : 'Front' }
-              return rest as QueuedCard;
-           }
-           return c
-        }).concat(extractedBack)
-     })
-  }
-
-  const swapCardImage = (id: string, newFile: File, side: 'front' | 'back') => {
-    setQueue(prev => prev.map(c => {
-      if (c.id === id) {
-        if (side === 'front') {
-           URL.revokeObjectURL(c.preview);
-           return { ...c, file: newFile, preview: URL.createObjectURL(newFile) };
-        } else {
-           if (c.back_preview) URL.revokeObjectURL(c.back_preview);
-           return { ...c, back_file: newFile, back_preview: URL.createObjectURL(newFile) };
-        }
+    const pairs: { side_a_url: string, side_b_url: string }[] = []
+    
+    eventSource.onmessage = (event) => {
+      const data = JSON.parse(event.data)
+      if (data.status === 'processing' && data.side_a_url && data.side_b_url) {
+        pairs.push({ side_a_url: data.side_a_url, side_b_url: data.side_b_url })
+        setCroppedPairs([...pairs])
+      } else if (data.status === 'completed') {
+        eventSource.close()
+        setIsProcessingSSE(false)
+        setStep(3)
+        // Automatically start AI identification
+        runIdentification(pairs, id)
+      } else if (data.status === 'error') {
+        eventSource.close()
+        setIsProcessingSSE(false)
+        alert('SSE Stream Error: ' + data.message)
       }
-      return c;
-    }))
-  }
-
-  // Temporarily disabled: applyCrop — Logic migrating to external B2B Microservices (Python CV microservice).
-
-  /** Swap-Back: atomically exchanges back_file + back_preview between two cards. */
-  const swapBacksBetweenCards = (idA: string, idB: string) => {
-    setQueue(prev => {
-      const cardA = prev.find(c => c.id === idA);
-      const cardB = prev.find(c => c.id === idB);
-      if (!cardA || !cardB) return prev;
-      const aBack = cardA.back_file;
-      const aBackPreview = cardA.back_preview;
-      const bBack = cardB.back_file;
-      const bBackPreview = cardB.back_preview;
-      // URLs don't need revoking — they stay alive in the other card.
-      return prev.map(c => {
-        if (c.id === idA) return { ...c, back_file: bBack, back_preview: bBackPreview };
-        if (c.id === idB) return { ...c, back_file: aBack, back_preview: aBackPreview };
-        return c;
-      });
-    });
-    setSwapSourceId(null);
-  }
-
-  const getAvg = (card: QueuedCard) => {
-    const prices = [parseFloat(card.data.comp1), parseFloat(card.data.comp2), parseFloat(card.data.comp3)].filter(p => !isNaN(p) && p > 0)
-    if (prices.length === 0) return { high: 0, low: 0, avg: 0 }
-    return {
-      high: Math.max(...prices),
-      low: Math.min(...prices),
-      avg: prices.reduce((a, b) => a + b, 0) / prices.length
+    }
+    
+    eventSource.onerror = () => {
+      eventSource.close()
+      setIsProcessingSSE(false)
     }
   }
 
-  const saveCard = async (card: QueuedCard) => {
-    updateCard(card.id, { status: 'saving', errorMsg: undefined })
+  const runIdentification = async (pairs: {side_a_url: string, side_b_url: string}[], qId: string) => {
+    setIsIdentifying(true)
     try {
-      const data = new FormData()
-      data.append('image', card.file)
-      if (card.back_file) {
-         data.append('back_image', card.back_file)
-      }
-      
-      const { high, low, avg } = getAvg(card)
-      
-      // The user requested smart retail rounding to the nearest .09 cent to boost sales psychology!
-      // Example: 1.26 -> 12.6 -> 13 -> 1.30 -> 1.29.
-      let retailAvg = avg;
-      if (avg > 0) {
-        retailAvg = Number((Math.round(avg * 10) / 10 - 0.01).toFixed(2));
-        if (retailAvg <= 0) retailAvg = 0.99; // safe floor
-      }
-
-      const payload = { 
-        ...card.data, 
-        high_price: high, 
-        low_price: low, 
-        avg_price: retailAvg,
-        listed_price: retailAvg,
-        cost_basis: card.data.cost_basis !== undefined ? card.data.cost_basis : (parseFloat(defaultCostBasis) || 0),
-        accepts_offers: card.data.accepts_offers !== undefined ? card.data.accepts_offers : defaultAcceptsOffers
-      }
-      
-      data.append('data', JSON.stringify(payload))
-      
-      await addCardAction(data)
-      updateCard(card.id, { status: 'saved' })
-      
-      // Graciously hold the Success state for 1.2s to flash the green checkmark before unmounting!
-      setTimeout(() => {
-         setQueue(prev => prev.filter(c => c.id !== card.id))
-      }, 1200)
-    } catch (err: any) {
-      updateCard(card.id, { status: 'error', errorMsg: err.message })
+      const promises = pairs.map(async pair => {
+        try {
+           // Provide fallback data in case AI fails
+          const res = await identifyCardPair({ queue_id: qId, side_a_url: pair.side_a_url, side_b_url: pair.side_b_url })
+          return { ...pair, ...res, price: 0 }
+        } catch (e) {
+          return { ...pair, player_name: 'AI Error', card_set: 'AI Error', price: 0 }
+        }
+      })
+      const results = await Promise.all(promises)
+      setIdentifiedResults(results)
+      setStep(4)
+      runPricing(results)
+    } catch (e: any) {
+      alert('Identification failed')
+    } finally {
+      setIsIdentifying(false)
     }
   }
 
-  const submitAllReady = async () => {
-    setIsSubmittingAll(true)
-    const readyCards = queue.filter(c => c.status === 'ready')
-    
-    const validCards = readyCards.filter(c => !c.isFlaggedForRescan)
-    const flaggedCards = readyCards.filter(c => c.isFlaggedForRescan)
-    
-    // Process Valid Cards naturally
-    await Promise.allSettled(validCards.map(c => saveCard(c)))
-    
-    // Process Flagged Cards natively to browser memory!
-    if (flaggedCards.length > 0) {
-       const textContent = "CARDS FLAGGED FOR RESCAN:\n\n" + flaggedCards.map((c, i) => `${i + 1}. ${c.rescanIdentifier || 'Unknown Item ID: ' + c.id}`).join('\n');
-       const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8;' });
-       const url = URL.createObjectURL(blob);
-       const link = document.createElement('a');
-       link.href = url;
-       link.download = `Rescan_List_${new Date().toISOString().split('T')[0]}.txt`;
-       document.body.appendChild(link);
-       link.click();
-       document.body.removeChild(link);
-       URL.revokeObjectURL(url);
-       
-       // Unmount the flagged cards instantly out of the UI
-       const flaggedIds = new Set(flaggedCards.map(c => c.id));
-       setQueue(prev => prev.filter(c => !flaggedIds.has(c.id)));
+  const runPricing = async (results: any[]) => {
+    setIsPricing(true)
+    try {
+      const payloads = results.map(r => ({ player_name: r.player_name, card_set: r.card_set, insert_name: r.insert_name, parallel_name: r.parallel_name }))
+      const prices = await getBatchOraclePrices(payloads)
+      
+      const pricedResults = results.map((r, i) => ({ ...r, price: prices[i] || 0 }))
+      setIdentifiedResults(pricedResults)
+      setStep(5)
+    } catch (e: any) {
+      alert('Pricing failed')
+      setStep(5)
+    } finally {
+      setIsPricing(false)
     }
-    
-    setIsSubmittingAll(false)
   }
 
-  // TODO: Pricing will be hydrated externally via the B2B Oracle API.
-  // fetchComps and fetchAllComps removed — /api/ebay-comps route has been deleted.
-  const fetchComps = async (_cardId: string, _dataToUse: QueuedCard['data']) => {
-    // Temporarily disabled: Logic migrating to external B2B Microservices.
-    console.warn('fetchComps is disabled. Pricing will be supplied by the B2B Oracle API.');
+  const handleCommit = async () => {
+    setIsCommitting(true)
+    try {
+      await batchCommitAction(identifiedResults)
+      alert("Successfully committed to inventory!")
+      // Reset
+      setStep(1)
+      setFrontImages([])
+      setBackImages([])
+      setCroppedPairs([])
+      setIdentifiedResults([])
+      setJobId(null)
+    } catch (e: any) {
+      alert("Commit failed")
+    } finally {
+      setIsCommitting(false)
+    }
   }
 
-  const queuedCount = queue.filter(c => c.status === 'queued').length;
-  const etaSeconds = queuedCount * 4;
-  const availableBacks = queue.filter(c => c.status === 'ready' && c.data.side === 'Back')
-  const availableQueuedBacks = queue.filter(c => c.status === 'queued')
-  // Temporarily disabled: isFetchingAllComps removed with fetchAllComps migration.
+  const updateResultField = (idx: number, field: string, value: string | number) => {
+    const next = [...identifiedResults]
+    next[idx] = { ...next[idx], [field]: value }
+    setIdentifiedResults(next)
+  }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 border-t-4 border-t-indigo-500">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-           <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-             Bulk Upload Pipeline
-           </h2>
-           <p className="text-xs font-semibold text-slate-500 mt-1">Select multiple images to securely queue them for delayed bulk AI extraction processing.</p>
-           
-           <div className="flex items-center gap-6 mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200 inline-flex">
-              <div className="flex items-center gap-2">
-                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Default Cost Basis $</label>
-                 <input type="number" step="0.01" value={defaultCostBasis} onChange={e => setDefaultCostBasis(e.target.value)} className="w-20 p-1.5 text-sm font-mono font-bold text-slate-900 bg-white border border-slate-300 rounded outline-none focus:ring-2 focus:ring-indigo-500 text-center" />
-              </div>
-              <label className="flex items-center gap-2 cursor-pointer">
-                 <input type="checkbox" checked={defaultAcceptsOffers} onChange={e => setDefaultAcceptsOffers(e.target.checked)} className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500" />
-                 <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Accept Offers</span>
-              </label>
-           </div>
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 relative overflow-hidden">
+      <div className="flex items-center gap-3 mb-10">
+        <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg shadow-sm border border-indigo-100">
+          <Wand2 className="w-6 h-6" />
         </div>
-        <div className="flex gap-3">
-          {queue.length > 0 && (
-            <button 
-              onClick={processAllQueued} 
-              disabled={isProcessingQueue || queuedCount === 0}
-              className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2 transition shadow-sm"
-            >
-              {isProcessingQueue ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-              Scan All Files
-            </button>
-          )}
-          {queue.length > 0 && (
-             <button 
-                onClick={handleDownloadBackupZip} 
-                className="bg-zinc-800 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-zinc-900 flex items-center gap-2 transition shadow-sm"
-             >
-                <Archive className="w-4 h-4" />
-                Backup Local ZIP
-             </button>
-          )}
-          {/* Temporarily disabled: Fetch All Comps — Logic migrating to external B2B Microservices. */}
-          {queue.filter(c => c.status === 'ready').length > 0 && (
-             <button 
-                onClick={submitAllReady} 
-                disabled={isSubmittingAll}
-                className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2 transition shadow-sm"
-             >
-                {isSubmittingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                Submit All Ready
-             </button>
-          )}
+        <div>
+          <h2 className="text-xl font-bold text-slate-900">AI-Powered Bulk Ingestion Wizard</h2>
+          <p className="text-sm font-medium text-slate-500">Vision Crop ➔ Identify ➔ Oracle Price ➔ Publish</p>
         </div>
       </div>
 
-      {isProcessingQueue && queuedCount > 0 && (
-        <div className="mb-6 bg-indigo-50 border border-indigo-100 rounded-lg p-5 flex items-center justify-between shadow-sm animate-pulse">
-          <div className="flex items-center gap-4">
-            <div className="bg-white p-2 rounded-full shadow-sm"><Loader2 className="w-6 h-6 animate-spin text-indigo-600" /></div>
-            <div>
-              <div className="text-sm font-bold text-indigo-900">AI Batch Processor Active</div>
-              <div className="text-xs text-indigo-700 font-medium tracking-wide">Scanning {queuedCount} remaining cards sequentially...</div>
-            </div>
-          </div>
-          <div className="text-right">
-             <div className="text-xs text-indigo-500 font-bold uppercase tracking-widest">Estimated Time left</div>
-             <div className="text-xl font-black text-indigo-900 font-mono">~{etaSeconds}s</div>
-          </div>
-        </div>
-      )}
+      <div className="flex justify-between items-center mb-10 px-4 sm:px-10 relative">
+         <div className="absolute top-1/2 left-10 right-10 h-0.5 bg-slate-200 -z-10 translate-y-[-50%]"></div>
+         {[
+           { num: 1, label: 'Upload' },
+           { num: 2, label: 'Process' },
+           { num: 3, label: 'Identify' },
+           { num: 4, label: 'Price' },
+           { num: 5, label: 'Review' }
+         ].map(s => (
+           <div key={s.num} className="flex flex-col items-center bg-white px-2">
+             <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm border-2 transition-colors ${step >= s.num ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-400 border-slate-300'}`}>
+               {s.num}
+             </div>
+             <span className={`text-[10px] sm:text-xs mt-2 uppercase tracking-wide font-black ${step >= s.num ? 'text-indigo-900' : 'text-slate-400'}`}>{s.label}</span>
+           </div>
+         ))}
+      </div>
 
-      {/* Swap-mode banner */}
-      {swapSourceId && (
-        <div className="mb-6 bg-violet-50 border border-violet-200 rounded-lg p-4 flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-top-2">
-          <div className="flex items-center gap-3">
-            <ArrowLeftRight className="w-5 h-5 text-violet-600" />
+      {step === 1 && (
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <div className="text-sm font-bold text-violet-900">Swap Mode Active</div>
-              <div className="text-xs text-violet-700 font-medium">Hover over another card and click “Swap Here” to exchange its back image with the selected card.</div>
+              <label className="block text-sm font-bold text-slate-700 mb-3 uppercase tracking-wider">Drag Fronts</label>
+              <div 
+                className={`border-2 border-dashed ${frontImages.length > 0 ? 'border-emerald-300 bg-emerald-50' : 'border-indigo-200 bg-indigo-50/30'} rounded-2xl h-56 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 transition-colors shadow-inner group`}
+                onDragOver={e => e.preventDefault()}
+                onDrop={handleFrontsDrop}
+                onClick={() => document.getElementById('fronts-upload')?.click()}
+              >
+                <div className="p-4 bg-white rounded-full shadow-sm group-hover:shadow transition flex items-center justify-center mb-3">
+                  <Upload className={`w-6 h-6 ${frontImages.length > 0 ? 'text-emerald-500' : 'text-indigo-400'}`} />
+                </div>
+                <span className={`text-sm font-bold ${frontImages.length > 0 ? 'text-emerald-700' : 'text-indigo-700'}`}>
+                   {frontImages.length > 0 ? `${frontImages.length} Front Images Selected` : 'Click or Drop Front Image files'}
+                </span>
+                <input id="fronts-upload" type="file" multiple accept="image/*" className="hidden" onChange={e => {if(e.target.files) setFrontImages(Array.from(e.target.files))}} />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-3 uppercase tracking-wider">Drag Backs</label>
+              <div 
+                className={`border-2 border-dashed ${backImages.length > 0 ? 'border-emerald-300 bg-emerald-50' : 'border-indigo-200 bg-indigo-50/30'} rounded-2xl h-56 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 transition-colors shadow-inner group`}
+                onDragOver={e => e.preventDefault()}
+                onDrop={handleBacksDrop}
+                onClick={() => document.getElementById('backs-upload')?.click()}
+              >
+                <div className="p-4 bg-white rounded-full shadow-sm group-hover:shadow transition flex items-center justify-center mb-3">
+                  <Upload className={`w-6 h-6 ${backImages.length > 0 ? 'text-emerald-500' : 'text-indigo-400'}`} />
+                </div>
+                <span className={`text-sm font-bold ${backImages.length > 0 ? 'text-emerald-700' : 'text-indigo-700'}`}>
+                   {backImages.length > 0 ? `${backImages.length} Back Images Selected` : 'Click or Drop Back Image files'}
+                </span>
+                <input id="backs-upload" type="file" multiple accept="image/*" className="hidden" onChange={e => {if(e.target.files) setBackImages(Array.from(e.target.files))}} />
+              </div>
             </div>
           </div>
-          <button
-            onClick={() => setSwapSourceId(null)}
-            className="px-3 py-1.5 bg-violet-200 hover:bg-violet-300 text-violet-900 font-bold text-xs rounded-lg transition-colors"
+          <button 
+            onClick={handleUpload}
+            disabled={isUploading || frontImages.length === 0 || backImages.length === 0}
+            className="w-full bg-indigo-600 text-white font-black text-lg py-4 rounded-xl disabled:opacity-50 hover:bg-indigo-700 hover:shadow-lg transition flex items-center justify-center gap-3"
           >
-            Cancel Swap
+            {isUploading ? <Loader2 className="w-6 h-6 animate-spin" /> : <Play className="w-6 h-6" />} Start Vision Pipeline
           </button>
         </div>
       )}
 
-      {/* Upload Zone */}
-      <div className="mb-8">
-        <div 
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-        >
-          <label className={`flex flex-col items-center justify-center w-full h-32 border-2 ${isDragging ? 'border-emerald-400 border-dashed bg-emerald-50 scale-[1.01]' : 'border-indigo-200 border-dashed bg-indigo-50/50 hover:bg-indigo-50'} rounded-xl cursor-pointer transition-all`}>
-            <div className="flex flex-col items-center justify-center gap-2">
-              <Upload className={`w-8 h-8 ${isDragging ? 'text-emerald-500' : 'text-indigo-400'}`} />
-              <span className={`text-sm font-bold ${isDragging ? 'text-emerald-700' : 'text-indigo-600'}`}>
-                 Standard Upload (Front & Back)
-              </span>
-              <span className="text-[10px] text-indigo-400/80 font-bold uppercase tracking-widest text-center px-4">Drop 2 pre-cropped images (Front + Back) here, or click to browse</span>
-            </div>
-            <input type="file" multiple className="hidden" accept="image/*" ref={fileInputRef} onChange={e => handleFiles(e.target.files)} />
-          </label>
-        </div>
-        {/* Temporarily disabled: Hardware Sync (OpenCV WASM) — Logic migrating to external B2B Microservices. */}
-      </div>
-
-      {/* Staging Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6">
-        {queue.map(card => (
-          <div key={card.id} className={`rounded-xl border flex flex-col overflow-hidden transition-all shadow-sm relative ${card.status === 'saved' ? 'opacity-50 grayscale border-slate-200 bg-slate-50' : card.isFlaggedForRescan ? 'opacity-90 bg-red-50/50 border-red-300 ring-4 ring-red-100/50' : card.status === 'error' ? 'border-red-300 ring-4 ring-red-100/50' : card.status === 'scanning' ? 'border-indigo-400 ring-4 ring-indigo-100/50' : card.status === 'ready' ? 'border-amber-300 ring-2 ring-amber-50' : 'border-slate-200'}`}>
-             <div className="absolute top-2 right-2 z-20 flex items-center gap-2">
-               <label className={`flex items-center gap-1.5 cursor-pointer px-2 py-1 rounded-lg text-xs font-bold transition-all ${card.status === 'saving' || card.status === 'saved' ? 'opacity-0 pointer-events-none' : ''} ${card.isFlaggedForRescan ? 'bg-red-500 text-white ring-2 ring-red-300 shadow-sm' : 'bg-white/80 text-red-500 border border-red-100 hover:bg-red-50'}`} title="Flag for Rescan">
-                 <input
-                   type="checkbox"
-                   checked={!!card.isFlaggedForRescan}
-                   onChange={() => updateCard(card.id, { isFlaggedForRescan: !card.isFlaggedForRescan })}
-                   disabled={card.status === 'saving' || card.status === 'saved'}
-                   className="w-3.5 h-3.5 accent-red-500 cursor-pointer"
-                 />
-                 {card.isFlaggedForRescan ? 'Quarantined' : 'Flag'}
-               </label>
-               <button onClick={() => removeCard(card.id)} disabled={card.status === 'saving' || card.status === 'saved'} className="p-1.5 bg-white/50 hover:bg-red-100 text-slate-400 hover:text-red-600 rounded-full transition-colors disabled:opacity-0" title="Delete from Queue">
-                 <Trash2 className="w-4 h-4 cursor-pointer" />
-               </button>
-             </div>
-            <div className={`flex items-stretch p-4 bg-slate-50 border-b border-slate-200/60 gap-4 relative ${card.isFlaggedForRescan ? 'grayscale border-red-200' : ''}`}>
-              <div className="flex gap-3 relative z-10 flex-shrink-0">
-                 <div 
-                    draggable={card.status === 'queued' && !card.back_file}
-                    onDragStart={e => {
-                       e.dataTransfer.effectAllowed = 'move';
-                       e.dataTransfer.setData('sourceId', card.id)
-                    }}
-                    onDragOver={e => {
-                       if (card.status === 'queued' && !card.back_file) {
-                          e.preventDefault()
-                          e.dataTransfer.dropEffect = 'move'
-                       }
-                    }}
-                    onDrop={e => {
-                       e.preventDefault();
-                       const sourceId = e.dataTransfer.getData('sourceId')
-                       if (sourceId && sourceId !== card.id && card.status === 'queued' && !card.back_file) {
-                          manuallyPairBack(card.id, sourceId)
-                       }
-                    }}
-                    className={`w-32 h-44 bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm relative group ${card.status === 'queued' && !card.back_file ? 'cursor-grab active:cursor-grabbing hover:ring-4 hover:ring-indigo-400/50 transition-all' : ''}`}
-                    title={card.status === 'queued' && !card.back_file ? "Drag & Drop onto another image to merge!" : ""}
-                 >
-                   <img src={card.preview} className="w-full h-full object-contain pointer-events-none" />
-                   {card.status === 'scanning' && <div className="absolute inset-0 bg-indigo-900/60 flex items-center justify-center backdrop-blur-[2px] transition-all"><Loader2 className="text-white w-8 h-8 animate-spin" /></div>}
-                   {card.status === 'saved' && <div className="absolute inset-0 bg-emerald-900/70 flex items-center justify-center backdrop-blur-[1px] transition-all"><CheckCircle2 className="text-emerald-100 w-10 h-10" /></div>}
-                   <div className="absolute inset-x-0 bottom-0 bg-black/60 text-white text-[10px] uppercase tracking-wider font-bold text-center py-1">{card.data.side || 'Front'}</div>
-                   <label className="absolute top-1 left-1 bg-white/90 hover:bg-white text-indigo-600 p-1.5 rounded backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow-sm" title="Swap Front Image">
-                       <Upload className="w-4 h-4" />
-                       <input disabled={card.status === 'saved' || card.status === 'scanning'} type="file" className="hidden" accept="image/*" onChange={e => { if (e.target.files?.[0]) swapCardImage(card.id, e.target.files[0], 'front') }} />
-                   </label>
-                    <button
-                      onClick={() => rotateCard(card.id, 'front')}
-                      disabled={card.status === 'saved' || card.status === 'scanning'}
-                      className="absolute bottom-7 left-1 bg-white/90 hover:bg-amber-50 text-amber-600 p-1.5 rounded backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity shadow-sm disabled:hidden"
-                      title="Rotate Front 90°"
-                    >
-                      <RotateCw className="w-4 h-4" />
-                    </button>
-                 </div>
-                 {card.back_preview && (
-                    <div className="w-32 h-44 bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm relative group">
-                       <img src={card.back_preview} className="w-full h-full object-contain pointer-events-none" />
-                       <div className="absolute inset-x-0 bottom-0 bg-black/60 text-white text-[10px] uppercase tracking-wider font-bold text-center py-1">Back</div>
-                       <label className="absolute top-1 left-1 bg-white/90 hover:bg-white text-indigo-600 p-1.5 rounded backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow-sm" title="Swap Back Image">
-                           <Upload className="w-4 h-4" />
-                           <input disabled={card.status === 'saved' || card.status === 'scanning'} type="file" className="hidden" accept="image/*" onChange={e => { if (e.target.files?.[0]) swapCardImage(card.id, e.target.files[0], 'back') }} />
-                       </label>
-                        <button
-                          onClick={() => rotateCard(card.id, 'back')}
-                          disabled={card.status === 'saved' || card.status === 'scanning'}
-                          className="absolute bottom-7 left-1 bg-white/90 hover:bg-amber-50 text-amber-600 p-1.5 rounded backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity shadow-sm disabled:hidden"
-                          title="Rotate Back 90°"
-                        >
-                          <RotateCw className="w-4 h-4" />
-                        </button>
-                       <button onClick={() => removePairedBack(card.id)} className="absolute top-1 right-1 bg-red-500/90 hover:bg-red-600 text-white p-1.5 rounded backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity" title="Unlink Back Image"><Unlink className="w-4 h-4" /></button>
-                    </div>
-                 )}
-              </div>
-              
-              <div className="flex-grow flex flex-col justify-center space-y-2 z-10">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Card ID: {card.id.toUpperCase()}</div>
-                {card.status === 'queued' && <span className="inline-flex items-center px-2.5 py-1 rounded bg-slate-200 text-slate-700 text-xs font-bold w-max shadow-sm border border-slate-300/50">Queued</span>}
-                {card.status === 'scanning' && <span className="inline-flex items-center px-2.5 py-1 rounded bg-indigo-100 text-indigo-700 text-xs font-bold w-max shadow-sm border border-indigo-200/50"><Loader2 className="w-3 h-3 animate-spin mr-1.5"/> Scanning...</span>}
-                {card.status === 'ready' && <span className="inline-flex items-center px-2.5 py-1 rounded bg-amber-100 text-amber-700 text-xs font-bold w-max shadow-sm border border-amber-200/50">Needs Pricing Check</span>}
-                {card.status === 'saving' && <span className="inline-flex items-center px-2.5 py-1 rounded bg-sky-100 text-sky-700 text-xs font-bold w-max shadow-sm border border-sky-200/50"><Loader2 className="w-3 h-3 animate-spin mr-1.5"/> Saving...</span>}
-                {card.status === 'saved' && <span className="inline-flex items-center px-2.5 py-1 rounded bg-emerald-100 text-emerald-800 text-xs font-bold w-max shadow-sm border border-emerald-300/50"><Check className="w-3 h-3 mr-1.5 stroke-[3px]"/> Published Live</span>}
-                {card.status === 'error' && <span className="inline-flex items-center px-2.5 py-1 rounded bg-red-100 text-red-700 text-xs font-bold w-max shadow-sm border border-red-200/50"><AlertCircle className="w-3 h-3 mr-1.5"/> Error</span>}
-                {card.back_file && <span className="inline-flex items-center px-2 py-0.5 rounded bg-blue-100 text-blue-700 text-[10px] font-bold w-max border border-blue-200/50"><Link2 className="w-3 h-3 mr-1"/> Auto-Paired Dual Sided</span>}
-              </div>
-            </div>
-
-            <div className="p-4 space-y-2 bg-white flex-grow">
-               <div className="flex gap-2">
-                 <input disabled={card.status === 'saved' || card.status === 'saving'} type="text" value={card.data.player_name} onChange={e => updateCardData(card.id, 'player_name', e.target.value)} className="w-1/2 p-2 text-sm font-bold text-slate-900 bg-white placeholder:text-slate-400 placeholder:font-normal border border-slate-300 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none disabled:opacity-50 transition-colors shadow-sm" placeholder="Player Name" />
-                 <div className="w-1/2 relative">
-                    <input list={`teams-${card.id}`} disabled={card.status === 'saved' || card.status === 'saving'} type="text" value={card.data.team_name} onChange={e => updateCardData(card.id, 'team_name', e.target.value)} className="w-full p-2 text-sm font-bold text-slate-900 bg-white placeholder:text-slate-400 placeholder:font-normal border border-slate-300 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none disabled:opacity-50 transition-colors shadow-sm" placeholder="Team Name" />
-                    <datalist id={`teams-${card.id}`}>
-                       {PRO_TEAMS.map(team => <option key={team} value={team} />)}
-                    </datalist>
-                 </div>
-               </div>
-               <div className="flex gap-2">
-                 <input disabled={card.status === 'saved'} type="text" value={card.data.year} onChange={e => updateCardData(card.id, 'year', e.target.value)} className="w-1/3 p-2 text-xs font-bold text-slate-900 bg-white placeholder:text-slate-400 placeholder:font-normal border border-slate-300 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none disabled:opacity-50 transition-colors shadow-sm" placeholder="Year" />
-                 <input disabled={card.status === 'saved'} type="text" value={card.data.card_set} onChange={e => updateCardData(card.id, 'card_set', e.target.value)} className="w-2/3 p-2 text-xs font-bold text-slate-900 bg-white placeholder:text-slate-400 placeholder:font-normal border border-slate-300 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none disabled:opacity-50 transition-colors shadow-sm" placeholder="Card Set" />
-               </div>
-               <div className="flex gap-2">
-                 <input disabled={card.status === 'saved'} type="text" value={card.data.card_number} onChange={e => updateCardData(card.id, 'card_number', e.target.value)} className="w-1/3 p-2 text-xs font-bold text-slate-900 bg-white placeholder:text-slate-400 placeholder:font-normal border border-slate-300 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none disabled:opacity-50 transition-colors shadow-sm" placeholder="Number" />
-                 <input disabled={card.status === 'saved'} type="text" value={card.data.parallel_insert_type} onChange={e => updateCardData(card.id, 'parallel_insert_type', e.target.value)} className="w-2/3 p-2 text-xs font-bold text-slate-900 bg-white placeholder:text-slate-400 placeholder:font-normal border border-slate-300 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none disabled:opacity-50 transition-colors shadow-sm" placeholder="Parallel/Insert" />
-               </div>
-
-               {card.status === 'queued' && !card.back_file && availableQueuedBacks.length > 1 && (
-                  <div className="mt-2 pt-2 border-t border-dashed border-slate-200">
-                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Select Back Image to Merge Before Scan</label>
-                     <select onChange={e => { if (e.target.value) manuallyPairBack(card.id, e.target.value) }} className="w-full p-2 text-xs bg-slate-50 border border-slate-200 rounded text-slate-700 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 cursor-pointer">
-                        <option value="">-- Pair with a queued image --</option>
-                        {availableQueuedBacks.filter(b => b.id !== card.id && !b.back_file).map(b => (
-                           <option key={b.id} value={b.id}>
-                              Queued Back Image: ID {b.id.toUpperCase()}
-                           </option>
-                        ))}
-                     </select>
-                  </div>
-               )}
-               
-               {card.status === 'ready' && card.data.side !== 'Back' && !card.back_file && availableBacks.length > 0 && (
-                  <div className="mt-2 pt-2 border-t border-dashed border-slate-200">
-                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Manual Override: Attach Post-Scan Back</label>
-                     <select onChange={e => { if (e.target.value) manuallyPairBack(card.id, e.target.value) }} className="w-full p-2 text-xs bg-slate-50 border border-slate-200 rounded text-slate-700 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 cursor-pointer">
-                        <option value="">-- Select a scanned back image --</option>
-                        {availableBacks.map(b => (
-                           <option key={b.id} value={b.id}>
-                              Orphaned Back: {b.data.player_name} #{b.data.card_number}
-                           </option>
-                        ))}
-                     </select>
-                  </div>
-               )}
-
-                {card.status !== 'queued' && card.status !== 'scanning' && card.data.side !== 'Back' && !card.isFlaggedForRescan && (
-                <div className="pt-3 mt-3 border-t border-slate-100">
-                  <div className="flex justify-between items-center mb-2">
-                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded">Pricing Setup</span>
-                     {/* Temporarily disabled: Auto-Fetch Comps — Logic migrating to external B2B Microservices. */}
-                  </div>
-                  <div className="flex gap-2 mb-3">
-                    <input disabled={card.status === 'saved'} inputMode="decimal" type="text" value={card.data.comp1} onChange={e => updateCardData(card.id, 'comp1', e.target.value)} className="w-1/3 p-2 text-sm font-mono font-bold text-slate-900 placeholder:text-slate-400 placeholder:font-normal border border-slate-300 rounded focus:bg-indigo-50 focus:border-indigo-500 outline-none disabled:opacity-50 text-center transition-colors shadow-sm" placeholder="C1 $" title="Comp 1" />
-                    <input disabled={card.status === 'saved'} inputMode="decimal" type="text" value={card.data.comp2} onChange={e => updateCardData(card.id, 'comp2', e.target.value)} className="w-1/3 p-2 text-sm font-mono font-bold text-slate-900 placeholder:text-slate-400 placeholder:font-normal border border-slate-300 rounded focus:bg-indigo-50 focus:border-indigo-500 outline-none disabled:opacity-50 text-center transition-colors shadow-sm" placeholder="C2 $" title="Comp 2"/>
-                    <input disabled={card.status === 'saved'} inputMode="decimal" type="text" value={card.data.comp3} onChange={e => updateCardData(card.id, 'comp3', e.target.value)} className="w-1/3 p-2 text-sm font-mono font-bold text-slate-900 placeholder:text-slate-400 placeholder:font-normal border border-slate-300 rounded focus:bg-indigo-50 focus:border-indigo-500 outline-none disabled:opacity-50 text-center transition-colors shadow-sm" placeholder="C3 $" title="Comp 3" />
-                  </div>
-                  {card.status !== 'saved' && (
-                      <button onClick={() => saveCard(card)} disabled={card.status === 'saving'} className="w-full bg-slate-900 text-white font-bold text-sm py-2.5 rounded shadow-sm hover:bg-emerald-600 flex justify-center items-center gap-2 transition-colors disabled:opacity-50">
-                        {card.status === 'saving' ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4"/>} Confirm & Publish
-                      </button>
-                  )}
-               </div>
-               )}
-
-               {card.isFlaggedForRescan && (
-                   <div className="mt-3 bg-red-50/50 border border-red-200 p-3 rounded-lg animate-in fade-in slide-in-from-top-2">
-                      <label className="text-[10px] font-bold text-red-700 uppercase tracking-widest block mb-2">Physical Identifier for Rescan List</label>
-                      <input 
-                         type="text" 
-                         value={card.rescanIdentifier || ''} 
-                         onChange={e => updateCard(card.id, { rescanIdentifier: e.target.value })} 
-                         className="w-full p-2.5 text-sm font-bold text-red-900 bg-white placeholder:text-red-300 border border-red-300 rounded focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none transition-colors shadow-sm mb-3"
-                         placeholder="e.g. Ohtani Base Card"
-                      />
-                      <button onClick={() => {
-                          const blob = new Blob([`CARDS FLAGGED FOR RESCAN:\n\n1. ${card.rescanIdentifier || 'Unknown Item ID: ' + card.id}`], { type: 'text/plain;charset=utf-8;' });
-                          const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download=`Rescan_List_${card.id}.txt`; document.body.appendChild(link); link.click(); document.body.removeChild(link);
-                          setQueue(prev => prev.filter(c => c.id !== card.id));
-                      }} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold text-sm py-2.5 rounded shadow-sm flex justify-center items-center gap-2 transition-colors">
-                         <Archive className="w-4 h-4"/> Eject & Download Note
-                      </button>
-                   </div>
-               )}
-            </div>
-            {card.errorMsg && <div className="bg-red-50 py-2 px-4 text-xs text-red-700 font-bold break-words border-t border-red-200 flex items-start gap-2"><AlertCircle className="w-4 h-4 flex-shrink-0" />{card.errorMsg}</div>}
+      {step === 2 && (
+        <div className="text-center py-20 animate-pulse">
+          <Loader2 className="w-16 h-16 animate-spin text-indigo-600 mx-auto mb-6" />
+          <h3 className="text-3xl font-black text-slate-900 mb-3">Cropping Images SSE</h3>
+          <p className="text-slate-500 font-medium text-lg mb-8 bg-slate-100 rounded-full px-6 py-2 w-fit mx-auto border border-slate-200 shadow-inner">
+             {croppedPairs.length} of {frontImages.length} pairs cropped via high-performance stream...
+          </p>
+          <div className="mt-8 flex justify-center gap-4 flex-wrap max-w-4xl mx-auto opacity-70">
+             {croppedPairs.map((p, i) => (
+                <div key={i} className="w-16 h-20 border-2 border-indigo-200 rounded-lg overflow-hidden relative shadow-md shadow-indigo-100">
+                   <img src={p.side_a_url} className="w-full h-full object-cover" />
+                </div>
+             ))}
           </div>
-        ))}
-      </div>
-      
-      {/* Temporarily disabled: CropModal — Logic migrating to external B2B Microservices (Python CV microservice). */}
+        </div>
+      )}
+
+      {step === 3 && (
+        <div className="text-center py-24 animate-in zoom-in duration-500">
+          <Wand2 className="w-20 h-20 animate-bounce text-purple-600 mx-auto mb-6 drop-shadow-xl" />
+          <h3 className="text-3xl font-black text-slate-900 mb-3">Vision AI Extraction</h3>
+          <p className="text-slate-500 font-medium text-lg">Querying PlayerIndex multi-modal LLM to identify all {croppedPairs.length} card sets, inserts, and parallels in parallel...</p>
+        </div>
+      )}
+
+      {step === 4 && (
+        <div className="text-center py-24 animate-in slide-in-from-bottom duration-500">
+          <div className="w-24 h-24 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-md border-4 border-emerald-50">
+             <DollarSign className="w-12 h-12 text-emerald-600" />
+          </div>
+          <h3 className="text-3xl font-black text-slate-900 mb-3">The Fintech Oracle</h3>
+          <p className="text-slate-500 font-medium text-lg">Cross-referencing {identifiedResults.length} assets with live market APIs to acquire real-time projection prices...</p>
+        </div>
+      )}
+
+      {step === 5 && (
+        <div className="space-y-8 animate-in fade-in duration-700">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 max-h-[600px] overflow-y-auto pr-2 pb-2">
+            {identifiedResults.map((result, idx) => (
+              <div key={idx} className="border border-slate-200 rounded-2xl p-5 flex gap-5 bg-white shadow hover:shadow-lg transition hover:border-indigo-200 group">
+                <div className="flex-shrink-0 w-28 flex flex-col gap-3">
+                  <div className="relative rounded-lg overflow-hidden border border-slate-200 shadow-sm aspect-[3/4]">
+                     <img src={result.side_a_url} className="w-full h-full object-cover" />
+                     <div className="absolute inset-x-0 bottom-0 bg-black/60 text-white text-[9px] font-black tracking-widest uppercase py-1 text-center">Front</div>
+                  </div>
+                  <div className="relative rounded-lg overflow-hidden border border-slate-200 shadow-sm aspect-[3/4]">
+                     <img src={result.side_b_url} className="w-full h-full object-cover" />
+                     <div className="absolute inset-x-0 bottom-0 bg-black/60 text-white text-[9px] font-black tracking-widest uppercase py-1 text-center">Back</div>
+                  </div>
+                </div>
+                <div className="flex-1 flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none block mb-1">Player</label>
+                      <input type="text" value={result.player_name || ''} onChange={e => updateResultField(idx, 'player_name', e.target.value)} className="w-full py-2 px-3 text-sm font-bold text-slate-900 bg-slate-50 border border-slate-200 rounded-lg focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 outline-none transition" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none block mb-1">Set</label>
+                      <input type="text" value={result.card_set || ''} onChange={e => updateResultField(idx, 'card_set', e.target.value)} className="w-full py-2 px-3 text-sm font-bold text-slate-900 bg-slate-50 border border-slate-200 rounded-lg focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 outline-none transition" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none block mb-1">Parallel / Insert</label>
+                      <input type="text" value={result.insert_name || result.parallel_name || ''} onChange={e => updateResultField(idx, 'insert_name', e.target.value)} className="w-full py-2 px-3 text-sm font-bold text-slate-900 bg-slate-50 border border-slate-200 rounded-lg focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 outline-none transition" />
+                    </div>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-dashed border-slate-200 flex items-center justify-between">
+                    <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded">
+                       <DollarSign className="w-3 h-3"/> Target Retail $
+                    </label>
+                    <input type="number" step="0.01" value={result.price || ''} onChange={e => updateResultField(idx, 'price', e.target.value)} className="w-24 px-2 py-1 text-sm font-black text-emerald-700 bg-white border border-emerald-200 rounded shadow-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none text-right" placeholder="0.00" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          <button 
+            onClick={handleCommit}
+            disabled={isCommitting}
+            className="w-full bg-slate-900 text-white font-black text-lg py-4 rounded-xl disabled:opacity-50 hover:bg-emerald-600 hover:shadow-xl transition-all flex items-center justify-center gap-3 drop-shadow-md border border-slate-800"
+          >
+            {isCommitting ? <Loader2 className="w-6 h-6 animate-spin" /> : <CheckCircle2 className="w-6 h-6 text-emerald-400" />} 
+            {isCommitting ? 'Injecting into Relational Matrix...' : `MINT ALL ${identifiedResults.length} TO INVENTORY DB`}
+          </button>
+        </div>
+      )}
     </div>
   )
 }
-

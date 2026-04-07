@@ -9,17 +9,20 @@ export async function validateCartCompleteness(itemIds: string[]) {
   
   if (!itemIds || itemIds.length === 0) return { valid: true, unavailableIds: [] }
 
-  const { data, error } = await (supabase.from('inventory') as any)
-    .select('id, status')
+  // Execute an atomic UPDATE to lock the items
+  const { data: updatedData, error: updateError } = await (supabase.from('inventory') as any)
+    .update({ 
+      status: 'pending_checkout', 
+      checkout_expires_at: new Date(Date.now() + 10 * 60000).toISOString() 
+    })
     .in('id', itemIds)
+    .eq('status', 'available')
+    .select('id')
 
-  if (error) throw new Error("Database validation failed")
+  if (updateError) throw new Error("Database locking failed: " + updateError.message)
 
-  // Iterate checking if an item was completely deleted or sold in another session
-  const missingOrSold = itemIds.filter(id => {
-    const dbItem = data.find((d: any) => d.id === id)
-    return !dbItem || dbItem.status !== 'available'
-  })
+  const lockedIds = updatedData?.map((d: any) => d.id) || []
+  const missingOrSold = itemIds.filter(id => !lockedIds.includes(id))
 
   return { 
     valid: missingOrSold.length === 0, 

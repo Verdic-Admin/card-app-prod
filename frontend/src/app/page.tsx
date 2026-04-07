@@ -8,11 +8,10 @@ import { getStoreSettings } from "@/app/actions/settings";
 const SITE_NAME = "Into the Gap Sportscards";
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://intothegapsportscards.com";
 /** Builds the URL for our dynamic /api/og edge route */
-function buildOgImageUrl(base: string, params: { q?: string; team?: string; year?: string }) {
+function buildOgImageUrl(base: string, params: { q?: string; team?: string }) {
   const url = new URL(`${base}/api/og`);
   if (params.q)    url.searchParams.set('q',    params.q);
   if (params.team) url.searchParams.set('team', params.team);
-  if (params.year) url.searchParams.set('year', params.year);
   return url.toString();
 }
 const DEFAULT_DESCRIPTION =
@@ -26,13 +25,10 @@ export async function generateMetadata({ searchParams }: PageProps): Promise<Met
   // Build a human-readable label from whatever filter is active
   const query = params?.q;
   const team  = params?.team;
-  const year  = params?.year;
 
   let label: string | null = null;
   if (query) label = query.trim();
-  else if (team && year) label = `${year} ${team}`;
   else if (team) label = team;
-  else if (year) label = year;
 
   const title = label ? `Shop ${label} Cards | ${SITE_NAME}` : SITE_NAME;
   const description = label
@@ -47,14 +43,14 @@ export async function generateMetadata({ searchParams }: PageProps): Promise<Met
       description,
       url: BASE_URL,
       siteName: SITE_NAME,
-      images: [{ url: buildOgImageUrl(BASE_URL, { q: query, team, year }), width: 1200, height: 630, alt: title }],
+      images: [{ url: buildOgImageUrl(BASE_URL, { q: query, team }), width: 1200, height: 630, alt: title }],
       type: "website",
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: [buildOgImageUrl(BASE_URL, { q: query, team, year })],
+      images: [buildOgImageUrl(BASE_URL, { q: query, team })],
     },
   };
 }
@@ -68,11 +64,10 @@ export default async function Home(props: { searchParams: Promise<{ [key: string
   // 1. Dynamically extract the highly precise lists of available teams and years that actually exist in the DB right now
   const { data: filterData } = await supabase
     .from('inventory')
-    .select('team_name, year')
+    .select('team_name')
     .eq('status', 'available')
   
   const availableTeams = Array.from(new Set(filterData?.map((d: any) => d.team_name).filter(Boolean) as string[])).sort()
-  const availableYears = Array.from(new Set(filterData?.map((d: any) => d.year).filter(Boolean) as string[])).sort((a,b) => b.localeCompare(a))
 
   // 2. Base Query Builder using Next.js pure SearchParams to natively enable shareable Deep Links instantly
   let query = supabase.from('inventory').select('*').eq('status', 'available')
@@ -82,9 +77,6 @@ export default async function Home(props: { searchParams: Promise<{ [key: string
   }
   if (searchParams?.team) {
       query = query.ilike('team_name', searchParams.team)
-  }
-  if (searchParams?.year) {
-      query = query.eq('year', searchParams.year)
   }
   if (searchParams?.minPrice) {
       query = query.gte('listed_price', searchParams.minPrice)
@@ -104,7 +96,7 @@ export default async function Home(props: { searchParams: Promise<{ [key: string
       <Hero settings={settings} />
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-16 flex flex-col lg:flex-row items-start gap-8">
         
-        <StoreFilters availableTeams={availableTeams} availableYears={availableYears} />
+        <StoreFilters availableTeams={availableTeams} />
 
         <div className="flex-1 w-full min-w-0">
           <div className="mb-8 flex items-center justify-between">

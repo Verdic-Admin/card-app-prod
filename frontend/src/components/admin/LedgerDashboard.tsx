@@ -37,11 +37,10 @@ export function LedgerDashboard({ soldItems }: { soldItems: InventoryItem[] }) {
   }, [soldItems, shippingRate])
 
   const exportCSV = () => {
-    const headers = ['Card_ID', 'Player', 'Year', 'Set', 'Listed_Price', 'Cost_Basis', 'Sold_Date']
+    const headers = ['Card_ID', 'Player', 'Set', 'Listed_Price', 'Cost_Basis', 'Sold_Date']
     const rows = soldItems.map(item => [
       item.id,
       `"${(item.player_name || '').replace(/"/g, '""')}"`,
-      `"${(item.year || '').replace(/"/g, '""')}"`,
       `"${(item.card_set || '').replace(/"/g, '""')}"`,
       (item.listed_price ?? item.avg_price ?? 0).toFixed(2),
       (item.cost_basis ?? 0).toFixed(2),

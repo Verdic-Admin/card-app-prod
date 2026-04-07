@@ -40,11 +40,10 @@ export async function addCardAction(formData: FormData) {
     }
   }
 
-  const { error: dbError } = await (admin.from('inventory') as any)
+  const { data: insertedRow, error: dbError } = await (admin.from('inventory') as any)
     .insert({
       player_name: payload.player_name,
       team_name: payload.team_name,
-      year: payload.year,
       card_set: payload.card_set,
       parallel_insert_type: payload.parallel_insert_type,
       card_number: payload.card_number,
@@ -57,9 +56,86 @@ export async function addCardAction(formData: FormData) {
       image_url: publicUrlData.publicUrl,
       back_image_url: backImageUrl,
       status: 'available'
-    })
+    }).select('id').single()
 
   if (dbError) throw new Error(`Database insert failed: ${dbError.message}`)
+
+  try {
+    const shopId = process.env.NEXT_PUBLIC_SHOP_ID || 'local_shop'
+    const fullUrl = `https://${process.env.NEXT_PUBLIC_SITE_DOMAIN || 'localhost:3000'}/product/${insertedRow?.id || 'new'}`
+    
+    await fetch('https://api.playerindexdata.com/fintech/syndication/webhook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        shop_id: shopId,
+        player_name: payload.player_name,
+        card_set: payload.card_set,
+        insert_name: payload.parallel_insert_type,
+        parallel_name: payload.parallel_insert_type,
+        price: payload.listed_price || payload.avg_price,
+        image_url: publicUrlData.publicUrl,
+        buy_url: fullUrl
+      })
+    })
+  } catch (e) {
+    console.warn("Syndication webhook failed:", e)
+  }
+
+  revalidatePath('/')
+  revalidatePath('/admin')
+  return { success: true }
+}
+
+export async function batchCommitAction(items: any[]) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error("Unauthorized")
+
+  const admin = createAdminClient()
+
+  for (const item of items) {
+    const payload = {
+      player_name: item.player_name,
+      card_set: item.card_set,
+      parallel_insert_type: item.insert_name || item.parallel_name, // Map accordingly
+      listed_price: item.price || 0,
+      avg_price: item.price || 0,
+      cost_basis: 0,
+      accepts_offers: true,
+      image_url: item.side_a_url,
+      back_image_url: item.side_b_url,
+      status: 'available'
+    }
+
+    const { data: insertedRow, error } = await (admin.from('inventory') as any).insert(payload).select('id').single()
+    if (error) {
+      console.error("Batch insert error:", error)
+      continue
+    }
+
+    // Fire webhook
+    try {
+      const shopId = process.env.NEXT_PUBLIC_SHOP_ID || 'local_shop'
+      const fullUrl = `https://${process.env.NEXT_PUBLIC_SITE_DOMAIN || 'localhost:3000'}/product/${insertedRow.id}`
+      await fetch('https://api.playerindexdata.com/fintech/syndication/webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          shop_id: shopId,
+          player_name: payload.player_name,
+          card_set: payload.card_set,
+          insert_name: payload.parallel_insert_type,
+          parallel_name: payload.parallel_insert_type,
+          price: payload.listed_price,
+          image_url: payload.image_url,
+          buy_url: fullUrl
+        })
+      })
+    } catch (e) {
+      console.warn("Syndication webhook failed:", e)
+    }
+  }
 
   revalidatePath('/')
   revalidatePath('/admin')
@@ -215,4 +291,77 @@ export async function rotateCardImageAction(
   revalidatePath('/')
   revalidatePath('/admin')
   return { newUrl }
+}
+
+export async function bulkUpdateMetricsAction(ids: string[], costBasis: number, acceptsOffers: boolean) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error("Unauthorized")
+
+  const admin = createAdminClient()
+
+  const { error } = await admin.from('inventory').update({
+    cost_basis: costBasis,
+    accepts_offers: acceptsOffers
+  }).in('id', ids)
+  
+  if (error) throw new Error(`Bulk update failed: ${error.message}`)
+
+  revalidatePath('/')
+  revalidatePath('/admin')
+  revalidatePath('/sold')
+}
+
+export async function updateLiveStreamUrl(url: string | null) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error("Unauthorized")
+  const admin = createAdminClient()
+  await (admin.from('store_settings') as any).update({ live_stream_url: url }).eq('id', 1)
+  revalidatePath('/admin')
+  revalidatePath('/auction')
+}
+
+export async function sendToAuctionBlock(ids: string[]) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error("Unauthorized")
+  const admin = createAdminClient()
+  await (admin.from('inventory') as any).update({ is_auction: true, auction_status: 'pending' }).in('id', ids)
+  revalidatePath('/admin')
+}
+
+export async function generateBatchCodes(ids: string[]) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error("Unauthorized")
+  const admin = createAdminClient()
+  for (const id of ids) {
+    const code = `PI-${Math.floor(1000 + Math.random() * 9000)}`
+    await (admin.from('inventory') as any).update({ verification_code: code }).eq('id', id)
+  }
+  revalidatePath('/admin')
+}
+
+export async function uploadVerifiedFlipUI(id: string, formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error("Unauthorized")
+  const admin = createAdminClient()
+  
+  const file = formData.get('video') as File
+  if (!file) throw new Error("Missing video file")
+  
+  const fileExt = file.name.split('.').pop()
+  const fileName = `video-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
+  const { error: uploadError } = await admin.storage.from('card-images').upload(fileName, file)
+  if (uploadError) throw new Error('Upload failed')
+  const { data: urlData } = admin.storage.from('card-images').getPublicUrl(fileName)
+  
+  await (admin.from('inventory') as any).update({
+    video_url: urlData.publicUrl,
+    is_verified_flip: true
+  }).eq('id', id)
+  revalidatePath('/admin')
+  revalidatePath('/auction')
 }
