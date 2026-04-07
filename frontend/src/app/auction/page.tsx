@@ -73,7 +73,7 @@ export default async function LiveAuctionPage() {
       <div>
         <h2 className="text-2xl font-bold text-white mb-6 border-b border-zinc-800 pb-2">Currently on the Block</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {(items || []).map(item => (
+          {(items || []).map((item: any) => (
             <div key={item.id} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-xl transform hover:-translate-y-1 transition-all duration-300">
               <div className="relative aspect-[3/4] bg-zinc-950 flex items-center justify-center overflow-hidden">
                 {item.is_verified_flip && item.video_url ? (
