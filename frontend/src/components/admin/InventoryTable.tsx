@@ -235,7 +235,7 @@ export function InventoryTable({ initialItems, discountRate = 0 }: { initialItem
   const handleSingleSync = async (id: string) => {
     setSyncingId(id)
     try {
-      const result = await syncSingleItemWithOracle(id)
+      const result: any = await syncSingleItemWithOracle(id)
       if (result.is_pending) {
         setPendingCorrections([result.pending_correction])
       } else if (result.success) {
@@ -253,7 +253,7 @@ export function InventoryTable({ initialItems, discountRate = 0 }: { initialItem
   const handleApplyOracleDiscount = async (item: InventoryItem) => {
     setApplyingId(item.id)
     try {
-      const result = await applyOracleDiscount(item.id)
+      const result: any = await applyOracleDiscount(item.id)
       if (result.success) {
         setItems(prev => prev.map(i => i.id === item.id ? { ...i, listed_price: result.new_price ?? null } : i))
       } else {
@@ -270,7 +270,7 @@ export function InventoryTable({ initialItems, discountRate = 0 }: { initialItem
     if (!window.confirm(`Apply Oracle pricing (${discountRate}% below market) to ALL items with projections?`)) return
     setIsApplyingAll(true)
     try {
-      const result = await applyOracleDiscountAll()
+      const result: any = await applyOracleDiscountAll()
       if (result.success) {
         alert(`Applied Oracle pricing to ${result.count} items at ${result.discount}% below market.`)
         window.location.reload()
@@ -287,7 +287,7 @@ export function InventoryTable({ initialItems, discountRate = 0 }: { initialItem
   const handleMasterSync = async () => {
     setIsMasterSyncing(true)
     try {
-      const result = await syncInventoryWithOracle()
+      const result: any = await syncInventoryWithOracle()
       if (result.pendingCorrections && result.pendingCorrections.length > 0) {
         setPendingCorrections(result.pendingCorrections)
         if (result.count > 0) {
