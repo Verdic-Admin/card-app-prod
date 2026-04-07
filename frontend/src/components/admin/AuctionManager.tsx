@@ -1,11 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { updateLiveStreamUrl, sendToAuctionBlock, generateBatchCodes, uploadVerifiedFlipUI } from '@/app/actions/inventory'
+import { updateLiveStreamUrl, sendToAuctionBlock, generateBatchCodes, uploadVerifiedFlipUI, updateProjectionTimeframe } from '@/app/actions/inventory'
 
-export function AuctionManager({ initialItems, initialStreamUrl }: { initialItems: any[], initialStreamUrl: string | null }) {
+export function AuctionManager({ initialItems, initialStreamUrl, initialProjectionTimeframe }: { initialItems: any[], initialStreamUrl: string | null, initialProjectionTimeframe?: string }) {
   const [streamUrl, setStreamUrl] = useState(initialStreamUrl || '')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [timeframe, setTimeframe] = useState(initialProjectionTimeframe || '90-Day')
+  const [isSavingTimeframe, setIsSavingTimeframe] = useState(false)
 
   const itemsForAuction = initialItems.filter(i => !i.is_auction && i.status === 'available')
   const pendingItems = initialItems.filter(i => i.is_auction && i.auction_status === 'pending')
@@ -13,6 +15,13 @@ export function AuctionManager({ initialItems, initialStreamUrl }: { initialItem
   const handleSaveStream = async () => {
     await updateLiveStreamUrl(streamUrl)
     alert("Live stream updated!")
+  }
+
+  const handleSaveTimeframe = async (val: string) => {
+    setTimeframe(val)
+    setIsSavingTimeframe(true)
+    try { await updateProjectionTimeframe(val) }
+    finally { setIsSavingTimeframe(false) }
   }
 
   const toggleSelect = (id: string) => {
@@ -38,16 +47,33 @@ export function AuctionManager({ initialItems, initialStreamUrl }: { initialItem
     <div className="space-y-8">
       <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
         <h2 className="text-xl font-bold mb-4">Live Stream Control</h2>
-        <div className="flex gap-4">
-          <input 
-            className="border p-2 rounded flex-1 focus:ring-2 focus:ring-indigo-500" 
-            value={streamUrl} 
-            onChange={e => setStreamUrl(e.target.value)} 
-            placeholder="YouTube or Twitch URL" 
-          />
-          <button className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-bold transition-colors" onClick={handleSaveStream}>
-            Save Stream
-          </button>
+        <div className="flex flex-col gap-4">
+          <div className="flex gap-4">
+            <input 
+              className="border p-2 rounded flex-1 focus:ring-2 focus:ring-indigo-500" 
+              value={streamUrl} 
+              onChange={e => setStreamUrl(e.target.value)} 
+              placeholder="YouTube or Twitch URL" 
+            />
+            <button className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-bold transition-colors" onClick={handleSaveStream}>
+              Save Stream
+            </button>
+          </div>
+          <div className="flex items-center gap-4">
+            <label className="text-sm font-bold text-slate-700 whitespace-nowrap">Projection Timeframe</label>
+            <select
+              value={timeframe}
+              onChange={e => handleSaveTimeframe(e.target.value)}
+              disabled={isSavingTimeframe}
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800 bg-white focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-60 shadow-sm"
+            >
+              {['30-Day', '90-Day', '6-Month', 'End of Season'].map(opt => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+            {isSavingTimeframe && <span className="text-xs text-slate-400 animate-pulse">Saving...</span>}
+            {!isSavingTimeframe && <span className="text-xs text-emerald-600 font-semibold">Active: {timeframe}</span>}
+          </div>
         </div>
       </div>
 

@@ -26,11 +26,12 @@ export default async function AdminPage() {
   // Fetch Oracle discount percentage and stream settings
   const { data: settings } = await (supabase as any)
     .from('store_settings')
-    .select('oracle_discount_percentage, live_stream_url')
+    .select('oracle_discount_percentage, live_stream_url, projection_timeframe')
     .eq('id', 1)
     .single()
   const discountRate = settings?.oracle_discount_percentage || 0
   const liveStreamUrl = settings?.live_stream_url || null
+  const projectionTimeframe = settings?.projection_timeframe || '90-Day'
 
   const soldItems = (inventory as any[] || []).filter(item => item.status === 'sold')
 
@@ -63,7 +64,7 @@ export default async function AdminPage() {
           <h2 className="text-xl font-bold text-slate-900 mb-6 flex justify-between items-center">
              <span>Live Inventory Database</span>
           </h2>
-          <InventoryTable initialItems={inventory || []} discountRate={discountRate} liveStreamUrl={liveStreamUrl} />
+          <InventoryTable initialItems={inventory || []} discountRate={discountRate} liveStreamUrl={liveStreamUrl} projectionTimeframe={projectionTimeframe} />
         </div>
       </div>
     </div>

@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { Database } from '@/types/database.types'
-import { toggleCardStatus, editCardAction, deleteCardAction, bulkDeleteCardsAction, bulkUpdateMetricsAction, rotateCardImageAction, sendToAuctionBlock, removeFromAuctionBlock, setAuctionStatus, updateLiveStreamUrl } from '@/app/actions/inventory'
+import { toggleCardStatus, editCardAction, deleteCardAction, bulkDeleteCardsAction, bulkUpdateMetricsAction, rotateCardImageAction, sendToAuctionBlock, removeFromAuctionBlock, setAuctionStatus, updateLiveStreamUrl, updateProjectionTimeframe } from '@/app/actions/inventory'
 import { syncSingleItemWithOracle, syncInventoryWithOracle, applyOracleDiscount, applyOracleDiscountAll, applyCorrection, approvePriceOnly, denyCorrection } from '@/app/actions/oracleSync'
 import { Loader2, Trash2, Edit2, Check, X, Search, Download, RotateCw, RefreshCw, DollarSign, Save, AlertCircle, Gavel, Tv, Radio } from 'lucide-react'
 
 type InventoryItem = Database['public']['Tables']['inventory']['Row']
 
-export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl = null }: { initialItems: InventoryItem[], discountRate?: number, liveStreamUrl?: string | null }) {
+export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl = null, projectionTimeframe: initialProjectionTimeframe = '90-Day' }: { initialItems: InventoryItem[], discountRate?: number, liveStreamUrl?: string | null, projectionTimeframe?: string }) {
   const [items, setItems] = useState(initialItems)
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [errorId, setErrorId] = useState<string | null>(null)
@@ -34,6 +34,8 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
   const [streamUrl, setStreamUrl] = useState(liveStreamUrl || '')
   const [isSavingStream, setIsSavingStream] = useState(false)
   const [auctionLoadingId, setAuctionLoadingId] = useState<string | null>(null)
+  const [projectionTimeframe, setProjectionTimeframe] = useState(initialProjectionTimeframe)
+  const [isSavingTimeframe, setIsSavingTimeframe] = useState(false)
 
   const [editingClarificationId, setEditingClarificationId] = useState<string | null>(null)
   const [clarificationDraft, setClarificationDraft] = useState({ player_name: '', card_set: '', card_number: '' })
@@ -376,6 +378,14 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
     finally { setIsSavingStream(false) }
   }
 
+  const handleSaveTimeframe = async (val: string) => {
+    setProjectionTimeframe(val)
+    setIsSavingTimeframe(true)
+    try { await updateProjectionTimeframe(val) }
+    catch (e: any) { alert('Failed to save timeframe: ' + e.message) }
+    finally { setIsSavingTimeframe(false) }
+  }
+
   if (items.length === 0) {
     return <div className="text-center text-slate-500 py-10 bg-slate-50 rounded-lg border border-dashed border-slate-200">No inventory found in database.</div>
   }
@@ -649,6 +659,21 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
               {isSavingStream ? <Loader2 className="w-3 h-3 animate-spin" /> : <Radio className="w-3 h-3" />}
               Save
             </button>
+          </div>
+          {/* Projection Timeframe */}
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest whitespace-nowrap">Projection Timeframe</span>
+            <select
+              value={projectionTimeframe}
+              onChange={e => handleSaveTimeframe(e.target.value)}
+              disabled={isSavingTimeframe}
+              className="bg-zinc-800 border border-zinc-700 text-zinc-100 text-xs font-semibold px-2.5 py-1.5 rounded-lg outline-none focus:ring-1 focus:ring-red-500 disabled:opacity-60"
+            >
+              {['30-Day', '90-Day', '6-Month', 'End of Season'].map(opt => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+            {isSavingTimeframe && <span className="text-[10px] text-zinc-500 animate-pulse">Saving...</span>}
           </div>
         </div>
 

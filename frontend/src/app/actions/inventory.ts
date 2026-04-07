@@ -322,6 +322,16 @@ export async function updateLiveStreamUrl(url: string | null) {
   revalidatePath('/auction')
 }
 
+export async function updateProjectionTimeframe(timeframe: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error("Unauthorized")
+  const admin = createAdminClient()
+  await (admin.from('store_settings') as any).update({ projection_timeframe: timeframe }).eq('id', 1)
+  revalidatePath('/admin')
+  revalidatePath('/auction')
+}
+
 export async function sendToAuctionBlock(ids: string[]) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
