@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { Database } from '@/types/database.types'
-import { toggleCardStatus, editCardAction, deleteCardAction, bulkDeleteCardsAction, bulkUpdateMetricsAction, rotateCardImageAction } from '@/app/actions/inventory'
+import { toggleCardStatus, editCardAction, deleteCardAction, bulkDeleteCardsAction, bulkUpdateMetricsAction, rotateCardImageAction, sendToAuctionBlock, removeFromAuctionBlock, setAuctionStatus, updateLiveStreamUrl } from '@/app/actions/inventory'
 import { syncSingleItemWithOracle, syncInventoryWithOracle, applyOracleDiscount, applyOracleDiscountAll, applyCorrection, approvePriceOnly, denyCorrection } from '@/app/actions/oracleSync'
-import { Loader2, Trash2, Edit2, Check, X, Search, Download, RotateCw, RefreshCw, DollarSign, Save, AlertCircle } from 'lucide-react'
+import { Loader2, Trash2, Edit2, Check, X, Search, Download, RotateCw, RefreshCw, DollarSign, Save, AlertCircle, Gavel, Tv, Radio } from 'lucide-react'
 
 type InventoryItem = Database['public']['Tables']['inventory']['Row']
 
-export function InventoryTable({ initialItems, discountRate = 0 }: { initialItems: InventoryItem[], discountRate?: number }) {
+export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl = null }: { initialItems: InventoryItem[], discountRate?: number, liveStreamUrl?: string | null }) {
   const [items, setItems] = useState(initialItems)
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [errorId, setErrorId] = useState<string | null>(null)
@@ -29,6 +29,11 @@ export function InventoryTable({ initialItems, discountRate = 0 }: { initialItem
   const [processingCorrectionId, setProcessingCorrectionId] = useState<string | null>(null)
   const [isProcessingMaster, setIsProcessingMaster] = useState(false)
   const [showCorrectionsModal, setShowCorrectionsModal] = useState(false)
+
+  // Auction Block State
+  const [streamUrl, setStreamUrl] = useState(liveStreamUrl || '')
+  const [isSavingStream, setIsSavingStream] = useState(false)
+  const [auctionLoadingId, setAuctionLoadingId] = useState<string | null>(null)
 
   const [editingClarificationId, setEditingClarificationId] = useState<string | null>(null)
   const [clarificationDraft, setClarificationDraft] = useState({ player_name: '', card_set: '', card_number: '' })
@@ -334,6 +339,43 @@ export function InventoryTable({ initialItems, discountRate = 0 }: { initialItem
     URL.revokeObjectURL(link.href);
   }
 
+  // Auction Block Handlers
+  const auctionItems = items.filter(i => (i as any).is_auction === true)
+
+  const handleAddToAuction = async (id: string) => {
+    setAuctionLoadingId(id)
+    try {
+      await sendToAuctionBlock([id])
+      setItems(prev => prev.map(i => i.id === id ? { ...i, is_auction: true, auction_status: 'pending' } as any : i))
+    } catch (e: any) { alert('Failed: ' + e.message) }
+    finally { setAuctionLoadingId(null) }
+  }
+
+  const handleRemoveFromAuction = async (id: string) => {
+    setAuctionLoadingId(id)
+    try {
+      await removeFromAuctionBlock(id)
+      setItems(prev => prev.map(i => i.id === id ? { ...i, is_auction: false, auction_status: 'pending' } as any : i))
+    } catch (e: any) { alert('Failed: ' + e.message) }
+    finally { setAuctionLoadingId(null) }
+  }
+
+  const handleSetStatus = async (id: string, status: 'pending' | 'live' | 'ended') => {
+    setAuctionLoadingId(id)
+    try {
+      await setAuctionStatus(id, status)
+      setItems(prev => prev.map(i => i.id === id ? { ...i, auction_status: status } as any : i))
+    } catch (e: any) { alert('Failed: ' + e.message) }
+    finally { setAuctionLoadingId(null) }
+  }
+
+  const handleSaveStream = async () => {
+    setIsSavingStream(true)
+    try { await updateLiveStreamUrl(streamUrl || null) }
+    catch (e: any) { alert('Failed: ' + e.message) }
+    finally { setIsSavingStream(false) }
+  }
+
   if (items.length === 0) {
     return <div className="text-center text-slate-500 py-10 bg-slate-50 rounded-lg border border-dashed border-slate-200">No inventory found in database.</div>
   }
@@ -575,6 +617,108 @@ export function InventoryTable({ initialItems, discountRate = 0 }: { initialItem
           </div>
         </div>
       )}
+
+      {/* ── Auction Block Panel ── */}
+      <div className="bg-gradient-to-br from-zinc-950 to-zinc-900 border border-zinc-700 rounded-2xl overflow-hidden shadow-2xl">
+        <div className="px-5 py-4 border-b border-zinc-800 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex items-center gap-2 flex-1">
+            <span className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+            </span>
+            <h3 className="text-sm font-black text-white uppercase tracking-widest">Auction Block</h3>
+            {auctionItems.length > 0 && (
+              <span className="bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full">{auctionItems.length}</span>
+            )}
+          </div>
+          {/* Stream URL */}
+          <div className="flex items-center gap-2">
+            <Tv className="w-4 h-4 text-zinc-400 shrink-0" />
+            <input
+              type="text"
+              value={streamUrl}
+              onChange={e => setStreamUrl(e.target.value)}
+              placeholder="Stream URL (YouTube / Twitch)"
+              className="w-64 bg-zinc-800 border border-zinc-700 text-zinc-100 text-xs font-medium px-3 py-1.5 rounded-lg outline-none focus:ring-1 focus:ring-red-500 placeholder:text-zinc-600"
+            />
+            <button
+              onClick={handleSaveStream}
+              disabled={isSavingStream}
+              className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
+            >
+              {isSavingStream ? <Loader2 className="w-3 h-3 animate-spin" /> : <Radio className="w-3 h-3" />}
+              Save
+            </button>
+          </div>
+        </div>
+
+        {auctionItems.length === 0 ? (
+          <div className="py-8 text-center text-zinc-600 text-sm font-medium">
+            No items on the auction block. Use the <Gavel className="inline w-3.5 h-3.5 mx-1" /> button on any card below to add it.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-zinc-800">
+                  <th className="px-4 py-2.5 font-bold text-zinc-500 uppercase tracking-widest text-[10px]">Card</th>
+                  <th className="px-4 py-2.5 font-bold text-zinc-500 uppercase tracking-widest text-[10px]">Current Bid</th>
+                  <th className="px-4 py-2.5 font-bold text-zinc-500 uppercase tracking-widest text-[10px]">Status</th>
+                  <th className="px-4 py-2.5 font-bold text-zinc-500 uppercase tracking-widest text-[10px] text-right">Controls</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-800/60">
+                {auctionItems.map((item: any) => {
+                  const isLoading = auctionLoadingId === item.id
+                  const status = item.auction_status || 'pending'
+                  return (
+                    <tr key={item.id} className="hover:bg-zinc-800/30 transition-colors">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          {item.image_url && (
+                            <img src={item.image_url} alt={item.player_name} className="w-10 h-12 object-contain rounded bg-zinc-800" />
+                          )}
+                          <div>
+                            <div className="font-bold text-white leading-tight">{item.player_name}</div>
+                            <div className="text-zinc-500 text-[10px] mt-0.5">{item.card_set}{item.card_number ? ` #${item.card_number}` : ''}</div>
+                            {item.parallel_insert_type && <div className="text-[10px] text-indigo-400 font-semibold">{item.parallel_insert_type}</div>}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 font-mono font-black text-cyan-400 text-sm">
+                        ${(item.current_bid || item.listed_price || 0).toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-wider ${
+                          status === 'live' ? 'bg-red-900/60 text-red-400 border border-red-700/40' :
+                          status === 'ended' ? 'bg-zinc-800 text-zinc-500 border border-zinc-700' :
+                          'bg-amber-900/60 text-amber-400 border border-amber-700/40'
+                        }`}>{status}</span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {status !== 'live' && (
+                            <button onClick={() => handleSetStatus(item.id, 'live')} disabled={isLoading}
+                              className="bg-red-600 hover:bg-red-700 text-white text-[10px] font-black px-2.5 py-1 rounded transition-colors disabled:opacity-50">Go Live</button>
+                          )}
+                          {status === 'live' && (
+                            <button onClick={() => handleSetStatus(item.id, 'ended')} disabled={isLoading}
+                              className="bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-[10px] font-bold px-2.5 py-1 rounded transition-colors disabled:opacity-50">End</button>
+                          )}
+                          <button onClick={() => handleRemoveFromAuction(item.id)} disabled={isLoading}
+                            className="bg-zinc-800 hover:bg-red-900/50 text-zinc-400 hover:text-red-400 text-[10px] font-bold px-2 py-1 rounded border border-zinc-700 hover:border-red-800 transition-colors disabled:opacity-50">
+                            {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-4">
@@ -833,7 +977,28 @@ export function InventoryTable({ initialItems, discountRate = 0 }: { initialItem
                         <button onClick={() => handleDelete(item.id, item.image_url)} disabled={isDeleting === item.id} className="text-red-600 hover:text-red-800 hover:bg-red-100 bg-red-50 h-7 w-7 rounded disabled:opacity-50 flex items-center justify-center transition-colors" title="Delete">
                           {isDeleting === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                         </button>
+                        {/* Auction Block Toggle */}
+                        {(item as any).is_auction ? (
+                          <button
+                            onClick={() => handleRemoveFromAuction(item.id)}
+                            disabled={auctionLoadingId === item.id}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-100 bg-red-50 h-7 w-7 rounded disabled:opacity-50 flex items-center justify-center transition-colors"
+                            title="Remove from Auction Block"
+                          >
+                            {auctionLoadingId === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleAddToAuction(item.id)}
+                            disabled={auctionLoadingId === item.id}
+                            className="text-amber-600 hover:text-amber-800 hover:bg-amber-100 bg-amber-50 h-7 w-7 rounded disabled:opacity-50 flex items-center justify-center transition-colors"
+                            title="Add to Auction Block"
+                          >
+                            {auctionLoadingId === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Gavel className="w-3.5 h-3.5" />}
+                          </button>
+                        )}
                       </div>
+
                     </div>
                   </div>
                 </>

@@ -365,3 +365,23 @@ export async function uploadVerifiedFlipUI(id: string, formData: FormData) {
   revalidatePath('/admin')
   revalidatePath('/auction')
 }
+
+export async function removeFromAuctionBlock(id: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error("Unauthorized")
+  const admin = createAdminClient()
+  await (admin.from('inventory') as any).update({ is_auction: false, auction_status: 'pending' }).eq('id', id)
+  revalidatePath('/admin')
+  revalidatePath('/auction')
+}
+
+export async function setAuctionStatus(id: string, status: 'pending' | 'live' | 'ended') {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error("Unauthorized")
+  const admin = createAdminClient()
+  await (admin.from('inventory') as any).update({ auction_status: status }).eq('id', id)
+  revalidatePath('/admin')
+  revalidatePath('/auction')
+}

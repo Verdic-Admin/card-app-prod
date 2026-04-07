@@ -5,7 +5,6 @@ import { InventoryTable } from '@/components/admin/InventoryTable'
 import { SignOutButton } from '@/components/admin/SignOutButton'
 import { LedgerDashboard } from '@/components/admin/LedgerDashboard'
 import { TradeLeadsCRM } from '@/components/admin/TradeLeadsCRM'
-import { AuctionManager } from '@/components/admin/AuctionManager'
 
 import Link from 'next/link'
 
@@ -62,15 +61,9 @@ export default async function AdminPage() {
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           <h2 className="text-xl font-bold text-slate-900 mb-6 flex justify-between items-center">
-             <span>Auction Manager 🔴</span>
-          </h2>
-          <AuctionManager initialItems={inventory || []} initialStreamUrl={liveStreamUrl} />
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-          <h2 className="text-xl font-bold text-slate-900 mb-6 flex justify-between items-center">
              <span>Live Inventory Database</span>
           </h2>
-          <InventoryTable initialItems={inventory || []} discountRate={discountRate} />
+          <InventoryTable initialItems={inventory || []} discountRate={discountRate} liveStreamUrl={liveStreamUrl} />
         </div>
       </div>
     </div>
