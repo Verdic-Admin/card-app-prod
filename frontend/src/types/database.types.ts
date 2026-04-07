@@ -17,11 +17,13 @@ export type Database = {
       inventory: {
         Row: {
           accepts_offers: boolean | null
+          auction_status: string | null
           avg_price: number | null
           back_image_url: string | null
           card_number: string | null
           card_set: string | null
           cost_basis: number | null
+          created_at: string | null
           current_bid: number | null
           filename: string | null
           high_price: number | null
@@ -105,6 +107,7 @@ export type Database = {
           live_stream_url: string | null
           oracle_discount_percentage: number | null
           paypal_email: string
+          projection_timeframe: string | null
           site_announcement: string
           social_discord: string | null
           social_facebook: string
@@ -137,6 +140,7 @@ export type Database = {
           live_stream_url?: string | null
           oracle_discount_percentage?: number | null
           paypal_email?: string
+          projection_timeframe?: string | null
           site_announcement?: string
           social_discord?: string | null
           social_facebook?: string
