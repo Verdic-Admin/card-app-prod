@@ -62,8 +62,6 @@ export default async function AdminPage() {
         <div>
           <AuctionManager 
             initialItems={inventory || []} 
-            initialStreamUrl={liveStreamUrl} 
-            initialProjectionTimeframe={projectionTimeframe}
           />
         </div>
         <div>
