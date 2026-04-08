@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   const displayPrice = (item.listed_price ?? item.avg_price ?? 0).toFixed(2)
-  const title = `${item.player_name} - ${item.year || ''} ${item.card_set || ''} | $${displayPrice}`
+  const title = `${item.player_name} - ${item.card_set || ''} | $${displayPrice}`
   
   let descriptionParts = []
   if (item.parallel_insert_type) descriptionParts.push(`Parallel/Insert: ${item.parallel_insert_type}`)
