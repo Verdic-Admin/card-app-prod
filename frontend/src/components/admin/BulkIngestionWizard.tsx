@@ -12,6 +12,9 @@ export function BulkIngestionWizard() {
   const [backImages, setBackImages] = useState<File[]>([])
   const [jobId, setJobId] = useState<string | null>(null)
   
+  // Tracking
+  const [identifiedCount, setIdentifiedCount] = useState<number>(0)
+  
   // Step 2 & 3 results
   const [croppedPairs, setCroppedPairs] = useState<{ side_a_url: string, side_b_url: string }[]>([])
   const [identifiedResults, setIdentifiedResults] = useState<any[]>([])
@@ -99,6 +102,7 @@ export function BulkIngestionWizard() {
 
   const runIdentification = async (pairs: {side_a_url: string, side_b_url: string}[], qId: string) => {
     setIsIdentifying(true)
+    setIdentifiedCount(0)
     try {
       const promises = pairs.map(async pair => {
         try {
@@ -107,6 +111,8 @@ export function BulkIngestionWizard() {
           
           const details = res.card_details || res.back_metadata || {}
           const fallback = res.top_match || {}
+          
+          setIdentifiedCount(prev => prev + 1)
           
           return { 
             side_a_url: pair.side_a_url,
@@ -118,6 +124,7 @@ export function BulkIngestionWizard() {
             price: 0 
           }
         } catch (e) {
+          setIdentifiedCount(prev => prev + 1)
           return { side_a_url: pair.side_a_url, side_b_url: pair.side_b_url, player_name: 'AI Error', card_set: 'AI Error', insert_name: '', parallel_name: '', price: 0 }
         }
       })
@@ -304,7 +311,10 @@ export function BulkIngestionWizard() {
         <div className="text-center py-24 animate-in zoom-in duration-500">
           <Wand2 className="w-20 h-20 animate-bounce text-purple-600 mx-auto mb-6 drop-shadow-xl" />
           <h3 className="text-3xl font-black text-slate-900 mb-3">Vision AI Extraction</h3>
-          <p className="text-slate-500 font-medium text-lg">Querying PlayerIndex multi-modal LLM to identify all {croppedPairs.length} card sets, inserts, and parallels in parallel...</p>
+          <p className="text-slate-500 font-medium text-lg mb-6">Querying PlayerIndex multi-modal LLM to identify card sets, inserts, and parallels in parallel...</p>
+          <div className="bg-purple-50 text-purple-700 font-black text-2xl py-4 px-8 rounded-full border-2 border-purple-200 inline-block">
+             {identifiedCount} / {croppedPairs.length} IDENTIFIED
+          </div>
         </div>
       )}
 
