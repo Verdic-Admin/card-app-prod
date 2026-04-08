@@ -1,8 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { updateStreamUrl, updateProjectionTimeframe } from '@/app/actions/settings'
-import { generateBatchCodes } from '@/app/actions/scanner'
 
 interface LiveAuctionStudioProps {
   initialItems: any[]
@@ -19,21 +17,26 @@ export function LiveAuctionStudio({ initialItems, initialStreamUrl, initialProje
   const pendingItems = initialItems.filter(i => i.is_auction && i.auction_status === 'pending')
 
   const handleSaveStream = async () => {
-    await updateStreamUrl(streamUrl)
+    const admin = await import('@/utils/supabase/client').then(m => m.createSupabaseClient())
+    await admin.from('store_settings').update({ live_stream_url: streamUrl }).eq('id', 1)
     alert("Live stream updated!")
   }
 
   const handleSaveTimeframe = async (val: string) => {
     setIsSavingTimeframe(true)
     setTimeframe(val)
-    await updateProjectionTimeframe(val)
+    const admin = await import('@/utils/supabase/client').then(m => m.createSupabaseClient())
+    await admin.from('store_settings').update({ projection_timeframe: val }).eq('id', 1)
     setIsSavingTimeframe(false)
   }
 
   const handleGenBatch = async () => {
     const ids = pendingItems.map(i => i.id)
     if (ids.length > 0) {
-      await generateBatchCodes(ids)
+      const admin = await import('@/utils/supabase/client').then(m => m.createSupabaseClient())
+      const updates = ids.map(id => ({ id, verification_code: Math.random().toString(36).substring(2, 10).toUpperCase() }))
+      await Promise.all(updates.map(u => admin.from('inventory').update({ verification_code: u.verification_code }).eq('id', u.id)))
+      alert("Batch codes generated. Please refresh to view.")
     }
   }
 

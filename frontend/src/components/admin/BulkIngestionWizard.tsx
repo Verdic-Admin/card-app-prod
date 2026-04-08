@@ -170,7 +170,7 @@ export function BulkIngestionWizard() {
         </div>
         <div>
           <h2 className="text-xl font-bold text-slate-900">AI-Powered Bulk Ingestion Wizard</h2>
-          <p className="text-sm font-medium text-slate-500">Vision Crop ➔ Identify ➔ Oracle Price ➔ Publish</p>
+          <p className="text-sm font-medium text-slate-500">Vision Crop ➔ Identify ➔ Market Price ➔ Publish</p>
         </div>
       </div>
 
@@ -270,7 +270,7 @@ export function BulkIngestionWizard() {
           <div className="w-24 h-24 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-md border-4 border-emerald-50">
              <DollarSign className="w-12 h-12 text-emerald-600" />
           </div>
-          <h3 className="text-3xl font-black text-slate-900 mb-3">The Fintech Oracle</h3>
+          <h3 className="text-3xl font-black text-slate-900 mb-3">The AI Pricing Engine</h3>
           <p className="text-slate-500 font-medium text-lg">Cross-referencing {identifiedResults.length} assets with live market APIs to acquire real-time projection prices...</p>
         </div>
       )}
