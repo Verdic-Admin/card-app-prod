@@ -5,7 +5,6 @@ import { createClient } from "@/utils/supabase/server";
 import { StoreFilters } from "@/components/StoreFilters";
 import { getStoreSettings } from "@/app/actions/settings";
 
-const SITE_NAME = "Into the Gap Sportscards";
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://intothegapsportscards.com";
 /** Builds the URL for our dynamic /api/og edge route */
 function buildOgImageUrl(base: string, params: { q?: string; team?: string }) {
@@ -14,13 +13,15 @@ function buildOgImageUrl(base: string, params: { q?: string; team?: string }) {
   if (params.team) url.searchParams.set('team', params.team);
   return url.toString();
 }
-const DEFAULT_DESCRIPTION =
-  "Zero-Fee Sports Card Storefront. Prices reflect direct-to-buyer savings — no hidden buyer premiums, just high-quality cards shipped straight to you.";
 
 type PageProps = { searchParams: Promise<{ [key: string]: string | undefined }> | any };
 
 export async function generateMetadata({ searchParams }: PageProps): Promise<Metadata> {
   const params = await searchParams;
+  const settings = await getStoreSettings();
+
+  const siteName = settings.site_name;
+  const defaultDescription = settings.store_description;
 
   // Build a human-readable label from whatever filter is active
   const query = params?.q;
@@ -30,10 +31,10 @@ export async function generateMetadata({ searchParams }: PageProps): Promise<Met
   if (query) label = query.trim();
   else if (team) label = team;
 
-  const title = label ? `Shop ${label} Cards | ${SITE_NAME}` : SITE_NAME;
+  const title = label ? `Shop ${label} Cards | ${siteName}` : siteName;
   const description = label
-    ? `Browse ${label} sports cards at Into the Gap Sportscards — zero fees, direct to you.`
-    : DEFAULT_DESCRIPTION;
+    ? `Browse ${label} sports cards at ${siteName} — zero fees, direct to you.`
+    : defaultDescription;
 
   return {
     title,
@@ -42,7 +43,7 @@ export async function generateMetadata({ searchParams }: PageProps): Promise<Met
       title,
       description,
       url: BASE_URL,
-      siteName: SITE_NAME,
+      siteName,
       images: [{ url: buildOgImageUrl(BASE_URL, { q: query, team }), width: 1200, height: 630, alt: title }],
       type: "website",
     },

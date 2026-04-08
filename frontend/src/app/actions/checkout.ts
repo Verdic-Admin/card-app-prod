@@ -1,26 +1,48 @@
 'use server'
 
-import { createClient } from '@/utils/supabase/server'
+import { createClient, createAdminClient } from '@/utils/supabase/server'
 
 export async function createPayPalOrder(itemIds: string[]) {
   const supabase = await createClient()
+  const admin = createAdminClient()
 
   if (!itemIds || itemIds.length === 0) {
     throw new Error('No items provided for checkout.')
   }
 
-  // Query absolute source-of-truth prices
-  const { data: items, error } = await supabase
+  // ── Lot Ghost-Cart Failsafe ─────────────────────────────────────────────
+  // Fetch full records so we know is_lot and lot_id for every item being bought
+  const { data: purchaseItems, error: fetchErr } = await supabase
     .from('inventory')
-    .select('id, listed_price, avg_price')
+    .select('id, listed_price, avg_price, is_lot, lot_id')
     .in('id', itemIds)
 
-  if (error || !items || items.length === 0) {
+  if (fetchErr || !purchaseItems || purchaseItems.length === 0) {
     throw new Error('Failed to query inventory prices.')
   }
 
+  // Case A: Buying a Lot → mark all its child cards sold
+  const lotIds = purchaseItems.filter(i => i.is_lot).map(i => i.id)
+  if (lotIds.length > 0) {
+    await (admin.from('inventory') as any)
+      .update({ status: 'sold', sold_at: new Date().toISOString() })
+      .in('lot_id', lotIds)
+  }
+
+  // Case B: Buying an individual card that belongs to a lot → mark the parent lot sold
+  const parentLotIds = purchaseItems
+    .filter(i => !i.is_lot && i.lot_id)
+    .map(i => i.lot_id as string)
+  const uniqueParentLotIds = [...new Set(parentLotIds)]
+  if (uniqueParentLotIds.length > 0) {
+    await (admin.from('inventory') as any)
+      .update({ status: 'sold', sold_at: new Date().toISOString() })
+      .in('id', uniqueParentLotIds)
+  }
+  // ── End Failsafe ────────────────────────────────────────────────────────
+
   let subtotal = 0;
-  for (const item of items) {
+  for (const item of purchaseItems) {
     subtotal += Number(item.listed_price ?? item.avg_price ?? 0);
   }
 

@@ -69,7 +69,40 @@ export default function SettingsPage() {
       </div>
 
       <form onSubmit={handleSave} className="space-y-8 bg-white p-8 rounded-2xl shadow-sm border border-slate-200/60">
-        
+
+        {/* Branding & Identity */}
+        <div>
+          <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+            <span className="bg-violet-100 text-violet-700 w-6 h-6 flex items-center justify-center rounded-full text-xs">✦</span>
+            Branding &amp; Identity
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-5 bg-slate-50 border border-slate-100 rounded-xl">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Site Name <span className="text-red-500">*</span></label>
+              <input
+                type="text"
+                required
+                value={settings.site_name}
+                onChange={e => setSettings({...settings, site_name: e.target.value})}
+                className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-900 font-bold focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none shadow-sm transition-all"
+                placeholder="e.g. Into the Gap Sportscards"
+              />
+              <p className="text-[10px] text-slate-500 mt-1.5 font-medium">Displayed in the Navbar, page titles, and all social share cards.</p>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Author / Subtitle</label>
+              <input
+                type="text"
+                value={settings.site_author ?? ''}
+                onChange={e => setSettings({...settings, site_author: e.target.value || null})}
+                className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-900 font-medium focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none shadow-sm transition-all"
+                placeholder="e.g. by John Doe"
+              />
+              <p className="text-[10px] text-slate-500 mt-1.5 font-medium">Optional subtitle shown under the site name. Leave blank to hide entirely.</p>
+            </div>
+          </div>
+        </div>
+
         {/* Checkout Settings */}
         <div>
           <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">

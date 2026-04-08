@@ -15,6 +15,8 @@ export interface StoreSettings {
     social_discord: string;
     social_threads: string;
     oracle_discount_percentage: number;
+    site_name: string;
+    site_author: string | null;
 }
 
 export async function getStoreSettings(): Promise<StoreSettings> {
@@ -40,7 +42,9 @@ export async function getStoreSettings(): Promise<StoreSettings> {
             social_facebook: '',
             social_discord: '',
             social_threads: '',
-            oracle_discount_percentage: 0.0
+            oracle_discount_percentage: 0.0,
+            site_name: 'My Card Store',
+            site_author: null
         }
     }
     

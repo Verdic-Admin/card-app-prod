@@ -3,9 +3,6 @@ import { createClient } from '@supabase/supabase-js';
 
 export const runtime = 'nodejs';
 
-const SITE_NAME = 'Into the Gap Sportscards';
-const HANDLE   = 'by logic_in_the_gap';
-
 // Lightweight admin client safe for edge (uses anon key — read-only public data only)
 function getSupabase() {
   return createClient(
@@ -29,6 +26,8 @@ export async function GET(request: Request) {
 
   // --- Try to pull a matching card image from Supabase ---
   let cardImageUrl: string | null = null;
+  let siteName = 'Sports Card Store';
+  let siteAuthor: string | null = null;
   try {
     const supabase = getSupabase();
     let query = (supabase.from('inventory') as any)
@@ -41,11 +40,19 @@ export async function GET(request: Request) {
 
     const { data } = await query.limit(1).single();
     if (data?.image_url) cardImageUrl = data.image_url;
+
+    // Fetch branding from store_settings
+    const { data: brandData } = await (supabase.from('store_settings') as any)
+      .select('site_name, site_author')
+      .eq('id', 1)
+      .single();
+    if (brandData?.site_name) siteName = brandData.site_name;
+    if (brandData?.site_author) siteAuthor = brandData.site_author;
   } catch {
     // Silently fall back to the brandmark-only design
   }
 
-  const title = label ? `Shop ${label} Cards` : SITE_NAME;
+  const title = label ? `Shop ${label} Cards` : siteName;
 
   return new ImageResponse(
     (
@@ -122,11 +129,13 @@ export async function GET(request: Request) {
 
           {/* Site name + handle */}
           <span style={{ color: '#71717a', fontSize: '20px', fontWeight: 600, marginTop: '6px' }}>
-            {SITE_NAME}
+            {siteName}
           </span>
-          <span style={{ color: '#3f3f46', fontSize: '16px', fontWeight: 500 }}>
-            {HANDLE}
-          </span>
+          {siteAuthor && (
+            <span style={{ color: '#3f3f46', fontSize: '16px', fontWeight: 500 }}>
+              by {siteAuthor}
+            </span>
+          )}
         </div>
 
         {/* Right: card image — object-fit: contain, no crop */}

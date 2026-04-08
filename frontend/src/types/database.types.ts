@@ -30,8 +30,10 @@ export type Database = {
           id: string
           image_url: string | null
           is_auction: boolean | null
+          is_lot: boolean | null
           is_verified_flip: boolean | null
           listed_price: number | null
+          lot_id: string | null
           low_price: number | null
           oracle_projection: number | null
           oracle_trend_percentage: number | null
@@ -57,8 +59,10 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_auction?: boolean | null
+          is_lot?: boolean | null
           is_verified_flip?: boolean | null
           listed_price?: number | null
+          lot_id?: string | null
           low_price?: number | null
           oracle_projection?: number | null
           oracle_trend_percentage?: number | null
@@ -84,8 +88,10 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_auction?: boolean | null
+          is_lot?: boolean | null
           is_verified_flip?: boolean | null
           listed_price?: number | null
+          lot_id?: string | null
           low_price?: number | null
           oracle_projection?: number | null
           oracle_trend_percentage?: number | null

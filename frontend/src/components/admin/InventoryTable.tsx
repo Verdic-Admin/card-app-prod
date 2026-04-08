@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { Database } from '@/types/database.types'
-import { toggleCardStatus, editCardAction, deleteCardAction, bulkDeleteCardsAction, bulkUpdateMetricsAction, rotateCardImageAction, sendToAuctionBlock, removeFromAuctionBlock, setAuctionStatus, updateLiveStreamUrl, updateProjectionTimeframe } from '@/app/actions/inventory'
+import { toggleCardStatus, editCardAction, deleteCardAction, bulkDeleteCardsAction, bulkUpdateMetricsAction, rotateCardImageAction, sendToAuctionBlock, removeFromAuctionBlock, setAuctionStatus, updateLiveStreamUrl, updateProjectionTimeframe, createLotAction, breakLotAction } from '@/app/actions/inventory'
 import { syncSingleItemWithOracle, syncInventoryWithOracle, applyOracleDiscount, applyOracleDiscountAll, applyCorrection, approvePriceOnly, denyCorrection } from '@/app/actions/oracleSync'
-import { Loader2, Trash2, Edit2, Check, X, Search, Download, RotateCw, RefreshCw, DollarSign, Save, AlertCircle, Gavel, Tv, Radio } from 'lucide-react'
+import { Loader2, Trash2, Edit2, Check, X, Search, Download, RotateCw, RefreshCw, DollarSign, Save, AlertCircle, Gavel, Tv, Radio, Package } from 'lucide-react'
 
 type InventoryItem = Database['public']['Tables']['inventory']['Row']
 
@@ -36,6 +36,13 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
   const [auctionLoadingId, setAuctionLoadingId] = useState<string | null>(null)
   const [projectionTimeframe, setProjectionTimeframe] = useState(initialProjectionTimeframe)
   const [isSavingTimeframe, setIsSavingTimeframe] = useState(false)
+
+  // Lot / Bundle state
+  const [showLotModal, setShowLotModal] = useState(false)
+  const [lotTitle, setLotTitle] = useState('')
+  const [lotPrice, setLotPrice] = useState('0.00')
+  const [isCreatingLot, setIsCreatingLot] = useState(false)
+  const [breakingLotId, setBreakingLotId] = useState<string | null>(null)
 
   const [editingClarificationId, setEditingClarificationId] = useState<string | null>(null)
   const [clarificationDraft, setClarificationDraft] = useState({ player_name: '', card_set: '', card_number: '' })
@@ -174,6 +181,45 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
       alert("Bulk update failed: " + e.message)
     } finally {
       setIsBulkUpdating(false)
+    }
+  }
+
+  // ── Lot handlers ──────────────────────────────────────────────────────────
+  const handleCreateLot = async () => {
+    if (selectedIds.size < 2) { alert('Select at least 2 cards to create a lot.'); return }
+    if (!lotTitle.trim()) { alert('Please enter a title for the lot.'); return }
+    const price = parseFloat(lotPrice) || 0
+    setIsCreatingLot(true)
+    try {
+      const ids = Array.from(selectedIds)
+      const result = await createLotAction(ids, lotTitle.trim(), price)
+      // Optimistically mark children in local state with lot_id
+      setItems(prev => prev.map(i => ids.includes(i.id) ? { ...i, lot_id: result.lotId } as any : i))
+      setSelectedIds(new Set())
+      setShowLotModal(false)
+      setLotTitle('')
+      setLotPrice('0.00')
+      alert(`Lot "${lotTitle}" created successfully! It's now live on the storefront.`)
+    } catch (e: any) {
+      alert('Failed to create lot: ' + e.message)
+    } finally {
+      setIsCreatingLot(false)
+    }
+  }
+
+  const handleBreakLot = async (lotId: string) => {
+    if (!window.confirm('Break this lot? All child cards will be unlinked and the lot row will be deleted.')) return
+    setBreakingLotId(lotId)
+    try {
+      await breakLotAction(lotId)
+      setItems(prev => prev
+        .filter(i => i.id !== lotId)
+        .map(i => (i as any).lot_id === lotId ? { ...i, lot_id: null } as any : i)
+      )
+    } catch (e: any) {
+      alert('Failed to break lot: ' + e.message)
+    } finally {
+      setBreakingLotId(null)
     }
   }
 
@@ -462,6 +508,62 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
 
   return (
     <div className="space-y-4">
+      {/* ── Bundle into Lot Modal ── */}
+      {showLotModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-in fade-in zoom-in duration-200 border border-slate-200">
+            <div className="bg-indigo-50 border-b border-indigo-100 px-6 py-4 rounded-t-2xl flex items-center justify-between">
+              <h2 className="text-lg font-black text-indigo-900 flex items-center gap-2">
+                <Package className="w-5 h-5" />
+                Bundle {selectedIds.size} Cards into a Lot
+              </h2>
+              <button onClick={() => setShowLotModal(false)} className="text-indigo-400 hover:text-indigo-700 p-1 rounded-lg"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="text-xs font-black text-slate-500 uppercase tracking-widest block mb-1">Lot Title</label>
+                <input
+                  type="text"
+                  value={lotTitle}
+                  onChange={e => setLotTitle(e.target.value)}
+                  placeholder="e.g. Yankees Base Lot (10 cards)"
+                  className="w-full px-3 py-2.5 text-sm font-bold text-slate-900 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-black text-slate-500 uppercase tracking-widest block mb-1">Bundle Price ($)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={lotPrice}
+                  onChange={e => setLotPrice(e.target.value)}
+                  className="w-full px-3 py-2.5 text-sm font-black font-mono text-slate-900 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
+              </div>
+              <p className="text-xs text-slate-400 font-medium">
+                The selected {selectedIds.size} cards will remain in your inventory linked to this lot. Their cost bases will be summed automatically.
+              </p>
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={() => setShowLotModal(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-300 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateLot}
+                  disabled={isCreatingLot || !lotTitle.trim()}
+                  className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-md"
+                >
+                  {isCreatingLot ? <Loader2 className="w-4 h-4 animate-spin" /> : <Package className="w-4 h-4" />}
+                  Create Lot
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Pending Corrections Modal */}
       {(showCorrectionsModal && pendingCorrections.length > 0) && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-6">
@@ -807,6 +909,16 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
               Apply
             </button>
             <div className="h-6 w-px bg-indigo-200 mx-1"></div>
+            <button
+              onClick={() => { setShowLotModal(true); setLotTitle(''); setLotPrice('0.00') }}
+              disabled={selectedIds.size < 2}
+              className="bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-1 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-50 shadow-sm"
+              title="Bundle selected cards into a Lot"
+            >
+              <Package className="w-4 h-4" />
+              Bundle Lot
+            </button>
+            <div className="h-6 w-px bg-indigo-200 mx-1"></div>
             <button onClick={handleBulkDelete} disabled={isBulkDeleting} className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-50 shadow-sm">
               {isBulkDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
               Delete
@@ -923,12 +1035,27 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                   <div>
                     <div className="font-black text-slate-900 text-base leading-tight flex items-center gap-1.5 flex-wrap">
                       {item.player_name}
+                      {(item as any).is_lot && (
+                        <span className="text-[9px] font-black bg-cyan-600 text-white px-1.5 py-0.5 rounded uppercase tracking-widest">📦 LOT</span>
+                      )}
+                      {!(item as any).is_lot && (item as any).lot_id && (
+                        <span className="text-[9px] font-black bg-amber-500 text-white px-1.5 py-0.5 rounded uppercase tracking-widest">In Lot</span>
+                      )}
                     </div>
                     {item.team_name && <div className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-0.5">{item.team_name}</div>}
                     <div className="text-sm text-slate-700 mt-1 font-semibold leading-snug">
                       {item.card_set}{item.card_number ? ` #${item.card_number}` : ''}
                     </div>
                     {item.parallel_insert_type && <div className="text-xs text-indigo-600 font-bold mt-0.5">{item.parallel_insert_type}</div>}
+                    {(item as any).is_lot && (
+                      <button
+                        onClick={() => handleBreakLot(item.id)}
+                        disabled={breakingLotId === item.id}
+                        className="mt-1 text-[10px] font-black text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 border border-red-200 px-2 py-0.5 rounded transition-colors disabled:opacity-50"
+                      >
+                        {breakingLotId === item.id ? 'Breaking...' : '✕ Break Lot'}
+                      </button>
+                    )}
                   </div>
 
                   {/* Oracle Pricing Section */}

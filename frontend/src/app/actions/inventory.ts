@@ -142,6 +142,81 @@ export async function batchCommitAction(items: any[]) {
   return { success: true }
 }
 
+// ─── Lot / Bundle Actions ──────────────────────────────────────────────────
+
+export async function createLotAction(
+  itemIds: string[],
+  lotTitle: string,
+  lotPrice: number
+) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  const admin = createAdminClient()
+
+  // 1. Sum cost_basis of all child cards
+  const { data: children, error: fetchErr } = await (admin.from('inventory') as any)
+    .select('cost_basis')
+    .in('id', itemIds)
+  if (fetchErr) throw new Error(`Failed to fetch children: ${fetchErr.message}`)
+
+  const totalCostBasis = (children as any[]).reduce(
+    (sum: number, c: any) => sum + Number(c.cost_basis ?? 0),
+    0
+  )
+
+  // 2. Insert the parent Lot row
+  const { data: lot, error: insertErr } = await (admin.from('inventory') as any)
+    .insert({
+      player_name: lotTitle,
+      listed_price: lotPrice,
+      avg_price: lotPrice,
+      cost_basis: totalCostBasis,
+      is_lot: true,
+      accepts_offers: false,
+      status: 'available',
+    })
+    .select('id')
+    .single()
+
+  if (insertErr || !lot) throw new Error(`Failed to create lot: ${insertErr?.message}`)
+
+  // 3. Link child cards to this lot
+  const { error: linkErr } = await (admin.from('inventory') as any)
+    .update({ lot_id: lot.id })
+    .in('id', itemIds)
+  if (linkErr) throw new Error(`Failed to link children: ${linkErr.message}`)
+
+  revalidatePath('/')
+  revalidatePath('/admin')
+  return { success: true, lotId: lot.id }
+}
+
+export async function breakLotAction(lotId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  const admin = createAdminClient()
+
+  // 1. Unlink all child cards
+  const { error: unlinkErr } = await (admin.from('inventory') as any)
+    .update({ lot_id: null })
+    .eq('lot_id', lotId)
+  if (unlinkErr) throw new Error(`Failed to unlink children: ${unlinkErr.message}`)
+
+  // 2. Delete the lot row itself
+  const { error: deleteErr } = await (admin.from('inventory') as any)
+    .delete()
+    .eq('id', lotId)
+  if (deleteErr) throw new Error(`Failed to delete lot: ${deleteErr.message}`)
+
+  revalidatePath('/')
+  revalidatePath('/admin')
+  return { success: true }
+}
+
 export async function toggleCardStatus(id: string, currentStatus: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

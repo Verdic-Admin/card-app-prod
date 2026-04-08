@@ -20,11 +20,13 @@ export function Navbar({ settings }: { settings: StoreSettings }) {
           <div className="flex justify-between h-16 items-center">
             <Link href="/" className="flex flex-col justify-center">
               <span className="font-black text-xl tracking-tight text-white leading-tight">
-                Into the Gap Sportscards
+                {settings.site_name}
               </span>
-              <span className="text-xs text-zinc-500 tracking-wide leading-tight">
-                by logic_in_the_gap
-              </span>
+              {settings.site_author && (
+                <span className="text-xs text-zinc-500 tracking-wide leading-tight">
+                  by {settings.site_author}
+                </span>
+              )}
             </Link>
             <div className="flex items-center gap-4 sm:gap-6">
               <Link href="/" className="text-sm font-bold text-zinc-400 hover:text-white transition-colors">
