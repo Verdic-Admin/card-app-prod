@@ -51,7 +51,7 @@ export function CoinRequestsCRM() {
   if (requests.length === 0) return null
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-amber-200">
+    <div className="bg-white text-slate-900 rounded-xl shadow-sm border border-amber-200">
       <div className="bg-amber-50 rounded-t-xl px-6 py-4 border-b border-amber-200 flex justify-between items-center">
         <h2 className="text-xl font-bold text-amber-900 flex items-center gap-2">
           <span>📸</span> Coin Requests Action Center

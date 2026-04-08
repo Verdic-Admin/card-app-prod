@@ -45,12 +45,12 @@ export function AuctionManager({ initialItems, initialStreamUrl, initialProjecti
 
   return (
     <div className="space-y-8">
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+      <div className="bg-white text-slate-900 p-6 rounded-xl shadow-sm border border-slate-200">
         <h2 className="text-xl font-bold mb-4">Live Stream Control</h2>
         <div className="flex flex-col gap-4">
           <div className="flex gap-4">
             <input 
-              className="border p-2 rounded flex-1 focus:ring-2 focus:ring-indigo-500" 
+              className="border border-slate-300 bg-white placeholder-slate-400 p-2 rounded flex-1 focus:ring-2 focus:ring-indigo-500" 
               value={streamUrl} 
               onChange={e => setStreamUrl(e.target.value)} 
               placeholder="YouTube or Twitch URL" 
@@ -77,7 +77,7 @@ export function AuctionManager({ initialItems, initialStreamUrl, initialProjecti
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+      <div className="bg-white text-slate-900 p-6 rounded-xl shadow-sm border border-slate-200">
         <h2 className="text-xl font-bold mb-4">Inventory Selection</h2>
         <div className="mb-4">
           <button 
@@ -103,7 +103,7 @@ export function AuctionManager({ initialItems, initialStreamUrl, initialProjecti
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+      <div className="bg-white text-slate-900 p-6 rounded-xl shadow-sm border border-slate-200">
         <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
           <h2 className="text-xl font-bold flex items-center gap-2">
             <span className="text-amber-500">⏳</span> Staging Area (Pending)
