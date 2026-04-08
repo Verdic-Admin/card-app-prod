@@ -4,10 +4,10 @@ import { useState } from 'react'
 import { Upload, Loader2, Play, Save, CheckCircle2, ChevronRight, Wand2, DollarSign } from 'lucide-react'
 import { uploadImagesToScanner, identifyCardPair } from '@/app/actions/visionSync'
 import { getBatchOraclePrices } from '@/app/actions/oracleSync'
-import { batchCommitAction } from '@/app/actions/inventory'
+import { createDraftCardsAction, updateDraftCardAction, publishDraftCardsAction } from '@/app/actions/drafts'
 
 export function BulkIngestionWizard() {
-  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1)
+  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5 | 6>(1)
   const [frontImages, setFrontImages] = useState<File[]>([])
   const [backImages, setBackImages] = useState<File[]>([])
   const [jobId, setJobId] = useState<string | null>(null)
@@ -102,17 +102,44 @@ export function BulkIngestionWizard() {
     try {
       const promises = pairs.map(async pair => {
         try {
-           // Provide fallback data in case AI fails
+          // Identify API returns nested data (e.g. res.card_details)
           const res = await identifyCardPair({ queue_id: qId, side_a_url: pair.side_a_url, side_b_url: pair.side_b_url })
-          return { ...pair, ...res, price: 0 }
+          
+          const details = res.card_details || res.back_metadata || {}
+          const fallback = res.top_match || {}
+          
+          return { 
+            side_a_url: pair.side_a_url,
+            side_b_url: pair.side_b_url,
+            player_name: details.player_name || fallback.full_name || '',
+            card_set: details.card_set || details.set_name || fallback.base_set_name || '',
+            insert_name: details.insert_name || '',
+            parallel_name: details.parallel_type || fallback.parallel_type || '',
+            price: 0 
+          }
         } catch (e) {
-          return { ...pair, player_name: 'AI Error', card_set: 'AI Error', price: 0 }
+          return { side_a_url: pair.side_a_url, side_b_url: pair.side_b_url, player_name: 'AI Error', card_set: 'AI Error', insert_name: '', parallel_name: '', price: 0 }
         }
       })
       const results = await Promise.all(promises)
-      setIdentifiedResults(results)
+
+      // Instantly persist these AI drafts heavily to our Database Table
+      const dbDrafts = await createDraftCardsAction(results)
+      
+      const uiResults = dbDrafts.map((d: any) => ({
+        db_id: d.id, // Supabase assigned PK
+        side_a_url: d.image_url,
+        side_b_url: d.back_image_url,
+        player_name: d.player_name,
+        card_set: d.card_set,
+        insert_name: d.parallel_insert_type,
+        parallel_name: d.parallel_insert_type,
+        price: d.listed_price || 0
+      }))
+
+      setIdentifiedResults(uiResults)
       setStep(4)
-      runPricing(results)
+      // Paused here for user to review and edit BEFORE pricing!
     } catch (e: any) {
       alert('Identification failed')
     } finally {
@@ -120,18 +147,24 @@ export function BulkIngestionWizard() {
     }
   }
 
-  const runPricing = async (results: any[]) => {
+  const runPricing = async () => {
     setIsPricing(true)
+    setStep(5)
     try {
-      const payloads = results.map(r => ({ player_name: r.player_name, card_set: r.card_set, insert_name: r.insert_name, parallel_name: r.parallel_name }))
+      const payloads = identifiedResults.map(r => ({ player_name: r.player_name, card_set: r.card_set, insert_name: r.insert_name, parallel_name: r.parallel_name }))
       const prices = await getBatchOraclePrices(payloads)
       
-      const pricedResults = results.map((r, i) => ({ ...r, price: prices[i] || 0 }))
+      const pricedResults = identifiedResults.map((r, i) => {
+        const generatedPrice = prices[i] || 0
+        // Write the DB table immediately with the live pricing
+        if (r.db_id) updateDraftCardAction(r.db_id, { price: generatedPrice }).catch(console.error)
+        return { ...r, price: generatedPrice }
+      })
       setIdentifiedResults(pricedResults)
-      setStep(5)
+      setStep(6)
     } catch (e: any) {
-      alert('Pricing failed')
-      setStep(5)
+      alert('Pricing failed: ' + e.message)
+      setStep(4)
     } finally {
       setIsPricing(false)
     }
@@ -140,8 +173,11 @@ export function BulkIngestionWizard() {
   const handleCommit = async () => {
     setIsCommitting(true)
     try {
-      await batchCommitAction(identifiedResults)
-      alert("Successfully committed to inventory!")
+      const idsToPublish = identifiedResults.map(r => r.db_id).filter(Boolean)
+      if (idsToPublish.length > 0) {
+        await publishDraftCardsAction(idsToPublish)
+      }
+      alert("Successfully published directly from drafts to live inventory!")
       // Reset
       setStep(1)
       setFrontImages([])
@@ -160,6 +196,12 @@ export function BulkIngestionWizard() {
     const next = [...identifiedResults]
     next[idx] = { ...next[idx], [field]: value }
     setIdentifiedResults(next)
+    
+    // DB sync magic: every edit re-writes to the table automatically.
+    const dbId = next[idx].db_id
+    if (dbId) {
+      updateDraftCardAction(dbId, { [field]: value }).catch(console.error)
+    }
   }
 
   return (
@@ -180,14 +222,15 @@ export function BulkIngestionWizard() {
            { num: 1, label: 'Upload' },
            { num: 2, label: 'Process' },
            { num: 3, label: 'Identify' },
-           { num: 4, label: 'Price' },
-           { num: 5, label: 'Review' }
+           { num: 4, label: 'Review' },
+           { num: 5, label: 'Price' },
+           { num: 6, label: 'Mint' }
          ].map(s => (
            <div key={s.num} className="flex flex-col items-center bg-white px-2">
-             <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm border-2 transition-colors ${step >= s.num ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-400 border-slate-300'}`}>
+             <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-sm border-2 transition-colors ${step >= s.num ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-400 border-slate-300'}`}>
                {s.num}
              </div>
-             <span className={`text-[10px] sm:text-xs mt-2 uppercase tracking-wide font-black ${step >= s.num ? 'text-indigo-900' : 'text-slate-400'}`}>{s.label}</span>
+             <span className={`text-[9px] sm:text-[10px] mt-2 uppercase tracking-wide font-black ${step >= s.num ? 'text-indigo-900' : 'text-slate-400'}`}>{s.label}</span>
            </div>
          ))}
       </div>
@@ -265,17 +308,17 @@ export function BulkIngestionWizard() {
         </div>
       )}
 
-      {step === 4 && (
+      {step === 5 && (
         <div className="text-center py-24 animate-in slide-in-from-bottom duration-500">
-          <div className="w-24 h-24 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-md border-4 border-emerald-50">
-             <DollarSign className="w-12 h-12 text-emerald-600" />
-          </div>
-          <h3 className="text-3xl font-black text-slate-900 mb-3">The AI Pricing Engine</h3>
-          <p className="text-slate-500 font-medium text-lg">Cross-referencing {identifiedResults.length} assets with live market APIs to acquire real-time projection prices...</p>
+           <div className="w-24 h-24 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-md border-4 border-emerald-50">
+              <DollarSign className="w-12 h-12 text-emerald-600 animate-pulse" />
+           </div>
+           <h3 className="text-3xl font-black text-slate-900 mb-3">The AI Pricing Engine</h3>
+           <p className="text-slate-500 font-medium text-lg">Cross-referencing {identifiedResults.length} assets with live market APIs to acquire real-time projection prices...</p>
         </div>
       )}
 
-      {step === 5 && (
+      {(step === 4 || step === 6) && (
         <div className="space-y-8 animate-in fade-in duration-700">
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 max-h-[600px] overflow-y-auto pr-2 pb-2">
             {identifiedResults.map((result, idx) => (
@@ -316,14 +359,23 @@ export function BulkIngestionWizard() {
             ))}
           </div>
           
-          <button 
-            onClick={handleCommit}
-            disabled={isCommitting}
-            className="w-full bg-slate-900 text-white font-black text-lg py-4 rounded-xl disabled:opacity-50 hover:bg-emerald-600 hover:shadow-xl transition-all flex items-center justify-center gap-3 drop-shadow-md border border-slate-800"
-          >
-            {isCommitting ? <Loader2 className="w-6 h-6 animate-spin" /> : <CheckCircle2 className="w-6 h-6 text-emerald-400" />} 
-            {isCommitting ? 'Injecting into Relational Matrix...' : `MINT ALL ${identifiedResults.length} TO INVENTORY DB`}
-          </button>
+          {step === 4 ? (
+            <button 
+              onClick={runPricing}
+              className="w-full bg-indigo-600 text-white font-black text-lg py-4 rounded-xl hover:bg-indigo-700 hover:shadow-xl transition-all flex items-center justify-center gap-3 drop-shadow-md"
+            >
+              <DollarSign className="w-6 h-6" /> FETCH ACCURATE MARKET PRICES
+            </button>
+          ) : (
+            <button 
+              onClick={handleCommit}
+              disabled={isCommitting}
+              className="w-full bg-slate-900 text-white font-black text-lg py-4 rounded-xl disabled:opacity-50 hover:bg-emerald-600 hover:shadow-xl transition-all flex items-center justify-center gap-3 drop-shadow-md border border-slate-800"
+            >
+              {isCommitting ? <Loader2 className="w-6 h-6 animate-spin" /> : <CheckCircle2 className="w-6 h-6 text-emerald-400" />} 
+              {isCommitting ? 'Injecting into Relational Matrix...' : `MINT ALL ${identifiedResults.length} TO INVENTORY DB`}
+            </button>
+          )}
         </div>
       )}
     </div>
