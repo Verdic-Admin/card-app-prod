@@ -40,8 +40,8 @@ export function BulkIngestionWizard() {
     setIsUploading(true)
     try {
       const formData = new FormData()
-      frontImages.forEach(f => formData.append('images_a', f))
-      backImages.forEach(f => formData.append('images_b', f))
+      frontImages.forEach(f => formData.append('fronts', f))
+      backImages.forEach(f => formData.append('backs', f))
       
       const returnedJobId = await uploadImagesToScanner(formData)
       setJobId(returnedJobId)
