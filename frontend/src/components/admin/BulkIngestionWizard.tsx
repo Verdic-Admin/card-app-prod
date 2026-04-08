@@ -104,31 +104,40 @@ export function BulkIngestionWizard() {
     setIsIdentifying(true)
     setIdentifiedCount(0)
     try {
-      const promises = pairs.map(async pair => {
-        try {
-          // Identify API returns nested data (e.g. res.card_details)
-          const res = await identifyCardPair({ queue_id: qId, side_a_url: pair.side_a_url, side_b_url: pair.side_b_url })
-          
-          const details = res.card_details || res.back_metadata || {}
-          const fallback = res.top_match || {}
-          
-          setIdentifiedCount(prev => prev + 1)
-          
-          return { 
-            side_a_url: pair.side_a_url,
-            side_b_url: pair.side_b_url,
-            player_name: details.player_name || fallback.full_name || '',
-            card_set: details.card_set || details.set_name || fallback.base_set_name || '',
-            insert_name: details.insert_name || '',
-            parallel_name: details.parallel_type || fallback.parallel_type || '',
-            price: 0 
+      const results: any[] = []
+      
+      // Process in chunks of 5 to allow React to paint the progress state and prevent slamming the Next.js server action queue
+      for (let i = 0; i < pairs.length; i += 5) {
+        const chunk = pairs.slice(i, i + 5)
+        const chunkPromises = chunk.map(async pair => {
+          try {
+            const res = await identifyCardPair({ queue_id: qId, side_a_url: pair.side_a_url, side_b_url: pair.side_b_url })
+            const details = res.card_details || res.back_metadata || {}
+            const fallback = res.top_match || {}
+            
+            setIdentifiedCount(prev => prev + 1)
+            
+            return { 
+              side_a_url: pair.side_a_url,
+              side_b_url: pair.side_b_url,
+              player_name: details.player_name || fallback.full_name || '',
+              card_set: details.card_set || details.set_name || fallback.base_set_name || '',
+              insert_name: details.insert_name || '',
+              parallel_name: details.parallel_type || fallback.parallel_type || '',
+              price: 0 
+            }
+          } catch (e) {
+            setIdentifiedCount(prev => prev + 1)
+            return { side_a_url: pair.side_a_url, side_b_url: pair.side_b_url, player_name: 'AI Error', card_set: 'AI Error', insert_name: '', parallel_name: '', price: 0 }
           }
-        } catch (e) {
-          setIdentifiedCount(prev => prev + 1)
-          return { side_a_url: pair.side_a_url, side_b_url: pair.side_b_url, player_name: 'AI Error', card_set: 'AI Error', insert_name: '', parallel_name: '', price: 0 }
-        }
-      })
-      const results = await Promise.all(promises)
+        })
+        
+        const chunkResults = await Promise.all(chunkPromises)
+        results.push(...chunkResults)
+        
+        // Yield to browser to ensure the UI repaints the progress tracker
+        await new Promise(r => setTimeout(r, 50))
+      }
 
       // Instantly persist these AI drafts heavily to our Database Table
       const dbDrafts = await createDraftCardsAction(results)

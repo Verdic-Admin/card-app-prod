@@ -261,13 +261,33 @@ export async function getSingleOraclePrice(payload: { player_name: string; card_
 export async function getBatchOraclePrices(cards: any[]) {
   try {
     const apiKey = process.env.PLAYERINDEX_API_KEY || '';
+    
+    // Map intuitive card props to Oracle B2B API payload shape
+    const formattedItems = cards.map(c => {
+      const rawFuzzyString = [
+        c.card_set,
+        c.card_number,
+        c.insert_name,
+        c.parallel_name,
+        c.attributes
+      ].filter(Boolean).join(" ");
+      
+      return {
+        player_name: c.player_name || "",
+        card_number: c.card_number || "",
+        attributes: rawFuzzyString,
+        storefront_id: c.storefront_id || c.db_id || "batch-item"
+      };
+    });
+
     const response = await fetch('https://api.playerindexdata.com/fintech/api/v1/b2b/calculate-batch', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-API-Key': apiKey,
       },
-      body: JSON.stringify({ cards }),
+      // Backend expects "items" payload
+      body: JSON.stringify({ items: formattedItems }),
     });
 
     if (!response.ok) {
@@ -276,7 +296,13 @@ export async function getBatchOraclePrices(cards: any[]) {
     }
 
     const data = await response.json();
-    return data?.prices || cards.map(() => null);
+    
+    // Backend returns { status: "success", results: [{ projected_target: 12.3 }, ... ] }
+    if (data && data.results && Array.isArray(data.results)) {
+      return data.results.map((r: any) => r.projected_target || 0);
+    }
+    
+    return cards.map(() => null);
   } catch (error) {
     console.error('Oracle batch calculate failed:', error);
     return cards.map(() => null);
