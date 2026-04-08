@@ -59,37 +59,37 @@ export function BulkIngestionWizard() {
     // Use our secure Next.js proxy — API key is injected server-side, never exposed
     const eventSource = new EventSource(`/api/scanner/stream/${id}`)
     
-    const pairs: { side_a_url: string, side_b_url: string }[] = []
-    
-    eventSource.onmessage = (event) => {
+    eventSource.addEventListener('complete', (event) => {
       try {
         const data = JSON.parse(event.data)
-        if (data.status === 'processing' && data.side_a_url && data.side_b_url) {
-          pairs.push({ side_a_url: data.side_a_url, side_b_url: data.side_b_url })
-          setCroppedPairs([...pairs])
-        } else if (data.status === 'completed') {
-          // completed may carry a final payload array; merge anything included
-          if (Array.isArray(data.data)) {
-            for (const p of data.data) {
-              if (p.side_a_url && p.side_b_url && !pairs.find(x => x.side_a_url === p.side_a_url)) {
-                pairs.push({ side_a_url: p.side_a_url, side_b_url: p.side_b_url })
-              }
-            }
+        const pairs: { side_a_url: string, side_b_url: string }[] = []
+        
+        const finalCards = Array.isArray(data.cards) ? data.cards : []
+        for (const p of finalCards) {
+          // Ignore orphans that lack either front or back
+          if (p.side_a_url && p.side_b_url) {
+            pairs.push({ side_a_url: p.side_a_url, side_b_url: p.side_b_url })
           }
-          eventSource.close()
-          setIsProcessingSSE(false)
-          setCroppedPairs([...pairs])
-          setStep(3)
-          runIdentification(pairs, id)
-        } else if (data.status === 'error') {
-          eventSource.close()
-          setIsProcessingSSE(false)
-          alert('SSE Stream Error: ' + data.message)
         }
-      } catch {
-        // Non-JSON frames (e.g. heartbeat pings) — ignore
+        
+        eventSource.close()
+        setIsProcessingSSE(false)
+        setCroppedPairs(pairs)
+        setStep(3)
+        runIdentification(pairs, id)
+      } catch (e) {
+        console.error("Parse error on complete", e)
       }
-    }
+    })
+
+    eventSource.addEventListener('failed', (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        alert('Worker Failed: ' + data.error)
+      } catch {}
+      eventSource.close()
+      setIsProcessingSSE(false)
+    })
     
     eventSource.onerror = () => {
       eventSource.close()
