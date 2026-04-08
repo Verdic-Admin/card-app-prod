@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Upload, Loader2, Play, Save, CheckCircle2, ChevronRight, Wand2, DollarSign } from 'lucide-react'
 import { uploadImagesToScanner, identifyCardPair } from '@/app/actions/visionSync'
-import { getBatchOraclePrices } from '@/app/actions/oracleSync'
+import { getBatchOraclePrices, getSingleOraclePrice } from '@/app/actions/oracleSync'
 import { createDraftCardsAction, updateDraftCardAction, publishDraftCardsAction } from '@/app/actions/drafts'
 
 export function BulkIngestionWizard() {
@@ -14,6 +14,7 @@ export function BulkIngestionWizard() {
   
   // Tracking
   const [identifiedCount, setIdentifiedCount] = useState<number>(0)
+  const [pricedCount, setPricedCount] = useState<number>(0)
   
   // Step 2 & 3 results
   const [croppedPairs, setCroppedPairs] = useState<{ side_a_url: string, side_b_url: string }[]>([])
@@ -166,17 +167,37 @@ export function BulkIngestionWizard() {
   const runPricing = async () => {
     setIsPricing(true)
     setStep(5)
+    setPricedCount(0)
     try {
-      const payloads = identifiedResults.map(r => ({ player_name: r.player_name, card_set: r.card_set, insert_name: r.insert_name, parallel_name: r.parallel_name }))
-      const prices = await getBatchOraclePrices(payloads)
+      const results: any[] = []
       
-      const pricedResults = identifiedResults.map((r, i) => {
-        const generatedPrice = prices[i] || 0
-        // Write the DB table immediately with the live pricing
-        if (r.db_id) updateDraftCardAction(r.db_id, { price: generatedPrice }).catch(console.error)
-        return { ...r, price: generatedPrice }
-      })
-      setIdentifiedResults(pricedResults)
+      // Process in chunks of 5 to allow React to paint the pricing progress state
+      for (let i = 0; i < identifiedResults.length; i += 5) {
+        const chunk = identifiedResults.slice(i, i + 5)
+        const chunkPromises = chunk.map(async (r) => {
+          try {
+            const price = await getSingleOraclePrice({ player_name: r.player_name, card_set: r.card_set, insert_name: r.insert_name, parallel_name: r.parallel_name })
+            const generatedPrice = price || 0
+            // Write the DB table immediately with the live pricing
+            if (r.db_id) updateDraftCardAction(r.db_id, { price: generatedPrice }).catch(console.error)
+            
+            setPricedCount(prev => prev + 1)
+            
+            return { ...r, price: generatedPrice }
+          } catch (e: any) {
+            setPricedCount(prev => prev + 1)
+            return { ...r, price: 0 }
+          }
+        })
+        
+        const chunkResults = await Promise.all(chunkPromises)
+        results.push(...chunkResults)
+        
+        // Yield to browser to ensure the UI repaints the progress tracker
+        await new Promise(res => setTimeout(res, 50))
+      }
+      
+      setIdentifiedResults(results)
       setStep(6)
     } catch (e: any) {
       alert('Pricing failed: ' + e.message)
@@ -211,12 +232,13 @@ export function BulkIngestionWizard() {
   const updateResultField = (idx: number, field: string, value: string | number) => {
     const next = [...identifiedResults]
     next[idx] = { ...next[idx], [field]: value }
+    
     setIdentifiedResults(next)
     
     // DB sync magic: every edit re-writes to the table automatically.
     const dbId = next[idx].db_id
     if (dbId) {
-      updateDraftCardAction(dbId, { [field]: value }).catch(console.error)
+      updateDraftCardAction(dbId, { [field]: value, insert_name: next[idx].insert_name, parallel_name: next[idx].parallel_name }).catch(console.error)
     }
   }
 
@@ -333,7 +355,10 @@ export function BulkIngestionWizard() {
               <DollarSign className="w-12 h-12 text-emerald-600 animate-pulse" />
            </div>
            <h3 className="text-3xl font-black text-slate-900 mb-3">The AI Pricing Engine</h3>
-           <p className="text-slate-500 font-medium text-lg">Cross-referencing {identifiedResults.length} assets with live market APIs to acquire real-time projection prices...</p>
+           <p className="text-slate-500 font-medium text-lg mb-6">Cross-referencing {identifiedResults.length} assets with live market APIs to acquire real-time projection prices...</p>
+           <div className="bg-emerald-50 text-emerald-700 font-black text-2xl py-4 px-8 rounded-full border-2 border-emerald-200 inline-block">
+              {pricedCount} / {identifiedResults.length} PRICED
+           </div>
         </div>
       )}
 
@@ -363,8 +388,16 @@ export function BulkIngestionWizard() {
                       <input type="text" value={result.card_set || ''} onChange={e => updateResultField(idx, 'card_set', e.target.value)} className="w-full py-2 px-3 text-sm font-bold text-slate-900 bg-slate-50 border border-slate-200 rounded-lg focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 outline-none transition" />
                     </div>
                     <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none block mb-1">Parallel / Insert</label>
-                      <input type="text" value={result.insert_name || result.parallel_name || ''} onChange={e => updateResultField(idx, 'insert_name', e.target.value)} className="w-full py-2 px-3 text-sm font-bold text-slate-900 bg-slate-50 border border-slate-200 rounded-lg focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 outline-none transition" />
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none block mb-1">Card #</label>
+                      <input type="text" value={result.card_number || ''} onChange={e => updateResultField(idx, 'card_number', e.target.value)} className="w-full py-2 px-3 text-sm font-bold text-slate-900 bg-slate-50 border border-slate-200 rounded-lg focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 outline-none transition" placeholder="e.g. US-300" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none block mb-1">Insert Name</label>
+                      <input type="text" value={result.insert_name || ''} onChange={e => updateResultField(idx, 'insert_name', e.target.value)} className="w-full py-2 px-3 text-sm font-bold text-slate-900 bg-slate-50 border border-slate-200 rounded-lg focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 outline-none transition" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none block mb-1">Parallel Color/Type</label>
+                      <input type="text" value={result.parallel_name || ''} onChange={e => updateResultField(idx, 'parallel_name', e.target.value)} className="w-full py-2 px-3 text-sm font-bold text-slate-900 bg-slate-50 border border-slate-200 rounded-lg focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 outline-none transition" />
                     </div>
                   </div>
                   <div className="mt-4 pt-4 border-t border-dashed border-slate-200 flex items-center justify-between">

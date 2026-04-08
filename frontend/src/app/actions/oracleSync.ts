@@ -274,6 +274,7 @@ export async function getBatchOraclePrices(cards: any[]) {
       
       return {
         player_name: c.player_name || "",
+        card_set: c.card_set || "",
         card_number: c.card_number || "",
         attributes: rawFuzzyString,
         storefront_id: c.storefront_id || c.db_id || "batch-item"
