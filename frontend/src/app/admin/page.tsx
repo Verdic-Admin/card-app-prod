@@ -60,15 +60,15 @@ export default async function AdminPage() {
           <CoinRequestsCRM />
         </div>
         <div>
-          <AuctionManager 
-            initialItems={inventory || []} 
-          />
-        </div>
-        <div>
           <BulkIngestionWizard />
         </div>
         <div>
           <TradeLeadsCRM />
+        </div>
+        <div>
+          <AuctionManager 
+            initialItems={inventory || []} 
+          />
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           <h2 className="text-xl font-bold text-slate-900 mb-6 flex justify-between items-center">
