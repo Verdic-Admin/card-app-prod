@@ -13,10 +13,10 @@ export interface StoreSettings {
     social_twitter: string;
     social_facebook: string;
     social_discord: string;
-    social_threads: string;
     oracle_discount_percentage: number;
     site_name: string;
     site_author: string | null;
+    site_theme: string;
 }
 
 export async function getStoreSettings(): Promise<StoreSettings> {
@@ -39,12 +39,11 @@ export async function getStoreSettings(): Promise<StoreSettings> {
             store_description: 'Zero-Fee Sports Card Storefront. Prices reflect direct-to-buyer savings. No hidden buyer premiums, just high-quality cards shipped directly to you.',
             social_instagram: '',
             social_twitter: '',
-            social_facebook: '',
-            social_discord: '',
             social_threads: '',
             oracle_discount_percentage: 0.0,
             site_name: 'My Card Store',
-            site_author: null
+            site_author: null,
+            site_theme: 'dark'
         }
     }
     

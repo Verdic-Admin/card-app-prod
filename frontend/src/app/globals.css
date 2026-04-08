@@ -24,3 +24,18 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+[data-theme="midnight"] {
+  --background: #0f172a;
+  --foreground: #f8fafc;
+}
+
+[data-theme="emerald"] {
+  --background: #022c22;
+  --foreground: #ecfdf5;
+}
+
+[data-theme="crimson"] {
+  --background: #4c0519;
+  --foreground: #fff1f2;
+}

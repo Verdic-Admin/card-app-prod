@@ -100,6 +100,20 @@ export default function SettingsPage() {
               />
               <p className="text-[10px] text-slate-500 mt-1.5 font-medium">Optional subtitle shown under the site name. Leave blank to hide entirely.</p>
             </div>
+            
+            <div className="md:col-span-2">
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Storefront Theme</label>
+              <select
+                value={settings.site_theme}
+                onChange={e => setSettings({...settings, site_theme: e.target.value})}
+                className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-900 font-bold focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none shadow-sm transition-all"
+              >
+                <option value="dark">Dark (Default)</option>
+                <option value="midnight">Midnight Blue</option>
+                <option value="emerald">Field Green</option>
+                <option value="crimson">Ruby Red</option>
+              </select>
+            </div>
           </div>
         </div>
 
