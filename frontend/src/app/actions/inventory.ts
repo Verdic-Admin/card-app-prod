@@ -416,6 +416,31 @@ export async function sendToAuctionBlock(ids: string[]) {
   revalidatePath('/admin')
 }
 
+export async function updateStagedAuction(itemId: string, reservePrice: number | null, endTime: string | null, description: string | null, coinedImageUrl?: string | null) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error("Unauthorized")
+  const admin = createAdminClient()
+  const payload: any = {}
+  if (reservePrice !== undefined) payload.auction_reserve_price = reservePrice
+  if (endTime !== undefined) payload.auction_end_time = endTime
+  if (description !== undefined) payload.auction_description = description
+  if (coinedImageUrl !== undefined) payload.coined_image_url = coinedImageUrl
+  
+  await (admin.from('inventory') as any).update(payload).eq('id', itemId)
+  revalidatePath('/admin')
+}
+
+export async function goLiveWithAuctions(itemIds: string[]) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error("Unauthorized")
+  const admin = createAdminClient()
+  await (admin.from('inventory') as any).update({ auction_status: 'live' }).in('id', itemIds)
+  revalidatePath('/admin')
+  revalidatePath('/auction')
+}
+
 export async function generateBatchCodes(ids: string[]) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

@@ -11,8 +11,21 @@ export function Navbar({ settings }: { settings: StoreSettings }) {
   return (
     <div className="flex flex-col w-full sticky top-0 z-50">
       {settings.site_announcement && (
-        <div className="bg-emerald-500 text-zinc-950 text-xs font-black text-center py-2 px-4 shadow-sm relative z-[60] tracking-wide">
-          {settings.site_announcement}
+        <div className="relative z-[60] overflow-hidden bg-gradient-to-r from-violet-600 via-fuchsia-600 to-orange-600 shadow-md">
+          <div className="absolute inset-0 bg-black/10 mix-blend-overlay pointer-events-none"></div>
+          <div className="py-3 px-4 flex items-center justify-center gap-3 relative">
+            <span className="flex h-2 w-2 relative shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-300"></span>
+            </span>
+            <p className="text-white text-sm sm:text-base font-black tracking-widest uppercase drop-shadow-md text-center">
+              {settings.site_announcement}
+            </p>
+            <span className="flex h-2 w-2 relative shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-300"></span>
+            </span>
+          </div>
         </div>
       )}
       <nav className="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-md relative z-50">

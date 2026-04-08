@@ -1,3 +1,4 @@
+import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
@@ -5,6 +6,53 @@ import { CardGrid } from '@/components/CardGrid'
 import { ItemDetailClient } from '@/components/ItemDetailClient'
 
 type PageProps = { params: Promise<{ id: string }> }
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params
+  const supabase = await createClient()
+
+  const { data: item } = await supabase
+    .from('inventory')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  if (!item) {
+    return {
+      title: 'Item Not Found | Sports Card Store',
+      description: 'The requested sports card could not be found.',
+    }
+  }
+
+  const displayPrice = (item.listed_price ?? item.avg_price ?? 0).toFixed(2)
+  const title = `${item.player_name} - ${item.year || ''} ${item.card_set || ''} | $${displayPrice}`
+  
+  let descriptionParts = []
+  if (item.parallel_insert_type) descriptionParts.push(`Parallel/Insert: ${item.parallel_insert_type}`)
+  if (item.team_name) descriptionParts.push(`Team: ${item.team_name}`)
+  if (item.is_lot) descriptionParts.push(`📦 Lot Bundle`)
+  
+  const description = descriptionParts.length > 0 
+    ? descriptionParts.join(' · ') 
+    : 'View this card and more on our zero-fee storefront.'
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      images: item.image_url ? [item.image_url] : [],
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: item.image_url ? [item.image_url] : [],
+    },
+  }
+}
 
 export default async function ItemPage({ params }: PageProps) {
   const { id } = await params
@@ -117,20 +165,33 @@ export default async function ItemPage({ params }: PageProps) {
         {/* Images */}
         <div className="space-y-4">
           {item.image_url && (
-            <div className="rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-950 shadow-2xl aspect-[2.5/3.5] flex items-center justify-center p-6">
+            <div className="rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-950 shadow-2xl aspect-[2.5/3.5] flex items-center justify-center p-6 relative group">
               <img
                 src={item.image_url}
                 alt={`${item.player_name} front`}
                 className="w-full h-full object-contain drop-shadow-2xl"
               />
+              <div className="absolute inset-0 ring-1 ring-inset ring-white/10 rounded-2xl pointer-events-none" />
             </div>
           )}
           {item.back_image_url && (
-            <div className="rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-950 shadow-xl aspect-[2.5/3.5] flex items-center justify-center p-6">
+            <div className="rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-950 shadow-xl aspect-[2.5/3.5] flex items-center justify-center p-6 relative">
               <img
                 src={item.back_image_url}
                 alt={`${item.player_name} back`}
-                className="w-full h-full object-contain drop-shadow-xl"
+                className="w-full h-full object-contain drop-shadow-xl opacity-90"
+              />
+            </div>
+          )}
+          {item.coined_image_url && (
+            <div className="rounded-2xl overflow-hidden border-2 border-emerald-500/50 bg-emerald-950/20 shadow-xl aspect-[2.5/3.5] flex items-center justify-center p-2 relative">
+              <div className="absolute top-4 right-4 bg-emerald-500 text-zinc-950 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-lg z-10 flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-zinc-950 animate-pulse" /> Validated
+              </div>
+              <img
+                src={item.coined_image_url}
+                alt={`${item.player_name} physical coin proof`}
+                className="w-full h-full object-contain drop-shadow-xl rounded-xl"
               />
             </div>
           )}

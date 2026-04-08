@@ -5,6 +5,8 @@ import { InventoryTable } from '@/components/admin/InventoryTable'
 import { SignOutButton } from '@/components/admin/SignOutButton'
 import { LedgerDashboard } from '@/components/admin/LedgerDashboard'
 import { TradeLeadsCRM } from '@/components/admin/TradeLeadsCRM'
+import { CoinRequestsCRM } from '@/components/admin/CoinRequestsCRM'
+import { AuctionManager } from '@/components/admin/AuctionManager'
 
 import Link from 'next/link'
 
@@ -53,6 +55,16 @@ export default async function AdminPage() {
       <div className="flex flex-col space-y-10">
         <div>
           <LedgerDashboard soldItems={soldItems} />
+        </div>
+        <div>
+          <CoinRequestsCRM />
+        </div>
+        <div>
+          <AuctionManager 
+            initialItems={inventory || []} 
+            initialStreamUrl={liveStreamUrl} 
+            initialProjectionTimeframe={projectionTimeframe}
+          />
         </div>
         <div>
           <BulkIngestionWizard />

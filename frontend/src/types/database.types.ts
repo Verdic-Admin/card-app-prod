@@ -14,14 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      coin_requests: {
+        Row: {
+          id: string
+          item_id: string | null
+          buyer_email: string
+          status: string
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          item_id?: string | null
+          buyer_email: string
+          status?: string
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          item_id?: string | null
+          buyer_email?: string
+          status?: string
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coin_requests_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       inventory: {
         Row: {
           accepts_offers: boolean | null
           auction_status: string | null
+          auction_reserve_price: number | null
+          auction_end_time: string | null
+          auction_description: string | null
           avg_price: number | null
           back_image_url: string | null
           card_number: string | null
           card_set: string | null
+          coined_image_url: string | null
           cost_basis: number | null
           created_at: string | null
           current_bid: number | null
@@ -48,10 +84,14 @@ export type Database = {
         Insert: {
           accepts_offers?: boolean | null
           auction_status?: string | null
+          auction_reserve_price?: number | null
+          auction_end_time?: string | null
+          auction_description?: string | null
           avg_price?: number | null
           back_image_url?: string | null
           card_number?: string | null
           card_set?: string | null
+          coined_image_url?: string | null
           cost_basis?: number | null
           current_bid?: number | null
           filename?: string | null
@@ -77,10 +117,14 @@ export type Database = {
         Update: {
           accepts_offers?: boolean | null
           auction_status?: string | null
+          auction_reserve_price?: number | null
+          auction_end_time?: string | null
+          auction_description?: string | null
           avg_price?: number | null
           back_image_url?: string | null
           card_number?: string | null
           card_set?: string | null
+          coined_image_url?: string | null
           cost_basis?: number | null
           current_bid?: number | null
           filename?: string | null
