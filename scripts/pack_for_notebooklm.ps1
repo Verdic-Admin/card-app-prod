@@ -13,7 +13,7 @@ $Workspaces = @(
 
 $IncludeExtensions = @(".md", ".txt", ".yaml", ".yml", ".json", ".sql", ".ps1", ".ts", ".tsx", ".js", ".jsx", ".cjs", ".mjs", ".css", ".py", ".dart", ".html", ".sh", ".bat", ".csv", ".xml", "Dockerfile", ".gitignore", ".dockerignore", ".env.example")
 $IgnorePatterns = @(
-    "*.git*", "*notebooklm_sources*", "*node_modules*", "*.next*", "*__pycache__*", "*.venv*", "*.env*", "*dist*", "*build*", "*.supabase*", "*.dart_tool*"
+    "*.git*", "*notebooklm_sources*", "*node_modules*", "*.next*", "*__pycache__*", "*.venv*", "*.env*", "*dist*", "*build*", "*.supabase*", "*.dart_tool*", "*skills*"
 )
 
 Write-Host "Resetting $OutputDir..."
