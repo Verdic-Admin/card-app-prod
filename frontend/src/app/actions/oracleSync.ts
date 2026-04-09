@@ -43,7 +43,8 @@ export async function syncInventoryWithOracle() {
       const rawFuzzyString = [
         item.card_set, 
         item.card_number, 
-        item.parallel_insert_type, 
+        item.insert_name, 
+        item.parallel_name, 
         item.grade, 
         item.attributes 
       ].filter(Boolean).join(" ");
@@ -125,7 +126,8 @@ export async function syncSingleItemWithOracle(id: string) {
     const rawFuzzyString = [
       (item as any).card_set, 
       (item as any).card_number, 
-      (item as any).parallel_insert_type, 
+      (item as any).insert_name, 
+      (item as any).parallel_name, 
       (item as any).grade, 
       (item as any).attributes 
     ].filter(Boolean).join(" ");
@@ -192,7 +194,8 @@ export async function evaluateItemWithOracle(payload: any) {
     const rawFuzzyString = [
       payload.card_set, 
       payload.card_number, 
-      payload.parallel_insert_type, 
+      payload.insert_name, 
+      payload.parallel_name, 
       payload.grade, 
       payload.attributes 
     ].filter(Boolean).join(" ");
