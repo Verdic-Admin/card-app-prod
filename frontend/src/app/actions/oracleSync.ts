@@ -40,25 +40,21 @@ export async function syncInventoryWithOracle() {
   for (const item of (inventory as any[])) {
     try {
       console.log(`-> Processing ${item.player_name}...`);
-      const rawFuzzyString = [
-        item.card_set, 
-        item.card_number, 
-        item.insert_name, 
-        item.parallel_name, 
-        item.grade, 
-        item.attributes 
-      ].filter(Boolean).join(" ");
-
       const payload = {
-        player_name: item.player_name,
-        card_number: item.card_number || "",
-        attributes: rawFuzzyString,
-        storefront_id: item.id
+        player_name: String(item.player_name || ""),
+        card_set: String(item.card_set || ""),
+        card_number: String(item.card_number || ""),
+        insert_name: String(item.insert_name || "Base"),
+        parallel_name: String(item.parallel_name || "Base"),
+        is_auto: Boolean(item.is_auto || false),
+        is_relic: Boolean(item.is_relic || false),
+        is_rookie: Boolean(item.is_rookie || false),
+        skip_fuzzy: true
       }
       
-      console.log(`-> Sending payload to ${oracle_api_url}/api/v1/b2b/calculate:`, payload);
+      console.log(`-> Sending payload to ${oracle_api_url}/api/v1/calculate:`, payload);
 
-      const res = await fetch(`${oracle_api_url}/api/v1/b2b/calculate`, {
+      const res = await fetch(`${oracle_api_url}/api/v1/calculate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -74,13 +70,13 @@ export async function syncInventoryWithOracle() {
 
       const data = await res.json()
       
-      if (data.projected_target && data.projected_target > 0) {
-        const new_price = data.projected_target * (1 - (discountRate / 100))
+      if (data.target_price && data.target_price > 0) {
+        const new_price = data.target_price * (1 - (discountRate / 100))
 
         const { error: updateError } = await supabase
           .from('inventory')
           // @ts-ignore
-          .update({ listed_price: new_price, oracle_projection: data.projected_target })
+          .update({ listed_price: new_price, oracle_projection: data.target_price })
           .eq('id', item.id)
 
         if (!updateError) {
@@ -123,23 +119,19 @@ export async function syncSingleItemWithOracle(id: string) {
   }
 
   try {
-    const rawFuzzyString = [
-      (item as any).card_set, 
-      (item as any).card_number, 
-      (item as any).insert_name, 
-      (item as any).parallel_name, 
-      (item as any).grade, 
-      (item as any).attributes 
-    ].filter(Boolean).join(" ");
-
     const payload = {
-      player_name: (item as any).player_name,
-      card_number: (item as any).card_number || "",
-      attributes: rawFuzzyString,
-      storefront_id: (item as any).id
+      player_name: String((item as any).player_name || ""),
+      card_set: String((item as any).card_set || ""),
+      card_number: String((item as any).card_number || ""),
+      insert_name: String((item as any).insert_name || "Base"),
+      parallel_name: String((item as any).parallel_name || "Base"),
+      is_auto: Boolean((item as any).is_auto || false),
+      is_relic: Boolean((item as any).is_relic || false),
+      is_rookie: Boolean((item as any).is_rookie || false),
+      skip_fuzzy: true
     }
 
-    const res = await fetch(`${oracle_api_url}/api/v1/b2b/calculate`, {
+    const res = await fetch(`${oracle_api_url}/api/v1/calculate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -154,13 +146,13 @@ export async function syncSingleItemWithOracle(id: string) {
 
     const data = await res.json()
     
-    if (data.projected_target && data.projected_target > 0) {
-      const new_price = data.projected_target * (1 - (discountRate / 100))
+    if (data.target_price && data.target_price > 0) {
+      const new_price = data.target_price * (1 - (discountRate / 100))
 
       const { error: updateError } = await supabase
         .from('inventory')
         // @ts-ignore
-        .update({ listed_price: new_price, oracle_projection: data.projected_target })
+        .update({ listed_price: new_price, oracle_projection: data.target_price })
         .eq('id', (item as any).id)
 
       if (!updateError) {
@@ -169,7 +161,7 @@ export async function syncSingleItemWithOracle(id: string) {
         return { success: false, message: `Failed to update price in Supabase.` }
       }
     } else {
-      return { success: false, message: `Oracle returned invalid projected_target.` }
+      return { success: false, message: `Oracle returned invalid target_price.` }
     }
 
   } catch (err: any) {
@@ -191,25 +183,21 @@ export async function evaluateItemWithOracle(payload: any) {
   const discountRate = settings?.oracle_discount_percentage || 0;
 
   try {
-    const rawFuzzyString = [
-      payload.card_set, 
-      payload.card_number, 
-      payload.insert_name, 
-      payload.parallel_name, 
-      payload.grade, 
-      payload.attributes 
-    ].filter(Boolean).join(" ");
-
     const formattedPayload = {
       player_name: String(payload.player_name || ""),
+      card_set: String(payload.card_set || ""),
       card_number: String(payload.card_number || ""),
-      attributes: String(rawFuzzyString),
-      storefront_id: String(payload.id || "eval")
+      insert_name: String(payload.insert_name || "Base"),
+      parallel_name: String(payload.parallel_name || "Base"),
+      is_auto: Boolean(payload.is_auto || false),
+      is_relic: Boolean(payload.is_relic || false),
+      is_rookie: Boolean(payload.is_rookie || false),
+      skip_fuzzy: true
     }
     
-    console.log(`-> Evaluate payload going to ${oracle_api_url}/api/v1/b2b/calculate:`, formattedPayload);
+    console.log(`-> Evaluate payload going to ${oracle_api_url}/api/v1/calculate:`, formattedPayload);
 
-    const res = await fetch(`${oracle_api_url}/api/v1/b2b/calculate`, {
+    const res = await fetch(`${oracle_api_url}/api/v1/calculate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -224,11 +212,11 @@ export async function evaluateItemWithOracle(payload: any) {
 
     const data = await res.json()
     
-    if (data.projected_target && data.projected_target > 0) {
-      const new_price = data.projected_target * (1 - (discountRate / 100))
+    if (data.target_price && data.target_price > 0) {
+      const new_price = data.target_price * (1 - (discountRate / 100))
       return { success: true, price: new_price }
     } else {
-      return { success: false, message: `Oracle returned invalid projected_target.` }
+      return { success: false, message: `Oracle returned invalid target_price.` }
     }
 
 } catch (err: any) {
@@ -236,26 +224,31 @@ export async function evaluateItemWithOracle(payload: any) {
   }
 }
 
-export async function getSingleOraclePrice(payload: { player_name: string; card_set: string; card_number?: string; insert_name?: string; parallel_name?: string; attributes?: string }) {
+export async function getSingleOraclePrice(payload: { 
+  player_name: string; 
+  card_set: string; 
+  card_number?: string; 
+  insert_name?: string; 
+  parallel_name?: string; 
+  is_auto?: boolean; 
+  is_relic?: boolean; 
+  is_rookie?: boolean; 
+}) {
   try {
-    const rawFuzzyString = [
-      payload.card_set,
-      payload.card_number,
-      payload.insert_name,
-      payload.parallel_name,
-      payload.attributes
-    ].filter(Boolean).join(" ");
-    
     const formattedPayload = {
       player_name: String(payload.player_name || ""),
       card_set: String(payload.card_set || ""),
       card_number: String(payload.card_number || ""),
-      attributes: String(rawFuzzyString),
-      storefront_id: "single-eval"
+      insert_name: String(payload.insert_name || "Base"),
+      parallel_name: String(payload.parallel_name || "Base"),
+      is_auto: Boolean(payload.is_auto || false),
+      is_relic: Boolean(payload.is_relic || false),
+      is_rookie: Boolean(payload.is_rookie || false),
+      skip_fuzzy: true
     };
 
     const apiKey = process.env.PLAYERINDEX_API_KEY || '';
-    const response = await fetch('https://api.playerindexdata.com/fintech/api/v1/b2b/calculate', {
+    const response = await fetch('https://api.playerindexdata.com/fintech/api/v1/calculate', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -270,7 +263,7 @@ export async function getSingleOraclePrice(payload: { player_name: string; card_
     }
 
     const data = await response.json();
-    return data?.projected_target || null;
+    return data?.target_price || null;
   } catch (error) {
     console.error('Oracle single calculate failed:', error);
     return null;

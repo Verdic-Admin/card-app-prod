@@ -1,24 +1,32 @@
-async function test() {
+async function testOracleAPI() {
   const payload = {
-    player_name: "Gunnar Henderson",
-    card_number: "US250",
-    card_set: "2023 Topps Update",
-    attributes: "2023 Topps Update US250",
-    storefront_id: "single-eval"
+    player_name: "Miguel Cabrera",
+    card_set: "2025 Stadium Club",
+    card_number: "55",
+    insert_name: "Base",
+    parallel_name: "Base",
+    is_auto: false,
+    is_relic: false,
+    is_rookie: false,
+    skip_fuzzy: true
   };
 
-  const apiKey = "pi_live_L5-fH6I-LyizQhJIEAEZR2jDCiV3vS6o1JKc1gKtwJU";
-  const response = await fetch('https://api.playerindexdata.com/fintech/api/v1/b2b/calculate', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-API-Key': apiKey,
-    },
-    body: JSON.stringify(payload),
-  });
-
-  const data = await response.json();
-  console.log(response.status, data);
+  console.log("-> Sending Payload to /calculate:", payload);
+  const apiKey = "pi_live_L5-fH6I-LyizQhJIEAEZR2jDCiV3vS6o1JKc1gKtwJU"; 
+  try {
+    const response = await fetch('https://api.playerindexdata.com/fintech/api/v1/calculate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': apiKey,
+      },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    console.log(`\n<- ${response.status} Response:`);
+    console.log(data);
+  } catch (err) {
+    console.error("Fetch Exception:", err.message);
+  }
 }
-
-test();
+testOracleAPI();
