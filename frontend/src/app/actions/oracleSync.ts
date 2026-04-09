@@ -201,10 +201,10 @@ export async function evaluateItemWithOracle(payload: any) {
     ].filter(Boolean).join(" ");
 
     const formattedPayload = {
-      player_name: payload.player_name,
-      card_number: payload.card_number || "",
-      attributes: rawFuzzyString,
-      storefront_id: payload.id || "eval"
+      player_name: String(payload.player_name || ""),
+      card_number: String(payload.card_number || ""),
+      attributes: String(rawFuzzyString),
+      storefront_id: String(payload.id || "eval")
     }
     
     console.log(`-> Evaluate payload going to ${oracle_api_url}/api/v1/b2b/calculate:`, formattedPayload);
@@ -247,10 +247,10 @@ export async function getSingleOraclePrice(payload: { player_name: string; card_
     ].filter(Boolean).join(" ");
     
     const formattedPayload = {
-      player_name: payload.player_name || "",
-      card_set: payload.card_set || "",
-      card_number: payload.card_number || "",
-      attributes: rawFuzzyString,
+      player_name: String(payload.player_name || ""),
+      card_set: String(payload.card_set || ""),
+      card_number: String(payload.card_number || ""),
+      attributes: String(rawFuzzyString),
       storefront_id: "single-eval"
     };
 
@@ -292,11 +292,11 @@ export async function getBatchOraclePrices(cards: any[]) {
       ].filter(Boolean).join(" ");
       
       return {
-        player_name: c.player_name || "",
-        card_set: c.card_set || "",
-        card_number: c.card_number || "",
-        attributes: rawFuzzyString,
-        storefront_id: c.storefront_id || c.db_id || "batch-item"
+        player_name: String(c.player_name || ""),
+        card_set: String(c.card_set || ""),
+        card_number: String(c.card_number || ""),
+        attributes: String(rawFuzzyString),
+        storefront_id: String(c.storefront_id || c.db_id || "batch-item")
       };
     });
 
