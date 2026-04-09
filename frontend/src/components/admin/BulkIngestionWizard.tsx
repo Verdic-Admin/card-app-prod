@@ -154,6 +154,7 @@ export function BulkIngestionWizard() {
         side_b_url: d.back_image_url,
         player_name: d.player_name,
         card_set: d.card_set,
+        card_number: d.card_number || '',
         insert_name: d.parallel_insert_type,
         parallel_name: d.parallel_insert_type,
         price: d.listed_price || 0
