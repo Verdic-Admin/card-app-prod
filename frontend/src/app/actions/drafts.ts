@@ -14,11 +14,12 @@ export async function createDraftCardsAction(cards: any[]) {
     image_url: c.side_a_url,
     back_image_url: c.side_b_url,
     listed_price: c.price || 0,
+    market_price: c.market_price || c.price || 0,
   }))
 
   const { data, error } = await (admin as any).from('scan_staging')
     .insert(payload)
-    .select('id, player_name, card_set, card_number, insert_name, parallel_name, image_url, back_image_url, listed_price')
+    .select('id, player_name, card_set, card_number, insert_name, parallel_name, image_url, back_image_url, listed_price, market_price')
 
   if (error) {
     console.error("Staging insert error:", error)
@@ -40,6 +41,9 @@ export async function updateDraftCardAction(id: string, updates: any) {
   if (updates.price !== undefined) {
     payload.listed_price = parseFloat(updates.price) || 0
   }
+  if (updates.market_price !== undefined) {
+    payload.market_price = parseFloat(updates.market_price) || 0
+  }
 
   const { error } = await (admin as any).from('scan_staging')
     .update(payload)
@@ -54,7 +58,7 @@ export async function publishDraftCardsAction(ids: string[]) {
   
   // 1. Read approved rows from staging
   const { data: staged, error: readError } = await (admin as any).from('scan_staging')
-    .select('player_name, card_set, card_number, insert_name, parallel_name, image_url, back_image_url, listed_price')
+    .select('player_name, card_set, card_number, insert_name, parallel_name, image_url, back_image_url, listed_price, market_price')
     .in('id', ids)
 
   if (readError || !staged?.length) {
@@ -71,6 +75,7 @@ export async function publishDraftCardsAction(ids: string[]) {
     image_url: s.image_url,
     back_image_url: s.back_image_url,
     listed_price: s.listed_price,
+    market_price: s.market_price,
     status: 'available',
   }))
 
