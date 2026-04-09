@@ -118,13 +118,17 @@ export function BulkIngestionWizard() {
             
             setIdentifiedCount(prev => prev + 1)
             
+            const iName = details.insert_name || '';
+            const pName = details.parallel_type || fallback.parallel_type || '';
+
             return { 
               side_a_url: pair.side_a_url,
               side_b_url: pair.side_b_url,
               player_name: details.player_name || fallback.full_name || '',
               card_set: details.card_set || details.set_name || fallback.base_set_name || '',
-              insert_name: details.insert_name || '',
-              parallel_name: details.parallel_type || fallback.parallel_type || '',
+              card_number: details.card_number || fallback.card_number || '',
+              insert_name: iName,
+              parallel_name: iName === pName ? '' : pName,
               price: 0 
             }
           } catch (e) {
