@@ -148,22 +148,17 @@ export function BulkIngestionWizard() {
       // Instantly persist these AI drafts heavily to our Database Table
       const dbDrafts = await createDraftCardsAction(results)
       
-      const uiResults = dbDrafts.map((d: any, idx: number) => {
-        // The DB only stores one combined column (parallel_insert_type).
-        // Recover the original insert/parallel split from the AI results.
-        const original = results[idx] || {}
-        return {
-          db_id: d.id, // Supabase assigned PK
-          side_a_url: d.image_url,
-          side_b_url: d.back_image_url,
-          player_name: d.player_name,
-          card_set: d.card_set,
-          card_number: d.card_number || original.card_number || '',
-          insert_name: original.insert_name || '',
-          parallel_name: original.parallel_name || '',
-          price: d.listed_price || 0
-        }
-      })
+      const uiResults = dbDrafts.map((d: any) => ({
+        db_id: d.id, // Supabase assigned PK
+        side_a_url: d.image_url,
+        side_b_url: d.back_image_url,
+        player_name: d.player_name,
+        card_set: d.card_set,
+        card_number: d.card_number || '',
+        insert_name: d.insert_name || '',
+        parallel_name: d.parallel_name || '',
+        price: d.listed_price || 0
+      }))
 
       setIdentifiedResults(uiResults)
       setStep(4)

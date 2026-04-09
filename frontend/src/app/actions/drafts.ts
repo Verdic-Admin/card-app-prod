@@ -9,7 +9,8 @@ export async function createDraftCardsAction(cards: any[]) {
     player_name: c.player_name || '',
     card_set: c.card_set || '',
     card_number: c.card_number || '',
-    parallel_insert_type: [c.parallel_name, c.insert_name].filter(Boolean).join(" ") || 'Base',
+    insert_name: c.insert_name || '',
+    parallel_name: c.parallel_name || '',
     image_url: c.side_a_url,
     back_image_url: c.side_b_url,
     listed_price: c.price || 0,
@@ -18,7 +19,7 @@ export async function createDraftCardsAction(cards: any[]) {
 
   const { data, error } = await (admin.from('inventory') as any)
     .insert(payload)
-    .select('id, player_name, card_set, card_number, parallel_insert_type, image_url, back_image_url, listed_price')
+    .select('id, player_name, card_set, card_number, insert_name, parallel_name, image_url, back_image_url, listed_price')
 
   if (error) {
     console.error("Draft insert error:", error)
@@ -36,9 +37,8 @@ export async function updateDraftCardAction(id: string, updates: any) {
   if (updates.card_set !== undefined) payload.card_set = updates.card_set
   if (updates.card_number !== undefined) payload.card_number = updates.card_number
   
-  if (updates.insert_name !== undefined || updates.parallel_name !== undefined) {
-    payload.parallel_insert_type = [updates.parallel_name, updates.insert_name].filter(Boolean).join(" ") || 'Base'
-  }
+  if (updates.insert_name !== undefined) payload.insert_name = updates.insert_name
+  if (updates.parallel_name !== undefined) payload.parallel_name = updates.parallel_name
   if (updates.price !== undefined) {
     payload.listed_price = parseFloat(updates.price) || 0
   }
