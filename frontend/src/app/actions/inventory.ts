@@ -71,8 +71,8 @@ export async function addCardAction(formData: FormData) {
         shop_id: shopId,
         player_name: payload.player_name,
         card_set: payload.card_set,
-        insert_name: item.insert_name || payload.parallel_insert_type,
-          parallel_name: item.parallel_name || payload.parallel_insert_type,
+        insert_name: payload.parallel_insert_type,
+        parallel_name: payload.parallel_insert_type,
         price: payload.listed_price || payload.avg_price,
         image_url: publicUrlData.publicUrl,
         buy_url: fullUrl
