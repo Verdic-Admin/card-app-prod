@@ -113,20 +113,21 @@ export function BulkIngestionWizard() {
         const chunkPromises = chunk.map(async pair => {
           try {
             const res = await identifyCardPair({ queue_id: qId, side_a_url: pair.side_a_url, side_b_url: pair.side_b_url })
-            const details = res.card_details || res.back_metadata || {}
+            const details = res.card_details || {}
+            const backMeta = res.back_metadata || {}
             const fallback = res.top_match || {}
             
             setIdentifiedCount(prev => prev + 1)
             
             const iName = details.insert_name || '';
-            const pName = details.parallel_type || fallback.parallel_type || '';
+            const pName = details.parallel_type || fallback.parallel_type || backMeta.parallel_type || '';
 
             return { 
               side_a_url: pair.side_a_url,
               side_b_url: pair.side_b_url,
-              player_name: details.player_name || fallback.full_name || '',
-              card_set: details.card_set || details.set_name || fallback.base_set_name || '',
-              card_number: details.card_number || fallback.card_number || '',
+              player_name: details.player_name || fallback.full_name || backMeta.player_name || '',
+              card_set: details.card_set || fallback.base_set_name || backMeta.set_name || '',
+              card_number: details.card_number || backMeta.card_number || '',
               insert_name: iName,
               parallel_name: iName === pName ? '' : pName,
               price: 0 
