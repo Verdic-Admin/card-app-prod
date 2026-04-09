@@ -2,6 +2,15 @@
 
 import { createClient } from '@/utils/supabase/server'
 
+// Helper to fix ALL CAPS names from OCR since the API catalog matcher is case-sensitive
+function toTitleCase(str: string) {
+  if (!str) return "";
+  return str.replace(
+    /\w\S*/g,
+    (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase()
+  );
+}
+
 export async function syncInventoryWithOracle() {
   const supabase = await createClient()
 
@@ -41,7 +50,7 @@ export async function syncInventoryWithOracle() {
     try {
       console.log(`-> Processing ${item.player_name}...`);
       const payload = {
-        player_name: String(item.player_name || ""),
+        player_name: toTitleCase(String(item.player_name || "")),
         card_set: String(item.card_set || ""),
         card_number: String(item.card_number || ""),
         insert_name: String(item.insert_name || "Base"),
@@ -120,7 +129,7 @@ export async function syncSingleItemWithOracle(id: string) {
 
   try {
     const payload = {
-      player_name: String((item as any).player_name || ""),
+      player_name: toTitleCase(String((item as any).player_name || "")),
       card_set: String((item as any).card_set || ""),
       card_number: String((item as any).card_number || ""),
       insert_name: String((item as any).insert_name || "Base"),
@@ -184,7 +193,7 @@ export async function evaluateItemWithOracle(payload: any) {
 
   try {
     const formattedPayload = {
-      player_name: String(payload.player_name || ""),
+      player_name: toTitleCase(String(payload.player_name || "")),
       card_set: String(payload.card_set || ""),
       card_number: String(payload.card_number || ""),
       insert_name: String(payload.insert_name || "Base"),
@@ -236,7 +245,7 @@ export async function getSingleOraclePrice(payload: {
 }) {
   try {
     const formattedPayload = {
-      player_name: String(payload.player_name || ""),
+      player_name: toTitleCase(String(payload.player_name || "")),
       card_set: String(payload.card_set || ""),
       card_number: String(payload.card_number || ""),
       insert_name: String(payload.insert_name || "Base"),
@@ -285,7 +294,7 @@ export async function getBatchOraclePrices(cards: any[]) {
       ].filter(Boolean).join(" ");
       
       return {
-        player_name: String(c.player_name || ""),
+        player_name: toTitleCase(String(c.player_name || "")),
         card_set: String(c.card_set || ""),
         card_number: String(c.card_number || ""),
         attributes: String(rawFuzzyString),
