@@ -71,8 +71,8 @@ export async function addCardAction(formData: FormData) {
         shop_id: shopId,
         player_name: payload.player_name,
         card_set: payload.card_set,
-        insert_name: payload.parallel_insert_type,
-        parallel_name: payload.parallel_insert_type,
+        insert_name: item.insert_name || payload.parallel_insert_type,
+          parallel_name: item.parallel_name || payload.parallel_insert_type,
         price: payload.listed_price || payload.avg_price,
         image_url: publicUrlData.publicUrl,
         buy_url: fullUrl
@@ -98,7 +98,7 @@ export async function batchCommitAction(items: any[]) {
     const payload = {
       player_name: item.player_name,
       card_set: item.card_set,
-      parallel_insert_type: item.insert_name || item.parallel_name, // Map accordingly
+      parallel_insert_type: [item.insert_name, item.parallel_name].filter(v => v && String(v).toLowerCase() !== 'base').join(' ') || 'Base',
       listed_price: item.price || 0,
       avg_price: item.price || 0,
       cost_basis: 0,
@@ -125,8 +125,8 @@ export async function batchCommitAction(items: any[]) {
           shop_id: shopId,
           player_name: payload.player_name,
           card_set: payload.card_set,
-          insert_name: payload.parallel_insert_type,
-          parallel_name: payload.parallel_insert_type,
+          insert_name: item.insert_name || payload.parallel_insert_type,
+          parallel_name: item.parallel_name || payload.parallel_insert_type,
           price: payload.listed_price,
           image_url: payload.image_url,
           buy_url: fullUrl

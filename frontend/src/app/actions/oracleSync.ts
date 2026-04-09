@@ -15,8 +15,8 @@ export async function syncInventoryWithOracle() {
   const supabase = await createClient()
 
   // 1. Fetch Settings from environment variables
-  const oracle_api_url = process.env.ORACLE_API_URL
-  const oracle_api_key = process.env.ORACLE_API_KEY
+  const oracle_api_url = process.env.PLAYERINDEX_API_URL || process.env.ORACLE_API_URL || 'https://api.playerindexdata.com/fintech'
+  const oracle_api_key = process.env.PLAYERINDEX_API_KEY || process.env.ORACLE_API_KEY
 
   if (!oracle_api_url || !oracle_api_key) {
     throw new Error('Oracle API credentials not configured in settings (.env.local).')
@@ -53,8 +53,8 @@ export async function syncInventoryWithOracle() {
         player_name: toTitleCase(String(item.player_name || "")),
         card_set: String(item.card_set || ""),
         card_number: String(item.card_number || ""),
-        insert_name: String(item.insert_name || "Base"),
-        parallel_name: String(item.parallel_name || "Base"),
+        insert_name: String(item.parallel_insert_type || "Base"),
+        parallel_name: String(item.parallel_insert_type || "Base"),
         is_auto: Boolean(item.is_auto || false),
         is_relic: Boolean(item.is_relic || false),
         is_rookie: Boolean(item.is_rookie || false),
@@ -106,8 +106,8 @@ export async function syncInventoryWithOracle() {
 export async function syncSingleItemWithOracle(id: string) {
   const supabase = await createClient()
 
-  const oracle_api_url = process.env.ORACLE_API_URL
-  const oracle_api_key = process.env.ORACLE_API_KEY
+  const oracle_api_url = process.env.PLAYERINDEX_API_URL || process.env.ORACLE_API_URL || 'https://api.playerindexdata.com/fintech'
+  const oracle_api_key = process.env.PLAYERINDEX_API_KEY || process.env.ORACLE_API_KEY
 
   if (!oracle_api_url || !oracle_api_key) {
     throw new Error('Oracle API credentials not configured in settings (.env.local).')
@@ -132,8 +132,8 @@ export async function syncSingleItemWithOracle(id: string) {
       player_name: toTitleCase(String((item as any).player_name || "")),
       card_set: String((item as any).card_set || ""),
       card_number: String((item as any).card_number || ""),
-      insert_name: String((item as any).insert_name || "Base"),
-      parallel_name: String((item as any).parallel_name || "Base"),
+      insert_name: String((item as any).parallel_insert_type || "Base"),
+      parallel_name: String((item as any).parallel_insert_type || "Base"),
       is_auto: Boolean((item as any).is_auto || false),
       is_relic: Boolean((item as any).is_relic || false),
       is_rookie: Boolean((item as any).is_rookie || false),

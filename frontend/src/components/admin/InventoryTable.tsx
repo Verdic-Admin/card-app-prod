@@ -872,7 +872,7 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
            </button>
             <button onClick={handleApplyAllOracle} disabled={isApplyingAll} className="whitespace-nowrap bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer disabled:opacity-50">
               {isApplyingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <DollarSign className="w-4 h-4" />}
-              Apply All Oracle Pricing
+              Apply All Pricing
             </button>
            <button onClick={handleExportCSV} className="whitespace-nowrap bg-zinc-800 hover:bg-zinc-900 text-white px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer">
              <Download className="w-4 h-4" />
@@ -1062,7 +1062,7 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                   {(item as any).oracle_projection && (item as any).oracle_projection > 0 && (
                     <div className="bg-purple-50 border border-purple-100 rounded-lg p-2 mb-1">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-[10px] font-bold text-purple-700 uppercase tracking-wider flex items-center gap-1">🔮 Oracle Valuation</span>
+                        <span className="text-[10px] font-bold text-purple-700 uppercase tracking-wider flex items-center gap-1">🔮 Market Valuation</span>
                         {(item as any).oracle_trend_percentage != null && (
                           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${(item as any).oracle_trend_percentage >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                             {(item as any).oracle_trend_percentage >= 0 ? '↑' : '↓'} {Math.abs((item as any).oracle_trend_percentage).toFixed(1)}%
@@ -1082,7 +1082,7 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                         className="mt-1.5 w-full text-[11px] font-bold py-1.5 rounded-md bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center gap-1 transition-colors disabled:opacity-50 shadow-sm"
                       >
                         {applyingId === item.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <DollarSign className="w-3 h-3" />}
-                        Apply {discountRate}% Below Oracle
+                        Apply {discountRate}% Below Market
                       </button>
                     </div>
                   )}
@@ -1114,7 +1114,7 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                         <button onClick={() => startEditing(item)} className="text-indigo-600 hover:text-indigo-800 hover:bg-indigo-100 bg-indigo-50 h-7 w-7 rounded flex items-center justify-center transition-colors" title="Edit">
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
-                        <button onClick={() => handleSingleSync(item.id)} disabled={syncingId === item.id} className="text-purple-600 hover:text-purple-800 hover:bg-purple-100 bg-purple-50 h-7 w-7 rounded disabled:opacity-50 flex items-center justify-center transition-colors" title="Sync with Oracle">
+                        <button onClick={() => handleSingleSync(item.id)} disabled={syncingId === item.id} className="text-purple-600 hover:text-purple-800 hover:bg-purple-100 bg-purple-50 h-7 w-7 rounded disabled:opacity-50 flex items-center justify-center transition-colors" title="Sync Pricing">
                           {syncingId === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
                         </button>
                         <a
