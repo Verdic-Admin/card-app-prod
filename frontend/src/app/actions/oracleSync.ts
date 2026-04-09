@@ -177,10 +177,10 @@ export async function syncSingleItemWithOracle(id: string) {
 
 export async function evaluateItemWithOracle(payload: any) {
   const supabase = await createClient()
-  const oracle_api_url = process.env.ORACLE_API_URL
-  const oracle_api_key = process.env.ORACLE_API_KEY
+  const oracle_api_url = process.env.ORACLE_API_URL || 'https://api.playerindexdata.com/fintech'
+  const oracle_api_key = process.env.PLAYERINDEX_API_KEY || process.env.ORACLE_API_KEY
 
-  if (!oracle_api_url || !oracle_api_key) {
+  if (!oracle_api_key) {
     throw new Error('Oracle API credentials not configured.')
   }
 
