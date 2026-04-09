@@ -157,7 +157,8 @@ export function BulkIngestionWizard() {
         card_number: d.card_number || '',
         insert_name: d.insert_name || '',
         parallel_name: d.parallel_name || '',
-        price: d.listed_price || 0
+        price: d.listed_price || 0,
+        market_price: d.market_price || 0
       }))
 
       setIdentifiedResults(uiResults)
@@ -185,14 +186,14 @@ export function BulkIngestionWizard() {
             const price = await getSingleOraclePrice({ player_name: r.player_name, card_set: r.card_set, insert_name: r.insert_name, parallel_name: r.parallel_name })
             const generatedPrice = price || 0
             // Write the DB table immediately with the live pricing
-            if (r.db_id) updateDraftCardAction(r.db_id, { price: generatedPrice }).catch(console.error)
+            if (r.db_id) updateDraftCardAction(r.db_id, { price: generatedPrice, market_price: generatedPrice }).catch(console.error)
             
             setPricedCount(prev => prev + 1)
             
-            return { ...r, price: generatedPrice }
+            return { ...r, price: generatedPrice, market_price: generatedPrice }
           } catch (e: any) {
             setPricedCount(prev => prev + 1)
-            return { ...r, price: 0 }
+            return { ...r, price: 0, market_price: 0 }
           }
         })
         
@@ -244,7 +245,7 @@ export function BulkIngestionWizard() {
     // DB sync magic: every edit re-writes to the table automatically.
     const dbId = next[idx].db_id
     if (dbId) {
-      updateDraftCardAction(dbId, { [field]: value, insert_name: next[idx].insert_name, parallel_name: next[idx].parallel_name }).catch(console.error)
+      updateDraftCardAction(dbId, { [field]: value, insert_name: next[idx].insert_name, parallel_name: next[idx].parallel_name, market_price: next[idx].market_price }).catch(console.error)
     }
   }
 
