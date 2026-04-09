@@ -16,7 +16,7 @@ export async function createDraftCardsAction(cards: any[]) {
     listed_price: c.price || 0,
   }))
 
-  const { data, error } = await (admin.from('scan_staging') as any)
+  const { data, error } = await (admin as any).from('scan_staging')
     .insert(payload)
     .select('id, player_name, card_set, card_number, insert_name, parallel_name, image_url, back_image_url, listed_price')
 
@@ -41,7 +41,7 @@ export async function updateDraftCardAction(id: string, updates: any) {
     payload.listed_price = parseFloat(updates.price) || 0
   }
 
-  const { error } = await (admin.from('scan_staging') as any)
+  const { error } = await (admin as any).from('scan_staging')
     .update(payload)
     .eq('id', id)
 
@@ -53,7 +53,7 @@ export async function publishDraftCardsAction(ids: string[]) {
   const admin = createAdminClient()
   
   // 1. Read approved rows from staging
-  const { data: staged, error: readError } = await (admin.from('scan_staging') as any)
+  const { data: staged, error: readError } = await (admin as any).from('scan_staging')
     .select('player_name, card_set, card_number, insert_name, parallel_name, image_url, back_image_url, listed_price')
     .in('id', ids)
 
@@ -74,7 +74,7 @@ export async function publishDraftCardsAction(ids: string[]) {
     status: 'available',
   }))
 
-  const { error: insertError } = await (admin.from('inventory') as any)
+  const { error: insertError } = await (admin as any).from('inventory')
     .insert(inventoryPayload)
 
   if (insertError) {
@@ -82,7 +82,7 @@ export async function publishDraftCardsAction(ids: string[]) {
   }
 
   // 3. Remove from staging
-  const { error: deleteError } = await (admin.from('scan_staging') as any)
+  const { error: deleteError } = await (admin as any).from('scan_staging')
     .delete()
     .in('id', ids)
 
