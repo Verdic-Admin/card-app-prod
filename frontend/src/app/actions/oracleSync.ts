@@ -236,8 +236,23 @@ export async function evaluateItemWithOracle(payload: any) {
   }
 }
 
-export async function getSingleOraclePrice(payload: { player_name: string; card_set: string; insert_name?: string; parallel_name?: string }) {
+export async function getSingleOraclePrice(payload: { player_name: string; card_set: string; card_number?: string; insert_name?: string; parallel_name?: string; attributes?: string }) {
   try {
+    const rawFuzzyString = [
+      payload.card_set,
+      payload.card_number,
+      payload.insert_name,
+      payload.parallel_name,
+      payload.attributes
+    ].filter(Boolean).join(" ");
+    
+    const formattedPayload = {
+      player_name: payload.player_name || "",
+      card_number: payload.card_number || "",
+      attributes: rawFuzzyString,
+      storefront_id: "single-eval"
+    };
+
     const apiKey = process.env.PLAYERINDEX_API_KEY || '';
     const response = await fetch('https://api.playerindexdata.com/fintech/api/v1/b2b/calculate', {
       method: 'POST',
@@ -245,7 +260,7 @@ export async function getSingleOraclePrice(payload: { player_name: string; card_
         'Content-Type': 'application/json',
         'X-API-Key': apiKey,
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(formattedPayload),
     });
 
     if (!response.ok) {

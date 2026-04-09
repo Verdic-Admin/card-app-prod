@@ -183,7 +183,7 @@ export function BulkIngestionWizard() {
         const chunk = identifiedResults.slice(i, i + 5)
         const chunkPromises = chunk.map(async (r) => {
           try {
-            const price = await getSingleOraclePrice({ player_name: r.player_name, card_set: r.card_set, insert_name: r.insert_name, parallel_name: r.parallel_name })
+            const price = await getSingleOraclePrice({ player_name: r.player_name, card_set: r.card_set, card_number: r.card_number, insert_name: r.insert_name, parallel_name: r.parallel_name })
             const generatedPrice = price || 0
             // Write the DB table immediately with the live pricing
             if (r.db_id) updateDraftCardAction(r.db_id, { price: generatedPrice, market_price: generatedPrice }).catch(console.error)
