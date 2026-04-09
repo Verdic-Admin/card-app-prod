@@ -248,6 +248,7 @@ export async function getSingleOraclePrice(payload: { player_name: string; card_
     
     const formattedPayload = {
       player_name: payload.player_name || "",
+      card_set: payload.card_set || "",
       card_number: payload.card_number || "",
       attributes: rawFuzzyString,
       storefront_id: "single-eval"
