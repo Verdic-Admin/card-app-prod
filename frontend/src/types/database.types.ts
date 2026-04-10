@@ -74,6 +74,8 @@ export type Database = {
           oracle_projection: number | null
           oracle_trend_percentage: number | null
           parallel_insert_type: string | null
+          insert_name: string | null
+          parallel_name: string | null
           player_name: string | null
           sold_at: string | null
           status: string | null
@@ -107,6 +109,8 @@ export type Database = {
           oracle_projection?: number | null
           oracle_trend_percentage?: number | null
           parallel_insert_type?: string | null
+          insert_name?: string | null
+          parallel_name?: string | null
           player_name?: string | null
           sold_at?: string | null
           status?: string | null
@@ -140,6 +144,8 @@ export type Database = {
           oracle_projection?: number | null
           oracle_trend_percentage?: number | null
           parallel_insert_type?: string | null
+          insert_name?: string | null
+          parallel_name?: string | null
           player_name?: string | null
           sold_at?: string | null
           status?: string | null

@@ -82,9 +82,23 @@ export function ProductCard({ item }: ProductCardProps) {
           <span className="text-xs font-bold text-zinc-500 mt-1 uppercase tracking-widest">
             {item.card_set} • #{item.card_number}
           </span>
-          <p className="text-sm text-zinc-400 mt-2 mb-4 flex-grow font-semibold">
-            <span className="text-cyan-400">{item.parallel_insert_type}</span>
-          </p>
+          <div className="flex flex-wrap gap-2 mt-2 mb-4 flex-grow font-semibold">
+            {item.insert_name && item.insert_name.toLowerCase() !== 'base' && (
+              <span className="text-[10px] text-indigo-300 bg-indigo-900/40 border border-indigo-700/50 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                {item.insert_name}
+              </span>
+            )}
+            {item.parallel_name && item.parallel_name.toLowerCase() !== 'base' && (
+              <span className="text-[10px] text-cyan-300 bg-cyan-900/40 border border-cyan-700/50 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                {item.parallel_name}
+              </span>
+            )}
+            {(!item.insert_name && !item.parallel_name && item.parallel_insert_type && item.parallel_insert_type.toLowerCase() !== 'base') && (
+              <span className="text-[10px] text-slate-300 bg-slate-800 border border-slate-700 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                {item.parallel_insert_type}
+              </span>
+            )}
+          </div>
 
           <div className="flex flex-col mt-auto gap-3">
             {(item as any).oracle_projection && (item as any).oracle_projection > 0 ? (

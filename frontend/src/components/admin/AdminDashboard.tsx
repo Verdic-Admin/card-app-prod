@@ -17,7 +17,8 @@ export function AdminDashboard() {
   const [formData, setFormData] = useState({
     player_name: '',
     card_set: '',
-    parallel_insert_type: '',
+    insert_name: '',
+    parallel_name: '',
     card_number: '',
     oracle_price: '',
   })
@@ -48,7 +49,8 @@ export function AdminDashboard() {
         ...prev,
         player_name: json.player_name || '',
         card_set: json.card_set || '',
-        parallel_insert_type: json.parallel_insert_type || '',
+        insert_name: json.insert_name || json.parallel_insert_type || '',
+        parallel_name: json.parallel_name || json.parallel_insert_type || '',
         card_number: json.card_number || '',
       }))
     } catch (err: any) {
@@ -66,8 +68,8 @@ export function AdminDashboard() {
       const price = await getSingleOraclePrice({
         player_name: formData.player_name,
         card_set: formData.card_set,
-        insert_name: formData.parallel_insert_type,
-        parallel_name: formData.parallel_insert_type
+        insert_name: formData.insert_name,
+        parallel_name: formData.parallel_name
       })
       if (price !== null) {
         setFormData(prev => ({ ...prev, oracle_price: price.toFixed(2) }))
@@ -106,7 +108,7 @@ export function AdminDashboard() {
       setFile(null)
       setPreview('')
       setFormData({
-        player_name: '', card_set: '', parallel_insert_type: '', card_number: '',
+        player_name: '', card_set: '', insert_name: '', parallel_name: '', card_number: '',
         oracle_price: '',
       })
       alert('Card saved successfully!')
@@ -177,8 +179,12 @@ export function AdminDashboard() {
             <input type="text" value={formData.card_set} onChange={e => setFormData({...formData, card_set: e.target.value})} className="w-full p-2.5 text-sm font-bold text-slate-900 bg-white border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Parallel / Insert</label>
-            <input type="text" value={formData.parallel_insert_type} onChange={e => setFormData({...formData, parallel_insert_type: e.target.value})} className="w-full p-2.5 text-sm font-bold text-slate-900 bg-white border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400" />
+            <label className="block text-xs font-medium text-slate-500 mb-1">Insert Name</label>
+            <input type="text" value={formData.insert_name} onChange={e => setFormData({...formData, insert_name: e.target.value})} className="w-full p-2.5 text-sm font-bold text-slate-900 bg-white border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Parallel Name</label>
+            <input type="text" value={formData.parallel_name} onChange={e => setFormData({...formData, parallel_name: e.target.value})} className="w-full p-2.5 text-sm font-bold text-slate-900 bg-white border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400" />
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1">Card Number/ID</label>

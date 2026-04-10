@@ -122,6 +122,8 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
         (item.team_name || '').toLowerCase().includes(q) ||
         (item.card_set || '').toLowerCase().includes(q) ||
         (item.card_number || '').toLowerCase().includes(q) ||
+        (item.insert_name || '').toLowerCase().includes(q) ||
+        (item.parallel_name || '').toLowerCase().includes(q) ||
         (item.parallel_insert_type || '').toLowerCase().includes(q)
      );
   });
@@ -362,7 +364,7 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
 
   const handleExportCSV = () => {
     if (filteredItems.length === 0) return;
-    const headers = ['Card ID', 'Player Name', 'Team Name', 'Set', 'Number', 'Parallel/Insert', 'Status', 'Cost Basis', 'Listed Price', 'Accepts Offers', 'Image URL'];
+    const headers = ['Card ID', 'Player Name', 'Team Name', 'Set', 'Number', 'Insert Name', 'Parallel Name', 'Legacy Parallel/Insert', 'Status', 'Cost Basis', 'Listed Price', 'Accepts Offers', 'Image URL'];
     
     const rows = filteredItems.map(item => [
       item.id,
@@ -370,6 +372,8 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
       `"${(item.team_name || '').replace(/"/g, '""')}"`,
       `"${(item.card_set || '').replace(/"/g, '""')}"`,
       `"${(item.card_number || '').replace(/"/g, '""')}"`,
+      `"${(item.insert_name || '').replace(/"/g, '""')}"`,
+      `"${(item.parallel_name || '').replace(/"/g, '""')}"`,
       `"${(item.parallel_insert_type || '').replace(/"/g, '""')}"`,
       (item.status || 'available').toUpperCase(),
       item.cost_basis || 0,
@@ -622,11 +626,23 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                           <div className="text-xs font-semibold text-slate-600 leading-snug whitespace-normal w-48">
                             {original?.card_set} {original?.card_number ? <span className="text-slate-400">#{original?.card_number}</span> : ''}
                           </div>
-                          {original?.parallel_insert_type && (
-                             <div className="text-[10px] uppercase font-bold text-slate-500 mt-1.5 bg-slate-100 rounded px-1.5 py-0.5 inline-block whitespace-normal break-words max-w-[190px]">
-                               {original?.parallel_insert_type}
-                             </div>
-                          )}
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {original?.insert_name && original.insert_name.toLowerCase() !== 'base' && (
+                              <div className="text-[10px] uppercase font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 rounded px-1.5 py-0.5">
+                                {original.insert_name}
+                              </div>
+                            )}
+                            {original?.parallel_name && original.parallel_name.toLowerCase() !== 'base' && (
+                              <div className="text-[10px] uppercase font-bold text-cyan-600 bg-cyan-50 border border-cyan-100 rounded px-1.5 py-0.5">
+                                {original.parallel_name}
+                              </div>
+                            )}
+                            {!original?.insert_name && !original?.parallel_name && original?.parallel_insert_type && original.parallel_insert_type.toLowerCase() !== 'base' && (
+                              <div className="text-[10px] uppercase font-bold text-slate-500 bg-slate-100 rounded px-1.5 py-0.5">
+                                {original.parallel_insert_type}
+                              </div>
+                            )}
+                          </div>
                         </td>
                         <td className="px-5 py-3 border-l border-indigo-50 bg-indigo-50/30 min-w-[300px]">
                           <>
@@ -808,7 +824,17 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                           <div>
                             <div className="font-bold text-white leading-tight">{item.player_name}</div>
                             <div className="text-zinc-500 text-[10px] mt-0.5">{item.card_set}{item.card_number ? ` #${item.card_number}` : ''}</div>
-                            {item.parallel_insert_type && <div className="text-[10px] text-indigo-400 font-semibold">{item.parallel_insert_type}</div>}
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {item.insert_name && item.insert_name.toLowerCase() !== 'base' && (
+                                <div className="text-[9px] text-indigo-400 font-bold uppercase">{item.insert_name}</div>
+                              )}
+                              {item.parallel_name && item.parallel_name.toLowerCase() !== 'base' && (
+                                <div className="text-[9px] text-cyan-400 font-bold uppercase">{item.parallel_name}</div>
+                              )}
+                              {!item.insert_name && !item.parallel_name && item.parallel_insert_type && item.parallel_insert_type.toLowerCase() !== 'base' && (
+                                <div className="text-[9px] text-slate-400 font-bold uppercase">{item.parallel_insert_type}</div>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -1001,8 +1027,9 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                     <input type="text" value={editForm.card_set || ''} onChange={e => setEditForm({...editForm, card_set: e.target.value})} className="w-full p-1.5 text-xs font-bold text-slate-900 bg-white border border-indigo-100 rounded focus:border-indigo-500 outline-none" placeholder="Card Set" />
                   </div>
                   <div className="flex gap-1.5">
-                    <input type="text" value={editForm.card_number || ''} onChange={e => setEditForm({...editForm, card_number: e.target.value})} className="w-1/3 p-1.5 text-xs font-bold text-slate-900 bg-white border border-indigo-100 rounded focus:border-indigo-500 outline-none" placeholder="Number" />
-                    <input type="text" value={editForm.parallel_insert_type || ''} onChange={e => setEditForm({...editForm, parallel_insert_type: e.target.value})} className="w-2/3 p-1.5 text-xs font-bold text-slate-900 bg-white border border-indigo-100 rounded focus:border-indigo-500 outline-none" placeholder="Parallel/Insert" />
+                    <input type="text" value={editForm.card_number || ''} onChange={e => setEditForm({...editForm, card_number: e.target.value})} className="w-1/4 p-1.5 text-xs font-bold text-slate-900 bg-white border border-indigo-100 rounded focus:border-indigo-500 outline-none" placeholder="#No" />
+                    <input type="text" value={editForm.insert_name || ''} onChange={e => setEditForm({...editForm, insert_name: e.target.value})} className="w-3/8 p-1.5 text-xs font-bold text-slate-900 bg-white border border-indigo-100 rounded focus:border-indigo-500 outline-none" placeholder="Insert" />
+                    <input type="text" value={editForm.parallel_name || ''} onChange={e => setEditForm({...editForm, parallel_name: e.target.value})} className="w-3/8 p-1.5 text-xs font-bold text-slate-900 bg-white border border-indigo-100 rounded focus:border-indigo-500 outline-none" placeholder="Parallel" />
                   </div>
                   <div className="flex gap-1.5">
                     <div className="flex items-center w-1/2">
@@ -1046,7 +1073,17 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                     <div className="text-sm text-slate-700 mt-1 font-semibold leading-snug">
                       {item.card_set}{item.card_number ? ` #${item.card_number}` : ''}
                     </div>
-                    {item.parallel_insert_type && <div className="text-xs text-indigo-600 font-bold mt-0.5">{item.parallel_insert_type}</div>}
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {item.insert_name && item.insert_name.toLowerCase() !== 'base' && (
+                        <div className="text-[10px] text-indigo-600 font-black uppercase">{item.insert_name}</div>
+                      )}
+                      {item.parallel_name && item.parallel_name.toLowerCase() !== 'base' && (
+                        <div className="text-[10px] text-cyan-500 font-black uppercase">{item.parallel_name}</div>
+                      )}
+                      {!item.insert_name && !item.parallel_name && item.parallel_insert_type && item.parallel_insert_type.toLowerCase() !== 'base' && (
+                        <div className="text-[10px] text-zinc-500 font-black uppercase">{item.parallel_insert_type}</div>
+                      )}
+                    </div>
                     {(item as any).is_lot && (
                       <button
                         onClick={() => handleBreakLot(item.id)}
@@ -1118,7 +1155,7 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                           {syncingId === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
                         </button>
                         <a
-                          href={`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent([item.player_name, item.card_set, item.parallel_insert_type, item.card_number].filter(Boolean).join(' '))}&LH_Sold=1&LH_Complete=1`}
+                          href={`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent([item.player_name, item.card_set, item.insert_name, item.parallel_name, item.parallel_insert_type, item.card_number].filter(v => v && v.toLowerCase() !== 'base').join(' '))}&LH_Sold=1&LH_Complete=1`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-sky-600 hover:text-sky-800 hover:bg-sky-100 bg-sky-50 h-7 w-7 rounded flex items-center justify-center transition-colors"
