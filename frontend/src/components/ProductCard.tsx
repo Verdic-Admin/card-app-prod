@@ -4,6 +4,7 @@ import { Database } from '@/types/database.types';
 import { useCart } from '@/context/CartContext';
 import { useState } from 'react';
 import { TradeModal } from '@/components/TradeModal';
+import Link from 'next/link';
 
 type InventoryItem = Database['public']['Tables']['inventory']['Row'];
 
@@ -23,16 +24,16 @@ export function ProductCard({ item }: ProductCardProps) {
       <div className="bg-zinc-900 rounded-xl shadow-md border border-zinc-800 overflow-hidden flex flex-col group transition-all hover:shadow-lg hover:border-zinc-700">
         
         {/* Dual Image Container */}
-        <div 
-           className="relative aspect-[2.5/3.5] w-full bg-zinc-950 perspective-1000 cursor-pointer"
-           onClick={() => { if (item.back_image_url) setIsFlipped(!isFlipped) }}
+        <Link 
+           href={`/item/${item.id}`}
+           className="relative aspect-[2.5/3.5] w-full bg-zinc-950 perspective-1000 cursor-pointer block"
         >
           {isAvailable && (item as any).oracle_projection && (item as any).oracle_projection > 0 && item.listed_price && item.listed_price < (item as any).oracle_projection && (
             <div className="absolute top-2 left-2 z-20 bg-indigo-900 text-indigo-300 text-xs px-2.5 py-1 rounded-full border border-indigo-700 font-bold shadow-[0_0_12px_rgba(79,70,229,0.4)] pointer-events-none flex items-center gap-1">
-              🔥 {((1 - item.listed_price / (item as any).oracle_projection) * 100).toFixed(0)}% Below Market
+               🔥 {((1 - item.listed_price / (item as any).oracle_projection) * 100).toFixed(0)}% Below Player Index
             </div>
           )}
-          <div className={`w-full h-full relative transition-transform duration-700 transform-style-3d ${item.back_image_url ? 'lg:group-hover:rotate-y-180' : ''} ${isFlipped ? 'rotate-y-180' : ''}`}>
+          <div className={`w-full h-full relative transition-transform duration-700 transform-style-3d ${item.back_image_url ? 'lg:group-hover:rotate-y-180' : ''}`}>
             
             {/* FRONT */}
             <div className="absolute inset-0 backface-hidden flex items-center justify-center p-6 bg-zinc-950">
@@ -72,13 +73,15 @@ export function ProductCard({ item }: ProductCardProps) {
               </span>
             </div>
           )}
-        </div>
+        </Link>
 
         {/* Details Footer */}
         <div className="p-5 flex flex-col flex-grow border-t border-zinc-800 bg-zinc-900">
-          <h3 className="font-extrabold text-lg text-white leading-tight tracking-tight">
-            {item.player_name}
-          </h3>
+          <Link href={`/item/${item.id}`} className="hover:text-cyan-400 transition-colors">
+            <h3 className="font-extrabold text-lg text-white leading-tight tracking-tight">
+              {item.player_name}
+            </h3>
+          </Link>
           <span className="text-xs font-bold text-zinc-500 mt-1 uppercase tracking-widest">
             {item.card_set} • #{item.card_number}
           </span>
@@ -105,7 +108,7 @@ export function ProductCard({ item }: ProductCardProps) {
               <div className="flex flex-col">
                 <div className="flex items-center gap-2 mb-0.5">
                   <span className="text-[10px] uppercase tracking-widest font-bold text-indigo-400 flex items-center gap-1">
-                     🔮 Market Value: <span className="line-through opacity-60">${(item as any).oracle_projection.toFixed(2)}</span>
+                     🔮 Player Index Value: <span className="line-through opacity-60">${(item as any).oracle_projection.toFixed(2)}</span>
                   </span>
                   {(item as any).oracle_trend_percentage != null && (
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${(item as any).oracle_trend_percentage >= 0 ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800' : 'bg-red-950/60 text-red-400 border border-red-800'}`}>

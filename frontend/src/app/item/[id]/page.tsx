@@ -223,7 +223,7 @@ export default async function ItemPage({ params }: PageProps) {
             {(item as any).oracle_projection && (item as any).oracle_projection > 0 ? (
               <div>
                 <p className="text-[11px] uppercase tracking-widest text-indigo-400 font-bold mb-1">
-                  🔮 Market Value:{' '}
+                  🔮 Player Index Value:{' '}
                   <span className="line-through opacity-60">
                     ${(item as any).oracle_projection.toFixed(2)}
                   </span>
