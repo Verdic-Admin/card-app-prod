@@ -322,7 +322,7 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
   }
 
   const handleApplyAllOracle = async () => {
-    if (!window.confirm(`Apply Oracle pricing (${discountRate}% below market) to ALL items with projections?`)) return
+    if (!window.confirm(`Apply Oracle pricing (${discountRate}% below Player Index) to ALL items with projections?`)) return
     setIsApplyingAll(true)
     try {
       const result: any = await applyOracleDiscountAll()
@@ -1099,7 +1099,7 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                   {(item as any).oracle_projection && (item as any).oracle_projection > 0 && (
                     <div className="bg-purple-50 border border-purple-100 rounded-lg p-2 mb-1">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-[10px] font-bold text-purple-700 uppercase tracking-wider flex items-center gap-1">🔮 Market Valuation</span>
+                        <span className="text-[10px] font-bold text-purple-700 uppercase tracking-wider flex items-center gap-1">🔮 Player Index Value</span>
                         {(item as any).oracle_trend_percentage != null && (
                           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${(item as any).oracle_trend_percentage >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                             {(item as any).oracle_trend_percentage >= 0 ? '↑' : '↓'} {Math.abs((item as any).oracle_trend_percentage).toFixed(1)}%
@@ -1108,7 +1108,7 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                       </div>
                       <div className="flex items-baseline gap-2">
                         <span className="text-sm font-black text-purple-900">${(item as any).oracle_projection.toFixed(2)}</span>
-                        <span className="text-[10px] text-purple-500 font-semibold">market value</span>
+                        <span className="text-[10px] text-purple-500 font-semibold">player index value</span>
                       </div>
                       {item.listed_price && (item as any).oracle_projection > item.listed_price && (
                         <div className="text-[10px] text-emerald-600 font-bold mt-0.5">Your price: ${item.listed_price.toFixed(2)} ({((1 - item.listed_price / (item as any).oracle_projection) * 100).toFixed(0)}% below)</div>
@@ -1119,7 +1119,7 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                         className="mt-1.5 w-full text-[11px] font-bold py-1.5 rounded-md bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center gap-1 transition-colors disabled:opacity-50 shadow-sm"
                       >
                         {applyingId === item.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <DollarSign className="w-3 h-3" />}
-                        Apply {discountRate}% Below Market
+                        Apply {discountRate}% Below Player Index
                       </button>
                     </div>
                   )}
