@@ -11,6 +11,7 @@ export async function createDraftCardsAction(cards: any[]) {
     card_number: c.card_number || '',
     insert_name: c.insert_name || '',
     parallel_name: c.parallel_name || '',
+    print_run: c.print_run || null,
     image_url: c.side_a_url,
     back_image_url: c.side_b_url,
     listed_price: c.price || 0,
@@ -19,7 +20,7 @@ export async function createDraftCardsAction(cards: any[]) {
 
   const { data, error } = await (admin as any).from('scan_staging')
     .insert(payload)
-    .select('id, player_name, card_set, card_number, insert_name, parallel_name, image_url, back_image_url, listed_price, market_price')
+    .select('id, player_name, card_set, card_number, insert_name, parallel_name, print_run, image_url, back_image_url, listed_price, market_price')
 
   if (error) {
     console.error("Staging insert error:", error)
@@ -38,6 +39,7 @@ export async function updateDraftCardAction(id: string, updates: any) {
   if (updates.card_number !== undefined) payload.card_number = updates.card_number
   if (updates.insert_name !== undefined) payload.insert_name = updates.insert_name
   if (updates.parallel_name !== undefined) payload.parallel_name = updates.parallel_name
+  if (updates.print_run !== undefined) payload.print_run = updates.print_run
   if (updates.price !== undefined) {
     payload.listed_price = parseFloat(updates.price) || 0
   }
@@ -58,7 +60,7 @@ export async function publishDraftCardsAction(ids: string[]) {
   
   // 1. Read approved rows from staging
   const { data: staged, error: readError } = await (admin as any).from('scan_staging')
-    .select('player_name, card_set, card_number, insert_name, parallel_name, image_url, back_image_url, listed_price, market_price')
+    .select('player_name, card_set, card_number, insert_name, parallel_name, print_run, image_url, back_image_url, listed_price, market_price')
     .in('id', ids)
 
   if (readError || !staged?.length) {
@@ -72,6 +74,7 @@ export async function publishDraftCardsAction(ids: string[]) {
     card_number: s.card_number,
     insert_name: s.insert_name,
     parallel_name: s.parallel_name,
+    print_run: s.print_run,
     image_url: s.image_url,
     back_image_url: s.back_image_url,
     listed_price: s.listed_price,

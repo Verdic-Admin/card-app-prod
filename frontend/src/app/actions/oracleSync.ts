@@ -87,7 +87,7 @@ export async function syncInventoryWithOracle() {
         const { error: updateError } = await supabase
           .from('inventory')
           // @ts-ignore
-          .update({ listed_price: new_price, oracle_projection: data.target_price })
+          .update({ listed_price: new_price, oracle_projection: data.target_price, oracle_trend_percentage: data.trend_percentage || null })
           .eq('id', item.id)
 
         if (!updateError) {
@@ -165,7 +165,7 @@ export async function syncSingleItemWithOracle(id: string) {
       const { error: updateError } = await supabase
         .from('inventory')
         // @ts-ignore
-        .update({ listed_price: new_price, oracle_projection: data.target_price })
+        .update({ listed_price: new_price, oracle_projection: data.target_price, oracle_trend_percentage: data.trend_percentage || null })
         .eq('id', (item as any).id)
 
       if (!updateError) {

@@ -130,11 +130,12 @@ export function BulkIngestionWizard() {
               card_number: details.card_number || backMeta.card_number || '',
               insert_name: iName,
               parallel_name: iName === pName ? '' : pName,
+              print_run: details.print_run || backMeta.print_run || null,
               price: 0 
             }
           } catch (e) {
             setIdentifiedCount(prev => prev + 1)
-            return { side_a_url: pair.side_a_url, side_b_url: pair.side_b_url, player_name: 'AI Error', card_set: 'AI Error', insert_name: '', parallel_name: '', price: 0 }
+            return { side_a_url: pair.side_a_url, side_b_url: pair.side_b_url, player_name: 'AI Error', card_set: 'AI Error', insert_name: '', parallel_name: '', print_run: null, price: 0 }
           }
         })
         
@@ -157,6 +158,7 @@ export function BulkIngestionWizard() {
         card_number: d.card_number || '',
         insert_name: d.insert_name || '',
         parallel_name: d.parallel_name || '',
+        print_run: d.print_run || '',
         price: d.listed_price || 0,
         market_price: d.market_price || 0
       }))
@@ -183,7 +185,7 @@ export function BulkIngestionWizard() {
         const chunk = identifiedResults.slice(i, i + 5)
         const chunkPromises = chunk.map(async (r) => {
           try {
-            const price = await getSingleOraclePrice({ player_name: r.player_name, card_set: r.card_set, card_number: r.card_number, insert_name: r.insert_name, parallel_name: r.parallel_name })
+            const price = await getSingleOraclePrice({ player_name: r.player_name, card_set: r.card_set, card_number: r.card_number, insert_name: r.insert_name, parallel_name: r.parallel_name, print_run: r.print_run ? parseInt(r.print_run) : undefined })
             const generatedPrice = price || 0
             // Write the DB table immediately with the live pricing
             if (r.db_id) updateDraftCardAction(r.db_id, { price: generatedPrice, market_price: generatedPrice }).catch(console.error)
@@ -245,7 +247,7 @@ export function BulkIngestionWizard() {
     // DB sync magic: every edit re-writes to the table automatically.
     const dbId = next[idx].db_id
     if (dbId) {
-      updateDraftCardAction(dbId, { [field]: value, insert_name: next[idx].insert_name, parallel_name: next[idx].parallel_name, market_price: next[idx].market_price }).catch(console.error)
+      updateDraftCardAction(dbId, { [field]: value, insert_name: next[idx].insert_name, parallel_name: next[idx].parallel_name, print_run: next[idx].print_run, market_price: next[idx].market_price }).catch(console.error)
     }
   }
 
@@ -405,6 +407,10 @@ export function BulkIngestionWizard() {
                     <div>
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none block mb-1">Parallel Color/Type</label>
                       <input type="text" value={result.parallel_name || ''} onChange={e => updateResultField(idx, 'parallel_name', e.target.value)} className="w-full py-2 px-3 text-sm font-bold text-slate-900 bg-slate-50 border border-slate-200 rounded-lg focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 outline-none transition" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none block mb-1">Print Run</label>
+                      <input type="number" value={result.print_run || ''} onChange={e => updateResultField(idx, 'print_run', e.target.value)} className="w-full py-2 px-3 text-sm font-bold text-slate-900 bg-slate-50 border border-slate-200 rounded-lg focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 outline-none transition" placeholder="/99" />
                     </div>
                   </div>
                   <div className="mt-4 pt-4 border-t border-dashed border-slate-200 flex items-center justify-between">
