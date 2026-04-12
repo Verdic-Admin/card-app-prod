@@ -83,7 +83,7 @@ export function ProductCard({ item }: ProductCardProps) {
             </h3>
           </Link>
           <span className="text-xs font-bold text-zinc-500 mt-1 uppercase tracking-widest">
-            {item.card_set} • #{item.card_number}
+            {item.card_set} • #{item.card_number}{(item as any).print_run ? ` / ${(item as any).print_run}` : ''}
           </span>
           <div className="flex flex-wrap gap-2 mt-2 mb-4 flex-grow font-semibold">
             {item.insert_name && item.insert_name.toLowerCase() !== 'base' && (

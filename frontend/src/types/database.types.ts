@@ -77,6 +77,7 @@ export type Database = {
           insert_name: string | null
           parallel_name: string | null
           player_name: string | null
+          print_run: number | null
           sold_at: string | null
           status: string | null
           team_name: string | null
@@ -112,6 +113,7 @@ export type Database = {
           insert_name?: string | null
           parallel_name?: string | null
           player_name?: string | null
+          print_run?: number | null
           sold_at?: string | null
           status?: string | null
           team_name?: string | null
@@ -147,6 +149,7 @@ export type Database = {
           insert_name?: string | null
           parallel_name?: string | null
           player_name?: string | null
+          print_run?: number | null
           sold_at?: string | null
           status?: string | null
           team_name?: string | null

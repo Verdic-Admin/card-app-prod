@@ -59,6 +59,7 @@ export async function syncInventoryWithOracle() {
         is_auto: Boolean(item.is_auto || false),
         is_relic: Boolean(item.is_relic || false),
         is_rookie: Boolean(item.is_rookie || false),
+        print_run: item.print_run ? Number(item.print_run) : undefined,
         skip_fuzzy: true
       }
       
@@ -139,6 +140,7 @@ export async function syncSingleItemWithOracle(id: string) {
       is_auto: Boolean((item as any).is_auto || false),
       is_relic: Boolean((item as any).is_relic || false),
       is_rookie: Boolean((item as any).is_rookie || false),
+      print_run: (item as any).print_run ? Number((item as any).print_run) : undefined,
       skip_fuzzy: true
     }
 
@@ -203,6 +205,7 @@ export async function evaluateItemWithOracle(payload: any) {
       is_auto: Boolean(payload.is_auto || false),
       is_relic: Boolean(payload.is_relic || false),
       is_rookie: Boolean(payload.is_rookie || false),
+      print_run: payload.print_run ? Number(payload.print_run) : undefined,
       skip_fuzzy: true
     }
     
@@ -244,6 +247,7 @@ export async function getSingleOraclePrice(payload: {
   is_auto?: boolean; 
   is_relic?: boolean; 
   is_rookie?: boolean; 
+  print_run?: number;
 }) {
   try {
     const formattedPayload = {
@@ -255,6 +259,7 @@ export async function getSingleOraclePrice(payload: {
       is_auto: Boolean(payload.is_auto || false),
       is_relic: Boolean(payload.is_relic || false),
       is_rookie: Boolean(payload.is_rookie || false),
+      print_run: payload.print_run ? Number(payload.print_run) : undefined,
       skip_fuzzy: true
     };
 
@@ -299,6 +304,7 @@ export async function getBatchOraclePrices(cards: any[]) {
         player_name: toTitleCase(String(c.player_name || "")),
         card_set: String(c.card_set || ""),
         card_number: String(c.card_number || ""),
+        print_run: c.print_run ? Number(c.print_run) : undefined,
         attributes: String(rawFuzzyString),
         storefront_id: String(c.storefront_id || c.db_id || "batch-item")
       };

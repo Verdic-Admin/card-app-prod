@@ -211,6 +211,7 @@ export default async function ItemPage({ params }: PageProps) {
           <div className="space-y-1 text-sm text-zinc-400 font-semibold border-t border-zinc-800 pt-4">
             {item.card_set && <p><span className="text-zinc-500">Set:</span> {item.card_set}</p>}
             {item.card_number && <p><span className="text-zinc-500">Card #:</span> {item.card_number}</p>}
+            {(item as any).print_run && <p><span className="text-zinc-500">Numbered To:</span> /{(item as any).print_run}</p>}
             {item.parallel_insert_type && (
               <p><span className="text-zinc-500">Parallel / Insert:</span>{' '}
                 <span className="text-cyan-400 font-bold">{item.parallel_insert_type}</span>

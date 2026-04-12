@@ -823,7 +823,7 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                           )}
                           <div>
                             <div className="font-bold text-white leading-tight">{item.player_name}</div>
-                            <div className="text-zinc-500 text-[10px] mt-0.5">{item.card_set}{item.card_number ? ` #${item.card_number}` : ''}</div>
+                            <div className="text-zinc-500 text-[10px] mt-0.5">{item.card_set}{item.card_number ? ` #${item.card_number}` : ''}{item.print_run ? ` /${item.print_run}` : ''}</div>
                             <div className="flex flex-wrap gap-1 mt-1">
                               {item.insert_name && item.insert_name.toLowerCase() !== 'base' && (
                                 <div className="text-[9px] text-indigo-400 font-bold uppercase">{item.insert_name}</div>
@@ -1028,8 +1028,9 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                   </div>
                   <div className="flex gap-1.5">
                     <input type="text" value={editForm.card_number || ''} onChange={e => setEditForm({...editForm, card_number: e.target.value})} className="w-1/4 p-1.5 text-xs font-bold text-slate-900 bg-white border border-indigo-100 rounded focus:border-indigo-500 outline-none" placeholder="#No" />
-                    <input type="text" value={editForm.insert_name || ''} onChange={e => setEditForm({...editForm, insert_name: e.target.value})} className="w-3/8 p-1.5 text-xs font-bold text-slate-900 bg-white border border-indigo-100 rounded focus:border-indigo-500 outline-none" placeholder="Insert" />
-                    <input type="text" value={editForm.parallel_name || ''} onChange={e => setEditForm({...editForm, parallel_name: e.target.value})} className="w-3/8 p-1.5 text-xs font-bold text-slate-900 bg-white border border-indigo-100 rounded focus:border-indigo-500 outline-none" placeholder="Parallel" />
+                    <input type="number" value={editForm.print_run || ''} onChange={e => setEditForm({...editForm, print_run: parseInt(e.target.value) || null})} className="w-1/4 p-1.5 text-xs font-bold text-slate-900 bg-white border border-indigo-100 rounded focus:border-indigo-500 outline-none" placeholder="/99 (Print)" />
+                    <input type="text" value={editForm.insert_name || ''} onChange={e => setEditForm({...editForm, insert_name: e.target.value})} className="w-1/4 p-1.5 text-xs font-bold text-slate-900 bg-white border border-indigo-100 rounded focus:border-indigo-500 outline-none" placeholder="Insert" />
+                    <input type="text" value={editForm.parallel_name || ''} onChange={e => setEditForm({...editForm, parallel_name: e.target.value})} className="w-1/4 p-1.5 text-xs font-bold text-slate-900 bg-white border border-indigo-100 rounded focus:border-indigo-500 outline-none" placeholder="Parallel" />
                   </div>
                   <div className="flex gap-1.5">
                     <div className="flex items-center w-1/2">
@@ -1071,7 +1072,7 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                     </div>
                     {item.team_name && <div className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-0.5">{item.team_name}</div>}
                     <div className="text-sm text-slate-700 mt-1 font-semibold leading-snug">
-                      {item.card_set}{item.card_number ? ` #${item.card_number}` : ''}
+                      {item.card_set}{item.card_number ? ` #${item.card_number}` : ''}{item.print_run ? ` /${item.print_run}` : ''}
                     </div>
                     <div className="flex flex-wrap gap-1 mt-1">
                       {item.insert_name && item.insert_name.toLowerCase() !== 'base' && (
