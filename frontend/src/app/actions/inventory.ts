@@ -62,8 +62,10 @@ export async function addCardAction(formData: FormData) {
   if (dbError) throw new Error(`Database insert failed: ${dbError.message}`)
 
   try {
-    const shopId = process.env.NEXT_PUBLIC_SHOP_ID || 'local_shop'
-    const fullUrl = `https://${process.env.NEXT_PUBLIC_SITE_DOMAIN || 'localhost:3000'}/product/${insertedRow?.id || 'new'}`
+    const shopId = process.env.NEXT_PUBLIC_SHOP_ID
+    const siteDomain = process.env.NEXT_PUBLIC_SITE_DOMAIN
+    if (!shopId || !siteDomain) throw new Error("Syndication configuration missing")
+    const fullUrl = `https://${siteDomain}/product/${insertedRow?.id || 'new'}`
     
     await fetch('https://api.playerindexdata.com/fintech/syndication/webhook', {
       method: 'POST',
@@ -119,8 +121,10 @@ export async function batchCommitAction(items: any[]) {
 
     // Fire webhook
     try {
-      const shopId = process.env.NEXT_PUBLIC_SHOP_ID || 'local_shop'
-      const fullUrl = `https://${process.env.NEXT_PUBLIC_SITE_DOMAIN || 'localhost:3000'}/product/${insertedRow.id}`
+      const shopId = process.env.NEXT_PUBLIC_SHOP_ID
+      const siteDomain = process.env.NEXT_PUBLIC_SITE_DOMAIN
+      if (!shopId || !siteDomain) throw new Error("Syndication configuration missing")
+      const fullUrl = `https://${siteDomain}/product/${insertedRow.id}`
       await fetch('https://api.playerindexdata.com/fintech/syndication/webhook', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -346,8 +350,11 @@ export async function rotateCardImageAction(
     try {
       const parts = new URL(oldUrl).pathname.split('/')
       const oldName = parts[parts.length - 1]
-      if (oldName) await admin.storage.from('card-images').remove([oldName])
-    } catch { /* ignore */ }
+      if (oldName) {
+         const { error: removeError } = await admin.storage.from('card-images').remove([oldName])
+         if (removeError) console.error("Failed to cleanly delete rotated old image:", removeError.message)
+      }
+    } catch (e: any) { console.error("Failed to cleanly delete rotated old image:", e.message) }
   }
 
   // Upload rotated file

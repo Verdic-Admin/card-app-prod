@@ -124,11 +124,19 @@ export function ProductCard({ item }: ProductCardProps) {
                     You save ${((item as any).oracle_projection - item.listed_price).toFixed(2)}
                   </span>
                 )}
+                <a href="https://playerindexdata.com" target="_blank" rel="noopener noreferrer" className="text-[10px] text-cyan-400 hover:text-cyan-300 font-semibold tracking-wide mt-1 block w-fit">
+                  As priced by PlayerIndexData.com
+                </a>
               </div>
             ) : (
-              <span className="font-black text-3xl text-white tracking-tighter">
-                ${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}
-              </span>
+              <div className="flex flex-col">
+                <span className="font-black text-3xl text-white tracking-tighter">
+                  ${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}
+                </span>
+                <a href="https://playerindexdata.com" target="_blank" rel="noopener noreferrer" className="text-[10px] text-cyan-400 hover:text-cyan-300 font-semibold tracking-wide mt-1 block w-fit">
+                  As priced by PlayerIndexData.com
+                </a>
+              </div>
             )}
             {isAvailable && (
               <div className="grid grid-cols-2 gap-2 w-full">

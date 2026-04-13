@@ -37,8 +37,12 @@ export function BulkIngestionWizard() {
   }
 
   const handleUpload = async () => {
-    if (frontImages.length === 0 || backImages.length === 0 || frontImages.length !== backImages.length) {
-      alert("Please upload an equal number of Fronts and Backs")
+    if (frontImages.length === 0) {
+      alert("Please upload at least one Front Image")
+      return
+    }
+    if (backImages.length > 0 && frontImages.length !== backImages.length) {
+      alert("Please upload an equal number of Fronts and Backs, or upload ONLY Fronts if your images contain both sides.")
       return
     }
     setIsUploading(true)
@@ -69,10 +73,23 @@ export function BulkIngestionWizard() {
         const pairs: { side_a_url: string, side_b_url: string }[] = []
         
         const finalCards = Array.isArray(data.cards) ? data.cards : []
+        const orphans: string[] = []
         for (const p of finalCards) {
           // Ignore orphans that lack either front or back
           if (p.side_a_url && p.side_b_url) {
             pairs.push({ side_a_url: p.side_a_url, side_b_url: p.side_b_url })
+          } else if (p.side_a_url) {
+            orphans.push(p.side_a_url)
+          }
+        }
+        
+        // If users uploaded only Front images (e.g. flatbed scan with front+back in one image),
+        // we pair the orphans sequentially as Front/Back.
+        if (backImages.length === 0 && orphans.length > 0) {
+          for (let i = 0; i < orphans.length; i += 2) {
+            if (orphans[i + 1]) {
+              pairs.push({ side_a_url: orphans[i], side_b_url: orphans[i + 1] })
+            }
           }
         }
         
@@ -322,7 +339,7 @@ export function BulkIngestionWizard() {
           </div>
           <button 
             onClick={handleUpload}
-            disabled={isUploading || frontImages.length === 0 || backImages.length === 0}
+            disabled={isUploading || frontImages.length === 0 || (backImages.length > 0 && frontImages.length !== backImages.length)}
             className="w-full bg-indigo-600 text-white font-black text-lg py-4 rounded-xl disabled:opacity-50 hover:bg-indigo-700 hover:shadow-lg transition flex items-center justify-center gap-3"
           >
             {isUploading ? <Loader2 className="w-6 h-6 animate-spin" /> : <Play className="w-6 h-6" />} Start Vision Pipeline

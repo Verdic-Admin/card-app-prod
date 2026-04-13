@@ -5,12 +5,12 @@ import { useCart } from '@/context/CartContext'
 import { X, ShoppingCart, Trash2, Handshake, Loader2, CheckCircle2 } from 'lucide-react'
 import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js'
 import { createPayPalOrder, capturePayPalOrder } from '@/app/actions/checkout'
-import { validateCartCompleteness, submitTradeOffer } from '@/app/actions/trades'
+import { submitTradeOffer } from '@/app/actions/trades'
 import { TradeModal } from '@/components/TradeModal'
 import { StoreSettings } from '@/app/actions/settings'
 
 export function CartDrawer({ settings }: { settings: StoreSettings }) {
-  const { cartItems, isCartOpen, setIsCartOpen, removeFromCart, clearCart, cartTotal, kickItems } = useCart()
+  const { cartItems, isCartOpen, setIsCartOpen, removeFromCart, clearCart, cartTotal, kickItems, validateCartCompleteness } = useCart()
   const [isTradeModalOpen, setIsTradeModalOpen] = useState(false)
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [tradeSubmitting, setTradeSubmitting] = useState(false)
@@ -25,9 +25,8 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
         try {
           const cashItems = cartItems.filter(i => !i.isTradeProposal);
           if (cashItems.length === 0) return;
-          const check = await validateCartCompleteness(cashItems.map(i => i.id))
-          if (!check.valid) {
-            kickItems(check.unavailableIds)
+          const isValid = await validateCartCompleteness()
+          if (!isValid) {
             setCartError("Heads up! Another collector just snagged an item while it was in your cart, but the rest of your stack is ready to go.")
           }
         } catch (e) {
@@ -202,10 +201,9 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
                         style={{ layout: "vertical", shape: "rect", color: "gold" }}
                         createOrder={async () => {
                           setCartError(null);
-                          const check = await validateCartCompleteness(cashItems.map(i => i.id));
+                          const isValid = await validateCartCompleteness();
                           
-                          if (!check.valid) {
-                            kickItems(check.unavailableIds);
+                          if (!isValid) {
                             setCartError("Whoops! Some items in your bundle just sold to a competitive buyer. Please review your updated cart.");
                             throw new Error("Cart items unavailable");
                           }
@@ -215,7 +213,7 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
                         }}
                         onApprove={async (data) => {
                           try {
-                            const res = await capturePayPalOrder(data.orderID);
+                            const res = await capturePayPalOrder(data.orderID, cashItems.map(i => i.id));
                             if (res.success) {
                                clearCart();
                                setIsCartOpen(false);

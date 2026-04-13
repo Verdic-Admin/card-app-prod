@@ -96,6 +96,7 @@ export async function publishDraftCardsAction(ids: string[]) {
 
   if (deleteError) {
     console.error("Warning: cards minted but staging cleanup failed:", deleteError)
+    throw new Error("Failed to clean up staging area after publishing")
   }
 
   return { success: true }

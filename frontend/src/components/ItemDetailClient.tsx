@@ -48,6 +48,11 @@ export function ItemDetailClient({ item }: Props) {
   return (
     <>
       <div className="flex flex-col gap-3">
+        <div className="flex justify-center -mb-1 mt-1">
+          <a href="https://playerindexdata.com" target="_blank" rel="noopener noreferrer" className="text-[10px] text-cyan-400 hover:text-cyan-300 font-semibold tracking-wide">
+            As priced by PlayerIndexData.com
+          </a>
+        </div>
         <button
           onClick={() => addToCart(item)}
           disabled={isInCart}

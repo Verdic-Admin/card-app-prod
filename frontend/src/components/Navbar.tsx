@@ -10,6 +10,13 @@ export function Navbar({ settings }: { settings: StoreSettings }) {
 
   return (
     <div className="flex flex-col w-full sticky top-0 z-50">
+      <a href="mailto:hello@playerindexdata.com" className="block relative z-[70] w-full bg-gradient-to-r from-indigo-600 to-cyan-600 hover:opacity-90 transition-opacity">
+        <div className="py-2 px-4 text-center">
+          <p className="text-white text-xs sm:text-sm font-bold tracking-wide">
+            Want to escape eBay? Claim your free zero-fee card shop website. Complete with AI Scanner & Live Auction Block.
+          </p>
+        </div>
+      </a>
       {settings.site_announcement && (
         <div className="relative z-[60] overflow-hidden bg-gradient-to-r from-violet-600 via-fuchsia-600 to-orange-600 shadow-md">
           <div className="absolute inset-0 bg-black/10 mix-blend-overlay pointer-events-none"></div>

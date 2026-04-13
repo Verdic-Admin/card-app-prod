@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { Database } from '@/types/database.types';
+import { createClient } from '@/utils/supabase/client';
 
 type InventoryItem = Database['public']['Tables']['inventory']['Row'];
 
@@ -27,6 +28,7 @@ interface CartContextType {
   isCartOpen: boolean;
   setIsCartOpen: (open: boolean) => void;
   kickItems: (ids: string[]) => void;
+  validateCartCompleteness: () => Promise<boolean>;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -41,7 +43,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       const stored = localStorage.getItem('store_cart');
       if (stored) {
         // Strip out volatile properties natively when hydrating
-        const hydrated = JSON.parse(stored).filter((i: any) => !i.isTradeProposal);
+        const hydrated = JSON.parse(stored).map((i: any) => {
+           if (i.isTradeProposal && i.tradeDetails) {
+              return { ...i, tradeDetails: { ...i.tradeDetails, offerImages: [], offerImageUrls: [] } };
+           }
+           return i;
+        });
         setCartItems(hydrated);
       }
     } catch (e) {
@@ -53,7 +60,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isInitialized) {
       // Don't save trade bindings natively into localStorage because File[] objects will crash JSON.stringify serialization
-      const savable = cartItems.filter(i => !i.isTradeProposal);
+      const savable = cartItems.map(i => {
+         if (i.isTradeProposal && i.tradeDetails) {
+            return { ...i, tradeDetails: { ...i.tradeDetails, offerImages: [], offerImageUrls: [] } };
+         }
+         return i;
+      });
       localStorage.setItem('store_cart', JSON.stringify(savable));
     }
   }, [cartItems, isInitialized]);
@@ -102,6 +114,40 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
+  const validateCartCompleteness = async () => {
+    if (cartItems.length === 0) return true;
+    
+    // Only check items that we are purchasing (not trades)
+    const purchaseItems = cartItems.filter(i => !i.isTradeProposal);
+    if (purchaseItems.length === 0) return true;
+
+    const supabase = createClient();
+    const { data } = await supabase
+      .from('inventory')
+      .select('id, status, checkout_expires_at')
+      .in('id', purchaseItems.map(i => i.id));
+
+    if (data) {
+      const now = new Date();
+      const invalidIds = data.filter(item => {
+        if (item.status === 'sold') return true;
+        if (item.status === 'pending_checkout') {
+          if (item.checkout_expires_at && new Date(item.checkout_expires_at) > now) {
+            return true; // Locked by someone else
+          }
+        }
+        return false;
+      }).map(i => i.id);
+
+      if (invalidIds.length > 0) {
+        kickItems(invalidIds);
+        alert("Attention: One or more items in your cart were sold or locked by another user and have been removed.");
+        return false;
+      }
+    }
+    return true;
+  };
+
   // Natively exclude Trade targets from Cart Price calculations!
   const cartTotal = cartItems.reduce((sum, item) => {
      if (item.isTradeProposal) return sum;
@@ -109,7 +155,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, 0);
 
   return (
-    <CartContext.Provider value={{ cartItems, addToCart, removeFromCart, addTradeToCart, clearCart, cartTotal, isCartOpen, setIsCartOpen, kickItems }}>
+    <CartContext.Provider value={{ cartItems, addToCart, removeFromCart, addTradeToCart, clearCart, cartTotal, isCartOpen, setIsCartOpen, kickItems, validateCartCompleteness }}>
       {children}
     </CartContext.Provider>
   )

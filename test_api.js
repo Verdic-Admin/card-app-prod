@@ -5,7 +5,7 @@ async function testOracleAPI() {
     { player_name: "Larry Walker", card_set: "2025 Stadium Club", card_number: "36" }
   ];
 
-  const apiKey = "pi_live_L5-fH6I-LyizQhJIEAEZR2jDCiV3vS6o1JKc1gKtwJU"; 
+  const apiKey = process.env.PLAYERINDEX_API_KEY || "dummy_api_key_for_testing"; 
 
   for (const c of cards) {
     const payload = {

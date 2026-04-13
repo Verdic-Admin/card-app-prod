@@ -60,6 +60,7 @@ export async function syncInventoryWithOracle() {
         is_relic: Boolean(item.is_relic || false),
         is_rookie: Boolean(item.is_rookie || false),
         print_run: item.print_run ? Number(item.print_run) : undefined,
+        discount_rate: discountRate,
         skip_fuzzy: true
       }
       
@@ -141,6 +142,7 @@ export async function syncSingleItemWithOracle(id: string) {
       is_relic: Boolean((item as any).is_relic || false),
       is_rookie: Boolean((item as any).is_rookie || false),
       print_run: (item as any).print_run ? Number((item as any).print_run) : undefined,
+      discount_rate: discountRate,
       skip_fuzzy: true
     }
 
@@ -206,6 +208,7 @@ export async function evaluateItemWithOracle(payload: any) {
       is_relic: Boolean(payload.is_relic || false),
       is_rookie: Boolean(payload.is_rookie || false),
       print_run: payload.print_run ? Number(payload.print_run) : undefined,
+      discount_rate: discountRate,
       skip_fuzzy: true
     }
     
@@ -340,23 +343,53 @@ export async function getBatchOraclePrices(cards: any[]) {
 }
 
 export async function applyOracleDiscount(id: string) {
-  return { success: true, new_price: 0 }
+  const supabase = await createClient()
+  const { data: settings } = await (supabase as any).from('store_settings').select('oracle_discount_percentage').eq('id', 1).single()
+  const discountRate = settings?.oracle_discount_percentage || 0;
+  
+  const { data: item } = await supabase.from('inventory').select('oracle_projection').eq('id', id).single()
+  // @ts-ignore
+  if (item?.oracle_projection) {
+       const new_price = item.oracle_projection * (1 - (discountRate / 100))
+       await (supabase.from('inventory') as any).update({ listed_price: new_price }).eq('id', id)
+       return { success: true, new_price }
+  }
+  return { success: false, message: 'No oracle projection' }
 }
 
 export async function applyOracleDiscountAll() {
-  return { success: true, count: 0, discount: 0 }
+  const supabase = await createClient()
+  const { data: settings } = await (supabase as any).from('store_settings').select('oracle_discount_percentage').eq('id', 1).single()
+  const discountRate = settings?.oracle_discount_percentage || 0;
+  
+  const { data: items } = await (supabase as any).from('inventory').select('id, oracle_projection').not('oracle_projection', 'is', null)
+  let count = 0
+  if (items) {
+      for (const item of items) {
+          if (item.oracle_projection) {
+              const new_price = item.oracle_projection * (1 - (discountRate / 100))
+              await (supabase.from('inventory') as any).update({ listed_price: new_price }).eq('id', item.id)
+              count++
+          }
+      }
+  }
+  return { success: true, count, discount: discountRate }
 }
 
 export async function applyCorrection(id: string, item: any) {
+  const supabase = await createClient()
+  await (supabase.from('inventory') as any).update({ ...item, needs_correction: false }).eq('id', id)
   return { success: true }
 }
 
 export async function approvePriceOnly(id: string, item: any) {
+  const supabase = await createClient()
+  await (supabase.from('inventory') as any).update({ listed_price: item.listed_price, needs_price_approval: false }).eq('id', id)
   return { success: true }
 }
 
 export async function denyCorrection(id: string) {
+  const supabase = await createClient()
+  await (supabase.from('inventory') as any).update({ needs_correction: false, needs_price_approval: false }).eq('id', id)
   return { success: true }
 }
-
-
