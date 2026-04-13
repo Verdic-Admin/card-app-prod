@@ -60,6 +60,7 @@ export type Database = {
           coined_image_url: string | null
           cost_basis: number | null
           created_at: string | null
+          checkout_expires_at: string | null
           current_bid: number | null
           filename: string | null
           high_price: number | null
@@ -96,6 +97,7 @@ export type Database = {
           card_set?: string | null
           coined_image_url?: string | null
           cost_basis?: number | null
+          checkout_expires_at?: string | null
           current_bid?: number | null
           filename?: string | null
           high_price?: number | null
@@ -132,6 +134,7 @@ export type Database = {
           card_set?: string | null
           coined_image_url?: string | null
           cost_basis?: number | null
+          checkout_expires_at?: string | null
           current_bid?: number | null
           filename?: string | null
           high_price?: number | null
