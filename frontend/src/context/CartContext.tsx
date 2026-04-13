@@ -122,14 +122,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (purchaseItems.length === 0) return true;
 
     const supabase = createSupabaseClient();
-    const { data } = await supabase
+    const { data } = await (supabase as any)
       .from('inventory')
       .select('id, status, checkout_expires_at')
       .in('id', purchaseItems.map(i => i.id));
 
     if (data) {
       const now = new Date();
-      const invalidIds = data.filter(item => {
+      const invalidIds = (data as any[]).filter(item => {
         if (item.status === 'sold') return true;
         if (item.status === 'pending_checkout') {
           if (item.checkout_expires_at && new Date(item.checkout_expires_at) > now) {
