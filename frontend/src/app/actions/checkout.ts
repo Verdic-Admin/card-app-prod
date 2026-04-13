@@ -128,6 +128,8 @@ export async function createPayPalOrder(itemIds: string[]) {
   const orderData = await orderRes.json();
   
   return { orderId: orderData.id };
+}
+
 export async function capturePayPalOrder(orderId: string, itemIds: string[]) {
   const admin = createAdminClient()
   const clientId = process.env.PAYPAL_CLIENT_ID;
