@@ -1261,7 +1261,7 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                           defaultValue={(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}
                           onBlur={async (e) => {
                               const val = parseFloat(e.target.value);
-                              const currentVal = parseFloat((item.listed_price ?? item.avg_price ?? 0) as string);
+                              const currentVal = Number(item.listed_price ?? item.avg_price ?? 0);
                               if (!isNaN(val) && val !== currentVal) {
                                  await editCardAction(item.id, { listed_price: val });
                               }
