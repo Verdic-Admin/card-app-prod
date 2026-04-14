@@ -8,9 +8,5 @@
       "path": "/api/cron/auction-finisher",
       "schedule": "* * * * *"
     }
-  ],
-  "env": {
-    "PLAYERINDEX_API_KEY": "@playerindex_api_key",
-    "NEXT_PUBLIC_PLAYERINDEX_API_KEY": "@playerindex_api_key"
-  }
+  ]
 }

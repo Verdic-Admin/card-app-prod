@@ -1,5 +1,5 @@
-import { sql } from '@vercel/postgres';
 'use server'
+import { sql } from '@vercel/postgres';
 
 import { put, del } from '@vercel/blob';
 
