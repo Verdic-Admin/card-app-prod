@@ -4,7 +4,7 @@
 import { sql } from '@vercel/postgres'
 import { vercelBatchUpdatePrices } from '@/app/actions/inventory'
 
-export const ALLOWED_COLUMNS = [
+const ALLOWED_COLUMNS = [
   'player_name', 'card_set', 'card_number', 'insert_name', 
   'parallel_name', 'print_run', 'listed_price', 'market_price',
   'image_url', 'back_image_url'
