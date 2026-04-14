@@ -1,4 +1,4 @@
-'use server'
+"use server";
 
 export async function uploadImagesToScanner(formData: FormData) {
   const apiKey = process.env.PLAYERINDEX_API_KEY || '';

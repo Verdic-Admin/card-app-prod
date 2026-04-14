@@ -1,5 +1,5 @@
+"use server";
 import { sql } from '@vercel/postgres';
-'use server'
 
 
 export const ALLOWED_COLUMNS = [

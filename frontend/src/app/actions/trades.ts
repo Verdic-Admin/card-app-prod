@@ -1,4 +1,4 @@
-'use server'
+"use server";
 import { sql } from '@vercel/postgres';
 
 import { put, del } from '@vercel/blob';

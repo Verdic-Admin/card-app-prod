@@ -1,5 +1,5 @@
+"use server";
 import { sql } from '@vercel/postgres';
-'use server'
 
 import { revalidatePath } from 'next/cache'
 
