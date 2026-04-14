@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-import { fetchWithAuth } from '@/utils/api';
+import { searchTaxonomyAction } from '@/app/actions/oracleAPI';
 
 interface TaxonomyResult {
   player_name: string;
@@ -27,13 +27,17 @@ export function TaxonomySearch({
     setIsLoading(true);
     const timeoutId = setTimeout(async () => {
       try {
-        const baseUrl = process.env.NEXT_PUBLIC_FINTECH_API_URL || 'http://localhost:8000/fintech';
-        const res = await fetchWithAuth(`${baseUrl}/v1/taxonomy/search?q=${encodeURIComponent(query)}`);
-        if (res.ok) {
-          const data = await res.json();
-          setResults(data.results || data || []);
+        const res = await searchTaxonomyAction(query);
+        if (res.error === 'credits_exhausted') {
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new CustomEvent("api-credits-exhausted"));
+              window.location.href = "/admin/billing";
+            }
+            setResults([]);
+        } else if (res.success) {
+           setResults(res.data.results || res.data || []);
         } else {
-          setResults([]);
+           setResults([]);
         }
       } catch (e) {
         console.error("Taxonomy search failed", e);

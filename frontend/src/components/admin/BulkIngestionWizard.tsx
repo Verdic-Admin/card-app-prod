@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Upload, Loader2, Play, CheckCircle2, Wand2, DollarSign } from 'lucide-react'
 import { vercelBatchInsertInventory, uploadAssetAction } from '@/app/actions/inventory'
-import { fetchWithAuth } from '@/utils/api'
+import { submitBatchIngestAction, checkBatchStatusAction } from '@/app/actions/oracleAPI'
 import { TaxonomySearch } from '@/components/admin/TaxonomySearch'
 
 export function BulkIngestionWizard() {
@@ -45,13 +45,18 @@ export function BulkIngestionWizard() {
        const mockUrls = await Promise.all(uploadPromises)
 
        // Submit array to orchestrator's batch route
-       const response = await fetchWithAuth(process.env.NEXT_PUBLIC_BATCH_ENDPOINT || 'http://localhost:8000/fintech/orchestrator/ingest/batch', {
-          method: 'POST',
-          body: JSON.stringify({ shop_id: 'local_shop', images: mockUrls })
-       });
+       const response = await submitBatchIngestAction('local_shop', mockUrls);
 
-       if (!response.ok) throw new Error("Batch ingestion rejected.")
-       const data = await response.json()
+       if (response.error === 'credits_exhausted') {
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new CustomEvent("api-credits-exhausted"));
+              window.location.href = "/admin/billing";
+            }
+            throw new Error("API Credits Exhausted")
+       }
+
+       if (!response.success) throw new Error("Batch ingestion rejected: " + response.statusText)
+       const data = response.data
        setJobId(data.job_id)
        setStep(2)
        startPolling(data.job_id)
@@ -66,13 +71,22 @@ export function BulkIngestionWizard() {
     setIsPolling(true)
     const interval = setInterval(async () => {
        try {
-         const response = await fetchWithAuth(process.env.NEXT_PUBLIC_STATUS_ENDPOINT || `http://localhost:8000/fintech/orchestrator/ingest/status/${id}`)
-         if (!response.ok) {
+         const response = await checkBatchStatusAction(id)
+         if (response.error === 'credits_exhausted') {
+            clearInterval(interval)
+            setIsPolling(false)
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new CustomEvent("api-credits-exhausted"));
+              window.location.href = "/admin/billing";
+            }
+            return
+         }
+         if (!response.success) {
            clearInterval(interval)
            setIsPolling(false)
            return
          }
-         const data = await response.json()
+         const data = response.data
          if (data.status === "completed") {
             clearInterval(interval)
             setIsPolling(false)
