@@ -1,63 +1,37 @@
-import { NextResponse, type NextRequest } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
-  })
-
-  // 1. API Key Setup Check
+export function middleware(request: NextRequest) {
   const apiKey = process.env.PLAYERINDEX_API_KEY;
-  if (request.nextUrl.pathname.startsWith('/admin')) {
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  const url = request.nextUrl.clone();
+
+  if (url.pathname.startsWith('/admin')) {
+    // 1. Check if the server has the required Oracle API key
     if (!apiKey) {
-      const url = request.nextUrl.clone();
       url.pathname = '/setup';
       return NextResponse.redirect(url);
     }
-  }
 
-  // 2. Supabase Auth Check
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://localhost:54321',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'test',
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({
-            request,
-          })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          )
-        },
-      },
+    // 2. Force the visitor to provide the admin password
+    const basicAuth = request.headers.get('authorization');
+    if (adminPassword) {
+      // Note: Basic Auth header is 'Basic <base64>' -> index 1
+      const authValue = basicAuth ? basicAuth.split(' ')[1] : '';
+      const expectedAuth = btoa(`admin:${adminPassword}`);
+      
+      if (authValue !== expectedAuth) {
+        return new NextResponse('Unauthorized Access', {
+          status: 401,
+          headers: { 'WWW-Authenticate': 'Basic realm="Secure Admin Dashboard"' }
+        });
+      }
     }
-  )
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user && request.nextUrl.pathname.startsWith('/admin')) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/login'
-    return NextResponse.redirect(url)
   }
 
-  // Also protect API routes meant for admin only
-  if (!user && (request.nextUrl.pathname.startsWith('/api/scan') || request.nextUrl.pathname.startsWith('/api/price'))) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  return supabaseResponse
+  return NextResponse.next();
 }
 
 export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
-}
+  matcher: ['/admin/:path*'],
+};
