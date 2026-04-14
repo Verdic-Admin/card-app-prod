@@ -1,25 +1,17 @@
+import { sql } from '@vercel/postgres';
 'use server'
 
-import { createAdminClient, createClient } from '@/utils/supabase/server'
+import { put, del } from '@vercel/blob';
 
 // Executes the user-requested Pre-Flight check right before PayPal generated. 
 // Protects the single-item cart model from ghost carts perfectly.
 export async function validateCartCompleteness(itemIds: string[]) {
-  const supabase = await createClient()
-  
-  if (!itemIds || itemIds.length === 0) return { valid: true, unavailableIds: [] }
-
-  // Execute an atomic UPDATE to lock the items
-  const { data: updatedData, error: updateError } = await (supabase.from('inventory') as any)
-    .update({ 
-      status: 'pending_checkout', 
-      checkout_expires_at: new Date(Date.now() + 10 * 60000).toISOString() 
-    })
-    .in('id', itemIds)
-    .eq('status', 'available')
-    .select('id')
-
-  if (updateError) throw new Error("Database locking failed: " + updateError.message)
+  const { rows: updatedData } = await sql`
+      UPDATE inventory 
+      SET status = 'pending_checkout', checkout_expires_at = ${new Date(Date.now() + 10 * 60000).toISOString()}
+      WHERE id = ANY(${itemIds as any}::uuid[]) AND status = 'available'
+      RETURNING id
+  `;
 
   const lockedIds = updatedData?.map((d: any) => d.id) || []
   const missingOrSold = itemIds.filter(id => !lockedIds.includes(id))
@@ -31,14 +23,31 @@ export async function validateCartCompleteness(itemIds: string[]) {
 }
 
 export async function submitTradeOffer(formData: FormData) {
-  const supabaseAdmin = createAdminClient()
+
   
   const buyer_name = formData.get('name') as string;
   const buyer_email = formData.get('email') as string;
   const offer_text = formData.get('offer') as string;
-  const target_items = JSON.parse(formData.get('targetItems') as string);
-  const imageFiles = formData.getAll('images') as File[];
+  let target_items = JSON.parse(formData.get('targetItems') as string) || [];
+  
+  if (Array.isArray(target_items) && target_items.length > 0) {
+    const itemIds = target_items.map((i: any) => i.id || i);
+    const { rows } = await sql`SELECT id, listed_price, market_price FROM inventory WHERE id = ANY(${itemIds as any}::uuid[])`;
+    target_items = target_items.map((t: any) => {
+       const itemId = t.id || t;
+       const dbItem = rows.find(r => r.id === itemId);
+       if (dbItem) {
+          return {
+             ...(typeof t === 'object' ? t : { id: t }),
+             snapshot_listed_price: dbItem.listed_price,
+             snapshot_market_price: dbItem.market_price
+          };
+       }
+       return t;
+    });
+  }
 
+  const imageFiles = formData.getAll('images') as File[];
   let attached_image_urls: string[] = [];
 
   for (const imageFile of imageFiles) {
@@ -47,41 +56,20 @@ export async function submitTradeOffer(formData: FormData) {
       const fileName = `trade_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
       const filePath = `trades/${fileName}`
 
-      // Pumping trade images into the exact same public bucket
-      const { error: uploadError } = await supabaseAdmin.storage
-        .from('trade-images')
-        .upload(filePath, imageFile, {
-          cacheControl: '3600',
-          upsert: false
-        })
-
-      if (uploadError) {
-        console.error("Failed to upload trade image:", uploadError)
-        return { success: false, error: `Bucket Upload Fault: ${uploadError.message}. Make absolutely sure the 'trade-images' Storage Bucket exists and is Public!` }
-      }
-
-      const { data: { publicUrl } } = supabaseAdmin.storage
-        .from('trade-images')
-        .getPublicUrl(filePath)
-
-      attached_image_urls.push(publicUrl);
+      const { url } = await put(filePath, imageFile, { access: 'public' });
+      attached_image_urls.push(url);
     }
   }
   
   const final_image_urls = attached_image_urls.length > 0 ? attached_image_urls.join(',') : null;
 
-  const { error } = await (supabaseAdmin.from('trade_offers') as any)
-    .insert({
-      buyer_name,
-      buyer_email,
-      offer_text,
-      target_items,
-      attached_image_url: final_image_urls,
-      status: 'pending'
-    })
-
-  if (error) {
-    console.error("Supabase Error Data:", error)
+  try {
+     await sql`
+        INSERT INTO trade_offers (buyer_name, buyer_email, offer_text, target_items, attached_image_url, status)
+        VALUES (${buyer_name}, ${buyer_email}, ${offer_text}, ${JSON.stringify(target_items)}, ${final_image_urls}, 'pending')
+     `;
+  } catch (error: any) {
+    console.error("PG Error Data:", error)
     return { success: false, error: `Database Insert Fault: ${error.message}. Is your attached_image_url column properly created as type Text?` }
   }
 
@@ -91,7 +79,7 @@ export async function submitTradeOffer(formData: FormData) {
       const embed: any = {
         title: `New Trade Offer from ${buyer_name}`,
         color: 3447003, // Blue embed color
-        description: `**Email:** ${buyer_email}\n**Offer:** ${offer_text || "*No offer text provided*"}\n\n**Action Required:** Login to your secure Supabase Dashboard to instantly review exactly what items they requested from your store!`,
+        description: `**Email:** ${buyer_email}\n**Offer:** ${offer_text || "*No offer text provided*"}\n\n**Action Required:** Login to your secure Vercel Admin Dashboard to instantly review exactly what items they requested from your store!`,
         timestamp: new Date().toISOString(),
       };
 
@@ -117,17 +105,12 @@ export async function submitTradeOffer(formData: FormData) {
 }
 
 export async function clearTradeImageStorage(tradeOfferId: string, imageUrl: string) {
-  const supabaseAdmin = createAdminClient()
   try {
-    const path = imageUrl.split('/trade-images/')[1]
-    if (path) {
-      await supabaseAdmin.storage.from('trade-images').remove([path])
+    if (imageUrl) {
+      const urls = imageUrl.split(',');
+      await del(urls);
     }
-    const { error } = await (supabaseAdmin.from('trade_offers') as any)
-      .update({ attached_image_url: null })
-      .eq('id', tradeOfferId)
-      
-    if (error) throw error
+    await sql`UPDATE trade_offers SET attached_image_url = null WHERE id = ${tradeOfferId}`;
     return { success: true }
   } catch (error: any) {
     console.error("Failed to clear trade image storage:", error)
@@ -136,29 +119,16 @@ export async function clearTradeImageStorage(tradeOfferId: string, imageUrl: str
 }
 
 export async function getAllTradeOffers() {
-  const supabaseAdmin = createAdminClient()
-  const { data, error } = await (supabaseAdmin.from('trade_offers') as any)
-    .select('*')
-    .order('created_at', { ascending: false })
-  
-  if (error) throw new Error(error.message)
-  return data
+  const { rows } = await sql`SELECT * FROM trade_offers ORDER BY created_at DESC`;
+  return rows;
 }
 
 export async function deleteTradeOfferRecord(id: string, imageUrl: string | null) {
-  const supabaseAdmin = createAdminClient()
   try {
     if (imageUrl) {
-      const path = imageUrl.split('/trade-images/')[1]
-      if (path) {
-        await supabaseAdmin.storage.from('trade-images').remove([path])
-      }
+      await del(imageUrl);
     }
-    const { error } = await (supabaseAdmin.from('trade_offers') as any)
-      .delete()
-      .eq('id', id)
-      
-    if (error) throw error
+    await sql`DELETE FROM trade_offers WHERE id = ${id}`;
     return { success: true }
   } catch (error: any) {
     console.error("Failed to delete trade offer:", error)

@@ -1,21 +1,19 @@
+import { sql } from '@vercel/postgres';
 import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/utils/supabase/server'
 import { CardGrid } from '@/components/CardGrid'
-import { ItemDetailClient } from '@/components/ItemDetailClient'
+import { ProductCard } from '@/components/ProductCard'
+import { ItemDetailClient, ImageMagnifier } from '@/components/ItemDetailClient'
+import { MarketSparkline } from '@/components/MarketSparkline'
 
 type PageProps = { params: Promise<{ id: string }> }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params
-  const supabase = await createClient()
-
-  const { data: item } = await supabase
-    .from('inventory')
-    .select('*')
-    .eq('id', id)
-    .single()
+  
+  const { rows } = await sql`SELECT * FROM inventory WHERE id = ${id}`;
+  const item = rows[0];
 
   if (!item) {
     return {
@@ -56,24 +54,27 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function ItemPage({ params }: PageProps) {
   const { id } = await params
-  const supabase = await createClient()
-
+  
   // ── Fetch the primary item ──────────────────────────────────────────────
-  const { data: item, error } = await supabase
-    .from('inventory')
-    .select('*')
-    .eq('id', id)
-    .single()
+  let item;
+  let error;
+  try {
+     const { rows } = await sql`SELECT * FROM inventory WHERE id = ${id}`;
+     item = rows[0];
+  } catch(e) {
+     error = e;
+  }
 
   if (error || !item) return notFound()
 
   // ── LOT PAGE: render parent lot + child card grid ───────────────────────
   if (item.is_lot) {
-    const { data: children } = await supabase
-      .from('inventory')
-      .select('*')
-      .eq('lot_id', item.id)
-      .eq('status', 'available')
+    const { rows: children } = await sql`SELECT * FROM inventory WHERE lot_id = ${item.id} AND status = 'available'`;
+
+    const childSum = children.reduce((acc: number, c: any) => acc + (parseFloat(c.listed_price) || 0), 0);
+    const lotPrice = parseFloat(item.listed_price ?? item.avg_price ?? 0);
+    const savings = childSum - lotPrice;
+    const savingsPct = childSum > 0 ? (savings / childSum) * 100 : 0;
 
     return (
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-20">
@@ -97,6 +98,18 @@ export default async function ItemPage({ params }: PageProps) {
               {children?.length ?? 0} cards included
             </span>
           </div>
+          
+          {savings > 0 && (
+            <div className="mt-4 flex items-center gap-2 bg-gradient-to-r from-emerald-950/60 to-emerald-900/30 border border-emerald-500/30 rounded-xl px-5 py-3 w-fit shadow-lg shadow-emerald-900/10">
+               <span className="text-emerald-400 text-lg flex-shrink-0">💰</span>
+               <div>
+                 <p className="text-emerald-400 font-black text-xs uppercase tracking-widest mb-0.5">Bundle Savings</p>
+                 <p className="text-white font-bold text-sm tracking-wide">
+                   Save <span className="text-emerald-300 font-black">${savings.toFixed(2)}</span> ({savingsPct.toFixed(0)}%) vs individual pricing
+                 </p>
+               </div>
+            </div>
+          )}
 
           {/* Add whole lot to cart */}
           <div className="mt-6">
@@ -107,14 +120,28 @@ export default async function ItemPage({ params }: PageProps) {
         {/* Divider */}
         <div className="border-t border-zinc-800 mb-10" />
 
-        {/* Child cards */}
+        {/* Child cards Carousel */}
         <h2 className="text-xl font-black text-zinc-300 mb-6 uppercase tracking-widest">
           Cards In This Lot
         </h2>
-        <CardGrid
-          items={(children ?? []) as any}
-          emptyMessage="No individual cards are currently linked to this lot."
-        />
+        {children && children.length > 0 ? (
+          <div className="relative">
+            <div className="flex gap-6 overflow-x-auto pb-8 snap-x snap-mandatory hide-scrollbars" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+              {children.map(child => (
+                <div key={child.id} className="snap-start flex-shrink-0 w-[280px]">
+                  <ProductCard item={child as any} />
+                </div>
+              ))}
+            </div>
+            {/* Soft fade gradients for horizontal scrolling indicator */}
+            <div className="pointer-events-none absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-zinc-950 to-transparent" />
+            <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-zinc-950 to-transparent" />
+          </div>
+        ) : (
+          <div className="py-20 text-center text-zinc-500 font-medium">
+             No individual cards are currently linked to this lot.
+          </div>
+        )}
       </div>
     )
   }
@@ -122,11 +149,8 @@ export default async function ItemPage({ params }: PageProps) {
   // ── INDIVIDUAL CARD PAGE: fetch parent lot if this card is part of one ──
   let parentLot: typeof item | null = null
   if (item.lot_id) {
-    const { data: lot } = await supabase
-      .from('inventory')
-      .select('*')
-      .eq('id', item.lot_id)
-      .single()
+    const { rows: lotRows } = await sql`SELECT * FROM inventory WHERE id = ${item.lot_id}`;
+    const lot = lotRows[0];
     parentLot = lot ?? null
   }
 
@@ -165,22 +189,14 @@ export default async function ItemPage({ params }: PageProps) {
         {/* Images */}
         <div className="space-y-4">
           {item.image_url && (
-            <div className="rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-950 shadow-2xl aspect-[2.5/3.5] flex items-center justify-center p-6 relative group">
-              <img
-                src={item.image_url}
-                alt={`${item.player_name} front`}
-                className="w-full h-full object-contain drop-shadow-2xl"
-              />
-              <div className="absolute inset-0 ring-1 ring-inset ring-white/10 rounded-2xl pointer-events-none" />
+            <div className="rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-950 shadow-2xl aspect-[2.5/3.5] flex items-center justify-center relative group">
+              <ImageMagnifier src={item.image_url} alt={`${item.player_name} front`} />
+              <div className="absolute inset-0 ring-1 ring-inset ring-white/10 rounded-2xl pointer-events-none z-10" />
             </div>
           )}
           {item.back_image_url && (
-            <div className="rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-950 shadow-xl aspect-[2.5/3.5] flex items-center justify-center p-6 relative">
-              <img
-                src={item.back_image_url}
-                alt={`${item.player_name} back`}
-                className="w-full h-full object-contain drop-shadow-xl opacity-90"
-              />
+            <div className="rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-950 shadow-xl aspect-[2.5/3.5] flex items-center justify-center relative group">
+              <ImageMagnifier src={item.back_image_url} alt={`${item.player_name} back`} />
             </div>
           )}
           {item.coined_image_url && (
@@ -229,9 +245,17 @@ export default async function ItemPage({ params }: PageProps) {
                     ${(item as any).oracle_projection.toFixed(2)}
                   </span>
                 </p>
-                <p className="text-5xl font-black text-white tracking-tighter">
-                  ${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}
-                </p>
+                <div className="flex items-center gap-3">
+                  <p className="text-5xl font-black text-white tracking-tighter">
+                    ${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}
+                  </p>
+                  {(item as any).trend_data && Array.isArray((item as any).trend_data) && (item as any).trend_data.length > 0 && (
+                    <MarketSparkline 
+                       data={(item as any).trend_data} 
+                       playerIndexUrl={(item as any).player_index_url || '#'} 
+                    />
+                  )}
+                </div>
                 {item.listed_price && item.listed_price < (item as any).oracle_projection && (
                   <p className="text-emerald-400 font-bold text-sm mt-1">
                     You save ${((item as any).oracle_projection - item.listed_price).toFixed(2)}
@@ -239,9 +263,17 @@ export default async function ItemPage({ params }: PageProps) {
                 )}
               </div>
             ) : (
-              <p className="text-5xl font-black text-white tracking-tighter">
-                ${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}
-              </p>
+              <div className="flex items-center gap-3">
+                <p className="text-5xl font-black text-white tracking-tighter">
+                  ${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}
+                </p>
+                {(item as any).trend_data && Array.isArray((item as any).trend_data) && (item as any).trend_data.length > 0 && (
+                  <MarketSparkline 
+                     data={(item as any).trend_data} 
+                     playerIndexUrl={(item as any).player_index_url || '#'} 
+                  />
+                )}
+              </div>
             )}
           </div>
 

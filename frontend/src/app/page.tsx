@@ -1,7 +1,7 @@
+import { sql } from '@vercel/postgres';
 import type { Metadata } from "next";
 import { Hero } from "@/components/Hero";
 import { CardGrid } from "@/components/CardGrid";
-import { createClient } from "@/utils/supabase/server";
 import { StoreFilters } from "@/components/StoreFilters";
 import { getStoreSettings } from "@/app/actions/settings";
 
@@ -59,37 +59,80 @@ export async function generateMetadata({ searchParams }: PageProps): Promise<Met
 
 export default async function Home(props: { searchParams: Promise<{ [key: string]: string | undefined }> | any }) {
   const searchParams = await props.searchParams;
-  const supabase = await createClient();
+
   const settings = await getStoreSettings();
 
   // 1. Dynamically extract the highly precise lists of available teams and years that actually exist in the DB right now
-  const { data: filterData } = await supabase
-    .from('inventory')
-    .select('team_name')
-    .eq('status', 'available')
-  
-  const availableTeams = Array.from(new Set(filterData?.map((d: any) => d.team_name).filter(Boolean) as string[])).sort()
+  const { rows: filterData } = await sql`SELECT DISTINCT team_name FROM inventory WHERE status = 'available' AND team_name IS NOT NULL`;
+  const availableTeams = filterData.map(d => d.team_name).sort();
 
   // 2. Base Query Builder using Next.js pure SearchParams to natively enable shareable Deep Links instantly
-  let query = supabase.from('inventory').select('*').eq('status', 'available')
+  let items = [];
+  let error = null;
+  try {
+     let queryStr = "SELECT * FROM inventory WHERE status = 'available'";
+     const values: any[] = [];
+     
+     if (searchParams?.q) {
+         values.push(`%${searchParams.q}%`);
+         queryStr += ` AND (player_name ILIKE $${values.length} OR team_name ILIKE $${values.length} OR card_set ILIKE $${values.length})`;
+     }
+     if (searchParams?.team) {
+         values.push(searchParams.team);
+         queryStr += ` AND team_name ILIKE $${values.length}`;
+     }
+     if (searchParams?.minPrice) {
+         values.push(searchParams.minPrice);
+         queryStr += ` AND listed_price >= $${values.length}`;
+     }
+     if (searchParams?.maxPrice) {
+         values.push(searchParams.maxPrice);
+         queryStr += ` AND listed_price <= $${values.length}`;
+     }
+     if (searchParams?.type) {
+         if (searchParams.type === 'auto') {
+             queryStr += ` AND (insert_name ILIKE '%Auto%' OR parallel_name ILIKE '%Auto%' OR parallel_insert_type ILIKE '%Auto%')`;
+         } else if (searchParams.type === 'relic') {
+             queryStr += ` AND (insert_name ILIKE '%Relic%' OR parallel_name ILIKE '%Relic%' OR parallel_insert_type ILIKE '%Relic%' OR insert_name ILIKE '%Patch%' OR parallel_name ILIKE '%Patch%' OR parallel_insert_type ILIKE '%Patch%')`;
+         } else if (searchParams.type === 'rookie') {
+             queryStr += ` AND (insert_name ILIKE '%Rookie%' OR parallel_name ILIKE '%Rookie%' OR parallel_insert_type ILIKE '%Rookie%' OR insert_name ILIKE '%RC%' OR parallel_name ILIKE '%RC%' OR parallel_insert_type ILIKE '%RC%')`;
+         }
+     }
 
-  if (searchParams?.q) {
-      query = query.or(`player_name.ilike.%${searchParams.q}%,team_name.ilike.%${searchParams.q}%,card_set.ilike.%${searchParams.q}%`)
-  }
-  if (searchParams?.team) {
-      query = query.ilike('team_name', searchParams.team)
-  }
-  if (searchParams?.minPrice) {
-      query = query.gte('listed_price', searchParams.minPrice)
-  }
-  if (searchParams?.maxPrice) {
-      query = query.lte('listed_price', searchParams.maxPrice)
+     queryStr += " ORDER BY player_name ASC";
+     const { rows } = await sql.query(queryStr, values);
+     items = rows;
+  } catch (err) {
+     error = err;
   }
 
-  const { data: items, error } = await query.order('player_name', { ascending: true });
 
   if (error) {
     console.error("Error fetching available inventory:", error);
+  }
+
+  const hasFilters = Boolean(searchParams?.q || searchParams?.team || searchParams?.minPrice || searchParams?.maxPrice);
+
+  if (!hasFilters && items.length === 0) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center bg-zinc-950 px-4">
+        <div className="max-w-2xl w-full text-center">
+          <div className="w-24 h-24 mx-auto mb-8 bg-zinc-900 border border-zinc-800 rounded-full flex items-center justify-center shadow-2xl">
+            <svg className="w-10 h-10 text-cyan-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+            </svg>
+          </div>
+          <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight mb-4">{settings.site_name}</h1>
+          <p className="text-xl text-zinc-400 mb-8 font-medium">Coming Soon</p>
+          <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-2xl p-6 md:p-8">
+            <p className="text-zinc-500">
+              We are currently scanning and organizing our initial inventory. 
+              Check back shortly as we go live with our first batch of premium cards!
+            </p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

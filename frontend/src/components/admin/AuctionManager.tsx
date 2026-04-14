@@ -10,6 +10,7 @@ interface AuctionManagerProps {
 
 export function AuctionManager({ initialItems }: AuctionManagerProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [isStagingMode, setIsStagingMode] = useState(false)
 
   // Status arrays
   const itemsForAuction = initialItems.filter(i => i.status === 'available' && !i.is_auction)
@@ -22,9 +23,16 @@ export function AuctionManager({ initialItems }: AuctionManagerProps) {
     setSelectedIds(next)
   }
 
-  const handleSendToBlock = async () => {
-    await sendToAuctionBlock(Array.from(selectedIds))
-    setSelectedIds(new Set())
+  const handleSendToBlock = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    try {
+       const fd = new FormData(e.currentTarget)
+       await sendToAuctionBlock(Array.from(selectedIds), fd)
+       setSelectedIds(new Set())
+       setIsStagingMode(false)
+    } catch (err: any) {
+       alert(err.message)
+    }
   }
 
   return (
@@ -44,11 +52,11 @@ export function AuctionManager({ initialItems }: AuctionManagerProps) {
 
         <div className="mb-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
           <button 
-            onClick={handleSendToBlock} 
+            onClick={() => setIsStagingMode(true)} 
             className="bg-slate-800 hover:bg-slate-900 text-white px-6 py-2 rounded-lg font-bold disabled:opacity-50 transition-colors" 
             disabled={selectedIds.size === 0}
           >
-            Move Selected to Block ({selectedIds.size})
+            Configure & Stage ({selectedIds.size})
           </button>
           {pendingItems.length > 0 && (
              <div className="text-sm font-semibold text-amber-600 bg-amber-50 px-3 py-1.5 rounded-md border border-amber-200">
@@ -65,12 +73,40 @@ export function AuctionManager({ initialItems }: AuctionManagerProps) {
                 <img src={item.image_url} alt="card" className="h-12 w-12 object-cover rounded shadow-sm" />
                 <div className="text-sm font-bold text-slate-800 line-clamp-1">{item.player_name}</div>
                 <div className="text-xs text-slate-500 line-clamp-1">{item.card_set}</div>
+                {item.is_lot && <div className="text-xs bg-indigo-100 text-indigo-800 mt-1 inline-block px-1.5 rounded font-bold">LOT BUNDLE</div>}
+                {item.lot_id && <div className="text-xs bg-orange-100 text-orange-800 mt-1 inline-block px-1.5 rounded font-bold">Child of Lot</div>}
               </div>
             </div>
           ))}
           {itemsForAuction.length === 0 && <div className="text-slate-500 text-sm col-span-full text-center py-8 bg-slate-50 rounded border border-slate-100">No available inventory to send to block.</div>}
         </div>
       </div>
+
+      {isStagingMode && (
+         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md">
+               <h3 className="text-xl font-bold mb-4 text-slate-900 border-b pb-2">Stage {selectedIds.size} Item(s)</h3>
+               <form onSubmit={handleSendToBlock} className="flex flex-col gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-slate-600 uppercase mb-1 block">Reserve Price ($)</label>
+                    <input type="number" step="0.01" name="reservePrice" className="w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 text-slate-900" placeholder="0.00" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-600 uppercase mb-1 block">End Time</label>
+                    <input type="datetime-local" name="endTime" className="w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 text-slate-900" required />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-600 uppercase mb-1 block">Description</label>
+                    <textarea name="description" className="w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 text-slate-900" rows={3} placeholder="Live auction hype text..."></textarea>
+                  </div>
+                  <div className="flex gap-3 justify-end mt-4">
+                    <button type="button" onClick={() => setIsStagingMode(false)} className="px-4 py-2 text-slate-600 font-semibold hover:bg-slate-100 rounded-lg transition-colors">Cancel</button>
+                    <button type="submit" className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-indigo-700 transition-colors shadow-md">Confirm Block</button>
+                  </div>
+               </form>
+            </div>
+         </div>
+      )}
     </div>
   )
 }

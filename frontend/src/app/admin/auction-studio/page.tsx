@@ -1,30 +1,17 @@
-import { createClient } from '@/utils/supabase/server'
+import { sql } from '@vercel/postgres';
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { LiveAuctionStudio } from '@/components/admin/LiveAuctionStudio'
-import { SignOutButton } from '@/components/admin/SignOutButton'
+
 
 export const dynamic = 'force-dynamic'
 
 export default async function AuctionStudioPage() {
-  const supabase = await createClient()
-  
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    redirect('/login')
-  }
-
-  const { data: inventory } = await supabase
-    .from('inventory')
-    .select('*')
-    .order('player_name', { ascending: true })
+  const { rows: inventory } = await sql`SELECT * FROM inventory ORDER BY player_name ASC`;
 
   // Fetch Oracle discount percentage and stream settings
-  const { data: settings } = await (supabase as any)
-    .from('store_settings')
-    .select('live_stream_url, projection_timeframe')
-    .eq('id', 1)
-    .single()
+  const { rows: storeRows } = await sql`SELECT live_stream_url, projection_timeframe FROM store_settings WHERE id = 1`;
+  const settings = storeRows[0] || {};
 
   const liveStreamUrl = settings?.live_stream_url || null
   const projectionTimeframe = settings?.projection_timeframe || '90-Day'
@@ -46,9 +33,6 @@ export default async function AuctionStudioPage() {
             Live Auction Studio
           </h1>
           <p className="text-slate-500 mt-1 font-medium">Manage streams, stage pending block inventory, and go live.</p>
-        </div>
-        <div className="flex items-center gap-4">
-          <SignOutButton />
         </div>
       </div>
 

@@ -1,19 +1,17 @@
 import { CardGrid } from "@/components/CardGrid";
-import { createSupabaseClient } from "@/utils/supabase/client";
+import { sql } from "@vercel/postgres";
 
 export const revalidate = 60;
 
 export default async function SoldPage() {
-  const supabase = createSupabaseClient();
-  
-  const { data: items, error } = await supabase
-    .from('inventory')
-    .select('*')
-    .eq('status', 'sold')
-    .order('player_name', { ascending: true });
-
-  if (error) {
-    console.error("Error fetching sold inventory:", error);
+  let items: any[] = [];
+  let error = false;
+  try {
+    const { rows } = await sql`SELECT * FROM inventory WHERE status = 'sold' ORDER BY player_name ASC`;
+    items = rows;
+  } catch (err) {
+    console.error("Error fetching sold inventory:", err);
+    error = true;
   }
 
   return (

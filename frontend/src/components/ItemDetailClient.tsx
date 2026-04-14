@@ -114,3 +114,44 @@ export function ItemDetailClient({ item }: Props) {
     </>
   )
 }
+
+export function ImageMagnifier({ src, alt }: { src: string; alt: string }) {
+  const [position, setPosition] = useState({ x: 0, y: 0 })
+  const [showMagnifier, setShowMagnifier] = useState(false)
+  const [cursorPosition, setCursorPosition] = useState({ x: 0, y: 0 })
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const { left, top, width, height } = e.currentTarget.getBoundingClientRect()
+    const x = ((e.clientX - left) / width) * 100
+    const y = ((e.clientY - top) / height) * 100
+    setPosition({ x, y })
+    setCursorPosition({ x: e.clientX - left, y: e.clientY - top })
+  }
+
+  return (
+    <div 
+      className="relative w-full h-full cursor-crosshair overflow-hidden rounded-2xl group"
+      onMouseEnter={() => setShowMagnifier(true)}
+      onMouseLeave={() => setShowMagnifier(false)}
+      onMouseMove={handleMouseMove}
+    >
+      <img src={src} alt={alt} className="w-full h-full object-contain drop-shadow-2xl" />
+      {showMagnifier && (
+        <div 
+          className="absolute pointer-events-none rounded-full border border-cyan-500/50 shadow-2xl bg-no-repeat bg-transparent z-50 transition-none"
+          style={{
+             width: '200px',
+             height: '200px',
+             left: cursorPosition.x - 100,
+             top: cursorPosition.y - 100,
+             backgroundImage: `url(${src})`,
+             backgroundPosition: `${position.x}% ${position.y}%`,
+             backgroundSize: '350%'
+          }}
+        >
+           <div className="absolute inset-0 rounded-full shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]"></div>
+        </div>
+      )}
+    </div>
+  )
+}

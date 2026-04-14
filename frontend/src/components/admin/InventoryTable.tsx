@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Database } from '@/types/database.types'
-import { toggleCardStatus, editCardAction, deleteCardAction, bulkDeleteCardsAction, bulkUpdateMetricsAction, rotateCardImageAction, sendToAuctionBlock, removeFromAuctionBlock, setAuctionStatus, updateLiveStreamUrl, updateProjectionTimeframe, createLotAction, breakLotAction } from '@/app/actions/inventory'
+import { toggleCardStatus, editCardAction, deleteCardAction, bulkDeleteCardsAction, bulkUpdateMetricsAction, rotateCardImageAction, sendToAuctionBlock, removeFromAuctionBlock, setAuctionStatus, updateLiveStreamUrl, updateProjectionTimeframe, createLotAction, breakLotAction, updateLotChildren } from '@/app/actions/inventory'
 import { syncSingleItemWithOracle, syncInventoryWithOracle, applyOracleDiscount, applyOracleDiscountAll, applyCorrection, approvePriceOnly, denyCorrection } from '@/app/actions/oracleSync'
 import { Loader2, Trash2, Edit2, Check, X, Search, Download, RotateCw, RefreshCw, DollarSign, Save, AlertCircle, Gavel, Tv, Radio, Package } from 'lucide-react'
 
@@ -43,6 +43,35 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
   const [lotPrice, setLotPrice] = useState('0.00')
   const [isCreatingLot, setIsCreatingLot] = useState(false)
   const [breakingLotId, setBreakingLotId] = useState<string | null>(null)
+
+  const [showEditLotModal, setShowEditLotModal] = useState(false);
+  const [editingLotId, setEditingLotId] = useState<string | null>(null);
+  const [editingLotStagingItems, setEditingLotStagingItems] = useState<string[]>([]);
+  const [editLotSearch, setEditLotSearch] = useState('');
+  const [isSavingLot, setIsSavingLot] = useState(false);
+
+  const handleEditLotOpen = (lotId: string) => {
+     setEditingLotId(lotId);
+     const initialChildren = items.filter(i => (i as any).lot_id === lotId).map(i => i.id);
+     setEditingLotStagingItems(initialChildren);
+     setEditLotSearch('');
+     setShowEditLotModal(true);
+  };
+
+  const handleSaveEditLot = async () => {
+     if (!editingLotId) return;
+     setIsSavingLot(true);
+     try {
+       await updateLotChildren(editingLotId, editingLotStagingItems);
+       alert("Lot updated successfully.");
+       window.location.reload(); 
+     } catch (e: any) {
+       alert("Error updating lot: " + e.message);
+     } finally {
+       setIsSavingLot(false);
+       setShowEditLotModal(false);
+     }
+  };
 
   const [editingClarificationId, setEditingClarificationId] = useState<string | null>(null)
   const [clarificationDraft, setClarificationDraft] = useState({ player_name: '', card_set: '', card_number: '' })
@@ -568,6 +597,93 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
         </div>
       )}
 
+      {/* ── Edit Lot Modal ── */}
+      {showEditLotModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl animate-in fade-in zoom-in duration-200 border border-slate-200 flex flex-col max-h-[90vh]">
+            <div className="bg-indigo-50 border-b border-indigo-100 px-6 py-4 rounded-t-2xl flex items-center justify-between shrink-0">
+              <h2 className="text-lg font-black text-indigo-900 flex items-center gap-2">
+                <Edit2 className="w-5 h-5" />
+                Edit Lot Children
+              </h2>
+              <button onClick={() => setShowEditLotModal(false)} className="text-indigo-400 hover:text-indigo-700 p-1 rounded-lg"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-6 overflow-y-auto space-y-6">
+              <div>
+                <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">Cards in this Lot ({editingLotStagingItems.length})</h3>
+                <div className="space-y-2">
+                  {editingLotStagingItems.map(id => {
+                     const child = items.find(i => i.id === id);
+                     if (!child) return null;
+                     return (
+                       <div key={id} className="flex items-center justify-between p-2 border border-slate-200 rounded-lg bg-slate-50">
+                          <div className="flex items-center gap-2">
+                             {child.image_url && <img src={child.image_url} className="w-8 h-8 rounded object-cover" />}
+                             <div>
+                                <div className="text-sm font-bold text-slate-900">{child.player_name}</div>
+                                <div className="text-[10px] text-slate-500 font-semibold">{child.card_set}</div>
+                             </div>
+                          </div>
+                          <button onClick={() => setEditingLotStagingItems(prev => prev.filter(stId => stId !== id))} className="text-xs font-bold text-red-600 hover:text-red-800 bg-red-100 px-2 py-1 rounded">
+                            Remove
+                          </button>
+                       </div>
+                     )
+                  })}
+                  {editingLotStagingItems.length === 0 && (
+                     <div className="text-sm text-slate-400 font-medium italic text-center py-2">No cards currently in this lot.</div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="border-t border-slate-200 pt-6">
+                <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">Add Cards to Lot</h3>
+                <div className="relative mb-3">
+                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                   <input type="text" value={editLotSearch} onChange={e => setEditLotSearch(e.target.value)} placeholder="Search inventory..." className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                   {items
+                      .filter(i => !(i as any).is_lot && !editingLotStagingItems.includes(i.id))
+                      .filter(i => !editLotSearch || (i.player_name || '').toLowerCase().includes(editLotSearch.toLowerCase()) || (i.card_set || '').toLowerCase().includes(editLotSearch.toLowerCase()))
+                      .slice(0, 15)
+                      .map(item => (
+                       <div key={item.id} className="flex items-center justify-between p-2 border border-slate-200 rounded-lg bg-white">
+                          <div className="flex items-center gap-2">
+                             {item.image_url && <img src={item.image_url} className="w-8 h-8 rounded object-cover" />}
+                             <div>
+                                <div className="text-sm font-bold text-slate-900 leading-tight">{item.player_name}</div>
+                                <div className="text-[10px] text-slate-500 font-semibold">{item.card_set}</div>
+                             </div>
+                          </div>
+                          <button onClick={() => setEditingLotStagingItems(prev => [...prev, item.id])} className="text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-2 py-1 rounded">
+                            + Add
+                          </button>
+                       </div>
+                   ))}
+                </div>
+              </div>
+            </div>
+            <div className="bg-slate-50 border-t border-slate-200 px-6 py-4 flex gap-3 shrink-0 rounded-b-2xl">
+                <button
+                  onClick={() => setShowEditLotModal(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-300 text-slate-600 font-bold text-sm hover:bg-slate-100 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveEditLot}
+                  disabled={isSavingLot}
+                  className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-md"
+                >
+                  {isSavingLot ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  Save Children
+                </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Pending Corrections Modal */}
       {(showCorrectionsModal && pendingCorrections.length > 0) && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-6">
@@ -1086,13 +1202,21 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                       )}
                     </div>
                     {(item as any).is_lot && (
-                      <button
-                        onClick={() => handleBreakLot(item.id)}
-                        disabled={breakingLotId === item.id}
-                        className="mt-1 text-[10px] font-black text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 border border-red-200 px-2 py-0.5 rounded transition-colors disabled:opacity-50"
-                      >
-                        {breakingLotId === item.id ? 'Breaking...' : '✕ Break Lot'}
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleEditLotOpen(item.id)}
+                          className="mt-1 text-[10px] font-black text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-0.5 rounded transition-colors"
+                        >
+                          ✎ Edit Lot
+                        </button>
+                        <button
+                          onClick={() => handleBreakLot(item.id)}
+                          disabled={breakingLotId === item.id}
+                          className="mt-1 text-[10px] font-black text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 border border-red-200 px-2 py-0.5 rounded transition-colors disabled:opacity-50"
+                        >
+                          {breakingLotId === item.id ? 'Breaking...' : '✕ Break Lot'}
+                        </button>
+                      </div>
                     )}
                   </div>
 
@@ -1128,7 +1252,26 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                   {/* Pricing row */}
                   <div className="flex items-end justify-between mt-auto pt-1">
                     <div>
-                      <span className="text-xl font-black text-slate-900">${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}</span>
+                      <div className="relative flex items-center -ml-1">
+                        <span className="absolute left-1 text-xl font-black text-slate-400 pointer-events-none">$</span>
+                        <input
+                          key={`price-${item.id}-${item.listed_price ?? item.avg_price ?? 0}`}
+                          type="number"
+                          step="0.01"
+                          defaultValue={(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}
+                          onBlur={async (e) => {
+                              const val = parseFloat(e.target.value);
+                              const currentVal = parseFloat((item.listed_price ?? item.avg_price ?? 0) as string);
+                              if (!isNaN(val) && val !== currentVal) {
+                                 await editCardAction(item.id, { listed_price: val });
+                              }
+                          }}
+                          onKeyDown={(e) => {
+                              if (e.key === 'Enter') e.currentTarget.blur();
+                          }}
+                          className="text-xl font-black text-slate-900 w-28 pl-5 py-0 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 outline-none transition-colors"
+                        />
+                      </div>
                       {item.cost_basis != null && <div className="text-xs text-emerald-600 font-bold uppercase tracking-wider mt-1">Cost: ${item.cost_basis.toFixed(2)}</div>}
                       {item.accepts_offers && <div className="text-xs text-indigo-500 font-bold uppercase tracking-wider">Takes Offers</div>}
                     </div>

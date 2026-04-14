@@ -19,6 +19,35 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
   const cashItems = cartItems.filter(i => !i.isTradeProposal);
   const tradeItems = cartItems.filter(i => i.isTradeProposal);
 
+  const earliestExpiry = cashItems
+    .filter(i => i.checkout_expires_at)
+    .map(i => new Date(i.checkout_expires_at!).getTime())
+    .sort((a, b) => a - b)[0];
+
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!earliestExpiry) {
+      setTimeLeft(null);
+      return;
+    }
+    const updateTime = () => {
+      const now = Date.now();
+      const diff = earliestExpiry - now;
+      setTimeLeft(diff > 0 ? diff : 0);
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, [earliestExpiry]);
+
+  const formatTime = (ms: number) => {
+    const totalSecs = Math.floor(ms / 1000);
+    const mins = Math.floor(totalSecs / 60);
+    const secs = totalSecs % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   useEffect(() => {
     if (isCartOpen && cartItems.length > 0) {
       const runPreFlight = async () => {
@@ -179,7 +208,19 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
                 <div className="bg-zinc-900/40 p-5 rounded-2xl border border-zinc-800/60 shadow-inner">
                   <div className="flex justify-between items-center mb-4">
                     <span className="text-zinc-400 font-bold uppercase tracking-widest text-[10px]">Cash Total</span>
-                    <span className="text-2xl font-black text-white tracking-tighter">${cartTotal.toFixed(2)}</span>
+                    <div className="flex items-center gap-3">
+                       {timeLeft !== null && timeLeft > 0 && (
+                          <span className={`${timeLeft < 120000 ? 'text-red-400 animate-pulse' : 'text-amber-400'} text-[11px] font-black bg-black/50 px-2 py-1 rounded shadow-inner border border-zinc-800`}>
+                             ⏳ {formatTime(timeLeft)}
+                          </span>
+                       )}
+                       {timeLeft === 0 && (
+                          <span className="text-red-500 animate-pulse text-[11px] font-black bg-black/50 px-2 py-1 rounded shadow-inner border border-zinc-800">
+                             EXPIRED
+                          </span>
+                       )}
+                       <span className="text-2xl font-black text-white tracking-tighter">${cartTotal.toFixed(2)}</span>
+                    </div>
                   </div>
 
                   {cartTotal < settings.cart_minimum && (

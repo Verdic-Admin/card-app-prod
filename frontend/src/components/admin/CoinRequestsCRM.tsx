@@ -1,12 +1,15 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createSupabaseClient } from '@/utils/supabase/client'
-import { fulfillCoinRequest } from '@/app/actions/coins'
-import { Database } from '@/types/database.types'
+import { fulfillCoinRequest, getPendingCoinRequests } from '@/app/actions/coins'
 
-type CoinRequest = Database['public']['Tables']['coin_requests']['Row'] & {
-  inventory: Database['public']['Tables']['inventory']['Row'] | null
+type CoinRequest = {
+  id: string;
+  item_id: string;
+  buyer_email: string;
+  status: string;
+  created_at: string;
+  inventory: any | null;
 }
 
 export function CoinRequestsCRM() {
@@ -15,13 +18,7 @@ export function CoinRequestsCRM() {
 
   useEffect(() => {
     async function loadRequests() {
-      const supabase = createSupabaseClient()
-      const { data } = await supabase
-        .from('coin_requests')
-        .select(`*, inventory(*)`)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false })
-      
+      const data = await getPendingCoinRequests()
       if (data) {
         setRequests(data as any)
       }

@@ -1,15 +1,8 @@
 import { ImageResponse } from 'next/og';
-import { createClient } from '@supabase/supabase-js';
+import { sql } from '@vercel/postgres';
+import { getStoreSettings } from '@/app/actions/settings';
 
 export const runtime = 'nodejs';
-
-// Lightweight admin client safe for edge (uses anon key — read-only public data only)
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -24,32 +17,38 @@ export async function GET(request: Request) {
   else if (team) label = team;
   else if (year) label = year;
 
-  // --- Try to pull a matching card image from Supabase ---
   let cardImageUrl: string | null = null;
   let siteName = 'Sports Card Store';
   let siteAuthor: string | null = null;
+  
   try {
-    const supabase = getSupabase();
-    let query = (supabase.from('inventory') as any)
-      .select('image_url')
-      .eq('status', 'available');
+    let queryStr = "SELECT image_url FROM inventory WHERE status = 'available' AND image_url IS NOT NULL";
+    let values: any[] = [];
+    
+    if (q) {
+      values.push(`%${q}%`);
+      queryStr += ` AND (player_name ILIKE $${values.length} OR team_name ILIKE $${values.length} OR card_set ILIKE $${values.length})`;
+    }
+    if (team) {
+      values.push(`%${team}%`);
+      queryStr += ` AND team_name ILIKE $${values.length}`;
+    }
+    if (year) {
+      values.push(`${year}%`);
+      queryStr += ` AND card_set ILIKE $${values.length}`;
+    }
+    queryStr += " LIMIT 1";
 
-    if (q)    query = query.or(`player_name.ilike.%${q}%,team_name.ilike.%${q}%,card_set.ilike.%${q}%`);
-    if (team) query = query.ilike('team_name', team);
-    if (year) query = query.eq('year', year);
+    const { rows } = await sql.query(queryStr, values);
+    if (rows && rows.length > 0 && rows[0].image_url) {
+      cardImageUrl = rows[0].image_url;
+    }
 
-    const { data } = await query.limit(1).single();
-    if (data?.image_url) cardImageUrl = data.image_url;
-
-    // Fetch branding from store_settings
-    const { data: brandData } = await (supabase.from('store_settings') as any)
-      .select('site_name, site_author')
-      .eq('id', 1)
-      .single();
+    const brandData = await getStoreSettings();
     if (brandData?.site_name) siteName = brandData.site_name;
     if (brandData?.site_author) siteAuthor = brandData.site_author;
-  } catch {
-    // Silently fall back to the brandmark-only design
+  } catch (e) {
+    console.error("OG Image generation DB error:", e);
   }
 
   const title = label ? `Shop ${label} Cards` : siteName;

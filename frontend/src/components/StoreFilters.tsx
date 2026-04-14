@@ -108,6 +108,24 @@ export function StoreFilters({ availableTeams }: StoreFiltersProps) {
            ))}
         </div>
       </div>
+      <div className="space-y-3">
+        <label className="text-sm font-bold text-zinc-400 tracking-wide uppercase">Quick Filters</label>
+        <div className="flex flex-wrap gap-2">
+          {['auto', 'relic', 'rookie'].map(type => {
+            const isActive = searchParams.get('type') === type;
+            const labels: Record<string, string> = { auto: '🖋️ Autographs', relic: '👕 Relics', rookie: '🌟 Rookies' };
+            return (
+              <button
+                key={type}
+                onClick={() => setFilter('type', isActive ? '' : type)}
+                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-colors shadow-sm ${isActive ? 'bg-cyan-900/40 text-cyan-400 border border-cyan-800/50' : 'bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-white border border-zinc-800'}`}
+              >
+                {labels[type]}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
 
 

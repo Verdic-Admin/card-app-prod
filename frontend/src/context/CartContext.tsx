@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { Database } from '@/types/database.types';
-import { createSupabaseClient } from '@/utils/supabase/client';
 
 type InventoryItem = Database['public']['Tables']['inventory']['Row'];
 
@@ -121,11 +120,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const purchaseItems = cartItems.filter(i => !i.isTradeProposal);
     if (purchaseItems.length === 0) return true;
 
-    const supabase = createSupabaseClient();
-    const { data } = await (supabase as any)
-      .from('inventory')
-      .select('id, status, checkout_expires_at')
-      .in('id', purchaseItems.map(i => i.id));
+    const data = await import('@/app/actions/checkout').then(m => m.validateCartItems(purchaseItems.map(i => i.id)));
 
     if (data) {
       const now = new Date();

@@ -1,5 +1,6 @@
-import { createClient } from '@/utils/supabase/server'
+import { sql } from '@vercel/postgres';
 import Link from 'next/link'
+import { LiveAuctionGrid } from '@/components/LiveAuctionGrid';
 
 export const dynamic = 'force-dynamic'
 
@@ -19,23 +20,13 @@ function getEmbedUrl(url: string | null) {
 }
 
 export default async function LiveAuctionPage() {
-  const supabase = await createClient()
-
-  const { data: settings } = await (supabase as any)
-    .from('store_settings')
-    .select('live_stream_url')
-    .eq('id', 1)
-    .single()
+  const { rows: storeRows } = await sql`SELECT live_stream_url FROM store_settings WHERE id = 1`;
+  const settings = storeRows[0] || {};
 
   const liveStreamUrl = settings?.live_stream_url
   const embedUrl = getEmbedUrl(liveStreamUrl)
 
-  const { data: items } = await (supabase as any)
-    .from('inventory')
-    .select('*')
-    .eq('is_auction', true)
-    .eq('auction_status', 'live')
-    .order('player_name', { ascending: true })
+  const { rows: items } = await sql`SELECT * FROM inventory WHERE is_auction = true AND auction_status = 'live' ORDER BY player_name ASC`;
 
   return (
     <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -72,51 +63,7 @@ export default async function LiveAuctionPage() {
 
       <div>
         <h2 className="text-2xl font-bold text-white mb-6 border-b border-zinc-800 pb-2">Currently on the Block</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {(items || []).map((item: any) => (
-            <div key={item.id} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-xl transform hover:-translate-y-1 transition-all duration-300">
-              <div className="relative aspect-[3/4] bg-zinc-950 flex items-center justify-center overflow-hidden">
-                {item.is_verified_flip && item.video_url ? (
-                  <>
-                    <video 
-                      autoPlay 
-                      loop 
-                      muted 
-                      playsInline 
-                      className="w-full h-full object-contain"
-                      src={item.video_url}
-                    ></video>
-                    <div className="absolute top-2 left-2 bg-zinc-950/80 backdrop-blur-md border border-emerald-500/30 text-emerald-400 text-[10px] font-black px-2 py-1 rounded shadow drop-shadow-md flex items-center gap-1 z-10">
-                       PlayerIndex Certified ✓
-                    </div>
-                  </>
-                ) : (
-                  <img src={item.image_url} alt={item.player_name} className="w-full h-full object-contain" />
-                )}
-              </div>
-              <div className="p-4">
-                <h3 className="font-bold text-lg text-white leading-tight">{item.player_name}</h3>
-                <p className="text-zinc-400 text-sm mb-3">{item.card_set}</p>
-                <div className="text-center font-mono font-black text-2xl text-cyan-400 bg-zinc-950 py-2 rounded mb-4 shadow-inner">
-                  ${item.current_bid || item.listed_price || '0.00'}
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => alert('Cash bidding coming soon!')} className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-2 rounded text-sm transition-colors shadow-lg">
-                    Bid Cash
-                  </button>
-                  <button onClick={() => alert('Trade offers coming soon!')} className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-2 rounded text-sm transition-colors shadow-lg">
-                    Offer Trade
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-          {!items || items.length === 0 ? (
-             <div className="col-span-full text-zinc-500 text-center py-10 bg-zinc-900/50 rounded-xl border border-zinc-800/50">
-               No items currently live on the block.
-             </div>
-          ) : null}
-        </div>
+        <LiveAuctionGrid initialItems={items as any} />
       </div>
     </div>
   )

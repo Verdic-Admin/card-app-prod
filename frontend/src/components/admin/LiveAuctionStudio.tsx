@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { AuctionQRCode } from './AuctionQRCode'
 
 interface LiveAuctionStudioProps {
   initialItems: any[]
@@ -12,38 +13,45 @@ export function LiveAuctionStudio({ initialItems, initialStreamUrl, initialProje
   const [streamUrl, setStreamUrl] = useState(initialStreamUrl || '')
   const [timeframe, setTimeframe] = useState(initialProjectionTimeframe || '90-Day')
   const [isSavingTimeframe, setIsSavingTimeframe] = useState(false)
+  const [showQR, setShowQR] = useState(true)
 
   // Status arrays
   const pendingItems = initialItems.filter(i => i.is_auction && i.auction_status === 'pending')
 
   const handleSaveStream = async () => {
-    const admin = await import('@/utils/supabase/client').then(m => m.createSupabaseClient())
-    await admin.from('store_settings').update({ live_stream_url: streamUrl }).eq('id', 1)
+    await import('@/app/actions/inventory').then(m => m.updateLiveStreamUrl(streamUrl))
     alert("Live stream updated!")
   }
 
   const handleSaveTimeframe = async (val: string) => {
     setIsSavingTimeframe(true)
     setTimeframe(val)
-    const admin = await import('@/utils/supabase/client').then(m => m.createSupabaseClient())
-    await admin.from('store_settings').update({ projection_timeframe: val }).eq('id', 1)
+    await import('@/app/actions/inventory').then(m => m.updateProjectionTimeframe(val))
     setIsSavingTimeframe(false)
   }
 
   const handleGenBatch = async () => {
     const ids = pendingItems.map(i => i.id)
     if (ids.length > 0) {
-      const admin = await import('@/utils/supabase/client').then(m => m.createSupabaseClient())
-      const updates = ids.map(id => ({ id, verification_code: Math.random().toString(36).substring(2, 10).toUpperCase() }))
-      await Promise.all(updates.map(u => admin.from('inventory').update({ verification_code: u.verification_code }).eq('id', u.id)))
+      await import('@/app/actions/inventory').then(m => m.generateBatchCodes(ids))
       alert("Batch codes generated. Please refresh to view.")
     }
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 relative">
+      {/* Floating QR Modal */}
+      <div className={`fixed bottom-8 right-8 z-50 transition-all ${showQR ? 'scale-100 opacity-100' : 'scale-95 opacity-0 pointer-events-none'}`}>
+        <AuctionQRCode isVisible={true} toggleVisibility={() => setShowQR(false)} />
+      </div>
+
       <div className="bg-white text-slate-900 p-6 rounded-xl shadow-sm border border-slate-200">
-        <h2 className="text-xl font-bold mb-4">Live Stream Control</h2>
+        <div className="flex items-center justify-between mb-4">
+           <h2 className="text-xl font-bold">Live Stream Control</h2>
+           <button onClick={() => setShowQR(!showQR)} className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow-sm transition-colors">
+              Toggle Live QR
+           </button>
+        </div>
         <div className="flex flex-col gap-4">
           <div className="flex gap-4">
             <input 
@@ -128,27 +136,7 @@ export function LiveAuctionStudio({ initialItems, initialStreamUrl, initialProje
                   onSubmit={async e => {
                     e.preventDefault()
                     const fd = new FormData(e.currentTarget)
-                    const rp = fd.get('reservePrice') as string
-                    const et = fd.get('endTime') as string
-                    const desc = fd.get('description') as string
-                    const file = fd.get('coinedImage') as File
-                    
-                    let coinedUrl = undefined
-                    if (file && file.size > 0) {
-                      const admin = await import('@/utils/supabase/client').then(m => m.createSupabaseClient())
-                      const ext = file.name.split('.').pop()
-                      const fName = `auction-coin-${Date.now()}.${ext}`
-                      await admin.storage.from('card-images').upload(fName, file)
-                      coinedUrl = admin.storage.from('card-images').getPublicUrl(fName).data.publicUrl
-                    }
-                    
-                    await import('@/app/actions/inventory').then(m => m.updateStagedAuction(
-                      item.id,
-                      rp ? Number(rp) : null,
-                      et || null,
-                      desc || null,
-                      coinedUrl
-                    ))
+                    await import('@/app/actions/inventory').then(m => m.updateStagedAuction(item.id, fd))
                     alert("Draft saved!")
                   }}
                   className="flex flex-col gap-2"

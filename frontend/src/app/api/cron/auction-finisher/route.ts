@@ -1,0 +1,73 @@
+import { sql } from '@vercel/postgres';
+import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
+
+export const dynamic = 'force-dynamic';
+
+export async function GET(request: Request) {
+  try {
+    const authHeader = request.headers.get('authorization');
+    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+      return new Response('Unauthorized', { status: 401 });
+    }
+
+    console.log("-> Running Auction Finisher Cron...");
+
+    const { rows: expiredItems } = await sql`
+      SELECT id, current_bid, auction_reserve_price 
+      FROM inventory 
+      WHERE is_auction = true 
+        AND auction_status = 'live' 
+        AND auction_end_time < NOW()
+    `;
+
+    if (!expiredItems || expiredItems.length === 0) {
+      return NextResponse.json({ success: true, message: 'No expired auctions to process.' });
+    }
+
+    let soldCount = 0;
+    let failedCount = 0;
+
+    for (const item of expiredItems) {
+       const reserve = item.auction_reserve_price || 0;
+       const bid = item.current_bid || 0;
+
+       if (bid >= reserve) {
+          // Reserve met
+          await sql`
+            UPDATE inventory 
+            SET status = 'sold',
+                listed_price = ${bid},
+                auction_status = 'ended'
+            WHERE id = ${item.id}
+          `;
+          soldCount++;
+       } else {
+          // Reserve not met
+          await sql`
+            UPDATE inventory 
+            SET is_auction = false,
+                auction_status = 'ended',
+                status = 'available'
+            WHERE id = ${item.id}
+          `;
+          failedCount++;
+       }
+    }
+
+    revalidatePath('/');
+    revalidatePath('/admin');
+    revalidatePath('/auction');
+
+    return NextResponse.json({ 
+      success: true, 
+      processed: expiredItems.length,
+      sold: soldCount,
+      failed_reserve: failedCount 
+    });
+
+  } catch (error: any) {
+    console.error("Auction Finisher Cron Error:", error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}

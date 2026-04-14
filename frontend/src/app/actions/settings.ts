@@ -1,6 +1,6 @@
+import { sql } from '@vercel/postgres';
 'use server'
 
-import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 
 export interface StoreSettings {
@@ -21,16 +21,13 @@ export interface StoreSettings {
 }
 
 export async function getStoreSettings(): Promise<StoreSettings> {
-    const supabase = await createClient()
-    const fallbackSupabase = supabase as any
-    
-    const { data, error } = await fallbackSupabase
-        .from('store_settings')
-        .select('*')
-        .eq('id', 1)
-        .single()
+    let data;
+    try {
+        const { rows } = await sql`SELECT * FROM store_settings WHERE id = 1`;
+        data = rows[0];
+    } catch { }
 
-    if (error || !data) {
+    if (!data) {
         // Fallbacks if the DB call fails or row doesn't exist yet
         return {
             cart_minimum: 20.00,
@@ -54,25 +51,20 @@ export async function getStoreSettings(): Promise<StoreSettings> {
 }
 
 export async function updateStoreSettings(newSettings: Partial<StoreSettings>) {
-    const supabase = await createClient()
-    
     // Security check: ensure the user is an admin
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-        throw new Error("Unauthorized to change settings")
+    if (!process.env.PLAYERINDEX_API_KEY) {
+        throw new Error("Unauthorized to change settings: Missing API Key");
     }
 
-    const fallbackSupabase = supabase as any
-    const { error } = await fallbackSupabase
-        .from('store_settings')
-        .update({
-            ...newSettings,
-            updated_at: new Date().toISOString(),
-        })
-        .eq('id', 1)
-
-    if (error) {
-        console.error("Error updating settings:", error)
+    try {
+        const keys = Object.keys(newSettings);
+        if (keys.length > 0) {
+           for (const [key, value] of Object.entries(newSettings)) {
+               await sql.query(`UPDATE store_settings SET \${key} = $1, updated_at = NOW() WHERE id = 1`, [value]);
+           }
+        }
+    } catch(err) {
+        console.error("Error updating settings:", err)
         throw new Error("Failed to save settings.")
     }
 

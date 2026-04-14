@@ -1,10 +1,14 @@
+import { sql } from '@vercel/postgres';
 'use server'
 
-import { createClient, createAdminClient } from '@/utils/supabase/server'
+
+export async function validateCartItems(itemIds: string[]) {
+  if (!itemIds || itemIds.length === 0) return [];
+  const { rows } = await sql`SELECT id, status, checkout_expires_at FROM inventory WHERE id = ANY(${itemIds as any}::uuid[])`;
+  return rows;
+}
 
 export async function createPayPalOrder(itemIds: string[]) {
-  const supabase = await createClient()
-  const admin = createAdminClient()
 
   if (!itemIds || itemIds.length === 0) {
     throw new Error('No items provided for checkout.')
@@ -13,26 +17,34 @@ export async function createPayPalOrder(itemIds: string[]) {
   // ── Atomic Inventory Locking ──────────────────────────────────────────────
   const tenMinsFromNow = new Date(Date.now() + 10 * 60000).toISOString();
   
-  // Attempt to lock ONLY items that are fully available OR have expired locks
-  const { data: lockedItems, error: lockErr } = await (admin.from('inventory') as any)
-    .update({ status: 'pending_checkout', checkout_expires_at: tenMinsFromNow })
-    .in('id', itemIds)
-    // Supabase standard syntax for nested filters
-    .or(`status.eq.available,and(status.eq.pending_checkout,checkout_expires_at.lt.${new Date().toISOString()})`)
-    .select('id, listed_price, avg_price, is_lot, lot_id');
-
-  if (lockErr || !lockedItems) {
-    throw new Error('Failed to query inventory prices.');
+  const { rows: testRows } = await sql`
+      SELECT id 
+      FROM inventory 
+      WHERE id = ANY(${itemIds as any}::uuid[]) 
+      AND (
+         status = 'available' 
+         OR (status = 'pending_checkout' AND checkout_expires_at < NOW())
+      )
+  `;
+  
+  if (testRows.length !== itemIds.length) {
+     throw new Error('One or more items in your cart are no longer available.');
   }
+
+  // Atomically lock them and fetch fields
+  const { rows: lockedItems } = await sql`
+      UPDATE inventory 
+      SET status = 'pending_checkout', checkout_expires_at = ${tenMinsFromNow}
+      WHERE id = ANY(${itemIds as any}::uuid[])
+      RETURNING id, listed_price, avg_price, is_lot, lot_id
+  `;
 
   // If the number of successfully locked rows doesn't match the requested items,
   // it means another user bought/locked one of them first.
   if (lockedItems.length !== itemIds.length) {
     // Release any items we *did* manage to lock in this partial batch to avoid grieving
     if (lockedItems.length > 0) {
-       await (admin.from('inventory') as any)
-          .update({ status: 'available', checkout_expires_at: null })
-          .in('id', lockedItems.map((i: any) => i.id));
+       await sql`UPDATE inventory SET status = 'available', checkout_expires_at = null WHERE id = ANY(${lockedItems.map((i: any) => i.id) as any}::uuid[])`;
     }
     throw new Error('One or more items in your cart are no longer available.');
   }
@@ -44,9 +56,7 @@ export async function createPayPalOrder(itemIds: string[]) {
   // Sold status belongs ONLY inside capturePayPalOrder now!
   const lotIds = purchaseItems.filter((i: any) => i.is_lot).map((i: any) => i.id)
   if (lotIds.length > 0) {
-    await (admin.from('inventory') as any)
-      .update({ status: 'pending_checkout', checkout_expires_at: tenMinsFromNow })
-      .in('lot_id', lotIds)
+    await sql`UPDATE inventory SET status = 'pending_checkout', checkout_expires_at = ${tenMinsFromNow} WHERE lot_id = ANY(${lotIds as any}::uuid[])`;
   }
 
   // Case B: Buying an individual card that belongs to a lot → lock the parent lot
@@ -55,9 +65,7 @@ export async function createPayPalOrder(itemIds: string[]) {
     .map((i: any) => i.lot_id as string)
   const uniqueParentLotIds = [...new Set(parentLotIds)]
   if (uniqueParentLotIds.length > 0) {
-    await (admin.from('inventory') as any)
-      .update({ status: 'pending_checkout', checkout_expires_at: tenMinsFromNow })
-      .in('id', uniqueParentLotIds)
+    await sql`UPDATE inventory SET status = 'pending_checkout', checkout_expires_at = ${tenMinsFromNow} WHERE id = ANY(${uniqueParentLotIds as any}::uuid[])`;
   }
   // ── End Failsafe ────────────────────────────────────────────────────────
 
@@ -66,7 +74,8 @@ export async function createPayPalOrder(itemIds: string[]) {
     subtotal += Number(item.listed_price ?? item.avg_price ?? 0);
   }
 
-  const { data: settings } = await (admin.from('store_settings') as any).select('shipping_fee, free_shipping_threshold').eq('id', 1).single();
+  const { rows: settingsRows } = await sql`SELECT shipping_fee, free_shipping_threshold FROM store_settings WHERE id = 1`;
+  const settings = settingsRows[0] || {};
   const SHIPPING_THRESHOLD = settings?.free_shipping_threshold ?? 25.00;
   const SHIPPING_FEE = settings?.shipping_fee ?? 4.00;
   const shipping = subtotal < SHIPPING_THRESHOLD ? SHIPPING_FEE : 0.00;
@@ -131,7 +140,6 @@ export async function createPayPalOrder(itemIds: string[]) {
 }
 
 export async function capturePayPalOrder(orderId: string, itemIds: string[]) {
-  const admin = createAdminClient()
   const clientId = process.env.PAYPAL_CLIENT_ID;
   const clientSecret = process.env.PAYPAL_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
@@ -174,22 +182,16 @@ export async function capturePayPalOrder(orderId: string, itemIds: string[]) {
   // ── Finalize Inventory (Mark Sold) ──────────────────────────────────────
   if (itemIds && itemIds.length > 0) {
     // 1. Mark the actual items sold
-    await (admin.from('inventory') as any)
-      .update({ status: 'sold', sold_at: new Date().toISOString() })
-      .in('id', itemIds);
+    await sql`UPDATE inventory SET status = 'sold', sold_at = NOW() WHERE id = ANY(${itemIds as any}::uuid[])`;
       
     // 2. Fetch those items to find linked lots
-    const { data: purchaseItems } = await admin.from('inventory')
-      .select('id, is_lot, lot_id')
-      .in('id', itemIds);
+    const { rows: purchaseItems } = await sql`SELECT id, is_lot, lot_id FROM inventory WHERE id = ANY(${itemIds as any}::uuid[])`;
       
     if (purchaseItems) {
       // Find children of lots we bought
       const lotIds = purchaseItems.filter(i => i.is_lot).map(i => i.id)
       if (lotIds.length > 0) {
-        await (admin.from('inventory') as any)
-          .update({ status: 'sold', sold_at: new Date().toISOString() })
-          .in('lot_id', lotIds)
+          await sql`UPDATE inventory SET status = 'sold', sold_at = NOW() WHERE lot_id = ANY(${lotIds as any}::uuid[])`;
       }
 
       // Find parent lots of individual children we bought
@@ -198,9 +200,7 @@ export async function capturePayPalOrder(orderId: string, itemIds: string[]) {
         .map(i => i.lot_id as string)
       const uniqueParentLotIds = [...new Set(parentLotIds)]
       if (uniqueParentLotIds.length > 0) {
-        await (admin.from('inventory') as any)
-          .update({ status: 'sold', sold_at: new Date().toISOString() })
-          .in('id', uniqueParentLotIds)
+          await sql`UPDATE inventory SET status = 'sold', sold_at = NOW() WHERE id = ANY(${uniqueParentLotIds as any}::uuid[])`;
       }
     }
   }

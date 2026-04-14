@@ -24,7 +24,7 @@ export function TradeLeadsCRM() {
     setIsLoading(true)
     try {
        const data = await getAllTradeOffers()
-       setOffers(data || [])
+       setOffers((data || []) as TradeOffer[])
     } catch(e) {
        console.error(e)
     } finally {

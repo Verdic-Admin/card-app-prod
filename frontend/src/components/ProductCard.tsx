@@ -5,6 +5,7 @@ import { useCart } from '@/context/CartContext';
 import { useState } from 'react';
 import { TradeModal } from '@/components/TradeModal';
 import Link from 'next/link';
+import { MarketSparkline } from '@/components/MarketSparkline';
 
 type InventoryItem = Database['public']['Tables']['inventory']['Row'];
 
@@ -116,26 +117,36 @@ export function ProductCard({ item }: ProductCardProps) {
                     </span>
                   )}
                 </div>
-                <span className="font-black text-3xl text-white tracking-tighter">
-                  ${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="font-black text-3xl text-white tracking-tighter">
+                    ${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}
+                  </span>
+                  {(item as any).trend_data && Array.isArray((item as any).trend_data) && (item as any).trend_data.length > 0 && (
+                    <MarketSparkline 
+                       data={(item as any).trend_data} 
+                       playerIndexUrl={(item as any).player_index_url || '#'} 
+                    />
+                  )}
+                </div>
                 {item.listed_price && item.listed_price < (item as any).oracle_projection && (
                   <span className="text-xs font-bold text-emerald-400 mt-0.5">
                     You save ${((item as any).oracle_projection - item.listed_price).toFixed(2)}
                   </span>
                 )}
-                <a href="https://playerindexdata.com" target="_blank" rel="noopener noreferrer" className="text-[10px] text-cyan-400 hover:text-cyan-300 font-semibold tracking-wide mt-1 block w-fit">
-                  As priced by PlayerIndexData.com
-                </a>
               </div>
             ) : (
               <div className="flex flex-col">
-                <span className="font-black text-3xl text-white tracking-tighter">
-                  ${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}
-                </span>
-                <a href="https://playerindexdata.com" target="_blank" rel="noopener noreferrer" className="text-[10px] text-cyan-400 hover:text-cyan-300 font-semibold tracking-wide mt-1 block w-fit">
-                  As priced by PlayerIndexData.com
-                </a>
+                <div className="flex items-center gap-2">
+                  <span className="font-black text-3xl text-white tracking-tighter">
+                    ${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}
+                  </span>
+                  {(item as any).trend_data && Array.isArray((item as any).trend_data) && (item as any).trend_data.length > 0 && (
+                    <MarketSparkline 
+                       data={(item as any).trend_data} 
+                       playerIndexUrl={(item as any).player_index_url || '#'} 
+                    />
+                  )}
+                </div>
               </div>
             )}
             {isAvailable && (

@@ -1,7 +1,14 @@
 'use server'
 
-import { createClient } from '@/utils/supabase/server'
 
+import { sql } from '@vercel/postgres'
+import { vercelBatchUpdatePrices } from '@/app/actions/inventory'
+
+export const ALLOWED_COLUMNS = [
+  'player_name', 'card_set', 'card_number', 'insert_name', 
+  'parallel_name', 'print_run', 'listed_price', 'market_price',
+  'image_url', 'back_image_url'
+];
 // Helper to fix ALL CAPS names from OCR since the API catalog matcher is case-sensitive
 function toTitleCase(str: string) {
   if (!str) return "";
@@ -12,102 +19,84 @@ function toTitleCase(str: string) {
 }
 
 export async function syncInventoryWithOracle() {
-  const supabase = await createClient()
-
-  // 1. Fetch Settings from environment variables
-  const oracle_api_url = process.env.PLAYERINDEX_API_URL || process.env.ORACLE_API_URL || 'https://api.playerindexdata.com/fintech'
-  const oracle_api_key = process.env.PLAYERINDEX_API_KEY || process.env.ORACLE_API_KEY
-
-  if (!oracle_api_url || !oracle_api_key) {
-    throw new Error('Oracle API credentials not configured in settings (.env.local).')
-  }
-
-  // Fetch discount percentage
-  const { data: settings } = await (supabase as any).from('store_settings').select('oracle_discount_percentage').eq('id', 1).single()
-  const discountRate = settings?.oracle_discount_percentage || 0;
-
-  // 2. Fetch Inventory
-  console.log("-> Fetching active inventory...");
-  const { data: inventory, error: inventoryError } = await supabase
-    .from('inventory')
-    .select('*')
-    .eq('status', 'available')
-
-  if (inventoryError) {
-    throw new Error('Failed to fetch inventory: ' + inventoryError.message)
-  }
-
+  console.log("-> Fetching active inventory from Vercel Postgres...");
+  const { rows: inventory } = await sql`SELECT id FROM inventory WHERE status = 'available'`;
+  
   if (!inventory || inventory.length === 0) {
     console.log("-> 0 items found, aborting.");
-    return { success: true, count: 0, message: 'No available inventory to sync.' }
+    return { success: true, count: 0, message: 'No available inventory to sync.' };
   }
 
-  console.log(`-> Found ${inventory.length} items to sync!`);
-  let successCount = 0
+  const cardIds = inventory.map((i: any) => i.id);
 
-  // 3. The Sync Loop
-  for (const item of (inventory as any[])) {
-    try {
-      console.log(`-> Processing ${item.player_name}...`);
-      const payload = {
-        player_name: toTitleCase(String(item.player_name || "")),
-        card_set: String(item.card_set || ""),
-        card_number: String(item.card_number || ""),
-        insert_name: String(item.insert_name || "Base"),
-        parallel_name: String(item.parallel_name || "Base"),
-        attributes: [item.insert_name, item.parallel_name, item.parallel_insert_type].filter(v => v && v.toLowerCase() !== 'base').join(' '),
-        is_auto: Boolean(item.is_auto || false),
-        is_relic: Boolean(item.is_relic || false),
-        is_rookie: Boolean(item.is_rookie || false),
-        print_run: item.print_run ? Number(item.print_run) : undefined,
-        discount_rate: discountRate,
-        skip_fuzzy: true
-      }
-      
-      console.log(`-> Sending payload to ${oracle_api_url}/api/v1/calculate:`, payload);
-
-      const res = await fetch(`${oracle_api_url}/api/v1/calculate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-Key': oracle_api_key
-        },
-        body: JSON.stringify(payload)
-      })
-
-      if (!res.ok) {
-        console.error(`Oracle API returned ${res.status} for item ${item.id}`)
-        continue
-      }
-
-      const data = await res.json()
-      
-      if (data.target_price && data.target_price > 0) {
-        const new_price = data.target_price * (1 - (discountRate / 100))
-
-        const { error: updateError } = await supabase
-          .from('inventory')
-          // @ts-ignore
-          .update({ listed_price: new_price, oracle_projection: data.target_price, oracle_trend_percentage: data.trend_percentage || null })
-          .eq('id', item.id)
-
-        if (!updateError) {
-          successCount++
-        } else {
-          console.error(`Failed to update item ${item.id} price in Supabase:`, updateError)
-        }
-      }
-
-    } catch (err) {
-      console.error(`Error processing item ${item.id}:`, err)
+  // Fetch discount percentage from shop_config
+  let discountRate = 0;
+  try {
+    const { rows: configRows } = await sql`SELECT discount_rate FROM shop_config LIMIT 1`;
+    if (configRows.length > 0) {
+      discountRate = parseFloat(configRows[0].discount_rate) || 0;
     }
+  } catch (e) {
+    console.warn("Could not fetch discount_rate", e);
   }
 
-  return { success: true, count: successCount }
+  console.log(`-> Batching ${cardIds.length} items to shop-api...`);
+
+  const batchPriceUrl = process.env.NEXT_PUBLIC_SHOP_API_URL || 'http://localhost:8000/fintech/shop-api/batch-price';
+  const apiKey = process.env.PLAYERINDEX_API_KEY || '';
+
+  const res = await fetch(batchPriceUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-API-KEY': apiKey
+    },
+    body: JSON.stringify({ card_ids: cardIds, discount_rate: discountRate })
+  });
+
+  if (!res.ok) {
+    if (res.status === 402) {
+      console.error("Payment Required (402) - credits exhausted.");
+      return { success: false, message: "API Credits exhausted. Please refill.", count: 0 };
+    }
+    throw new Error(`Failed to batch price items. Status: ${res.status}`);
+  }
+
+  const data = await res.json();
+  if (!data.items) {
+    throw new Error('Invalid response from shop-api batch-price endpoint.');
+  }
+
+  const updates = data.items.map((item: any) => ({
+    id: item.card_id,
+    listed_price: item.listed_price,
+    market_price: item.oracle_value,
+    trend_data: item.trend_points || [],
+    player_index_url: item.player_index_url || ''
+  }));
+
+  console.log(`-> Performing single atomic DB update for ${updates.length} items...`);
+  await vercelBatchUpdatePrices(updates);
+
+  console.log(`-> Checking Lot-Aware Pricing Validity...`);
+  await sql`
+    UPDATE inventory i
+    SET needs_price_approval = true
+    FROM (
+      SELECT parent.id as parent_id, parent.listed_price as parent_listed_price, COALESCE(SUM(c.market_price), 0) as children_sum
+      FROM inventory parent
+      JOIN inventory c ON c.lot_id = parent.id
+      WHERE parent.is_lot = true
+      GROUP BY parent.id, parent.listed_price
+    ) as agg
+    WHERE i.id = agg.parent_id AND agg.children_sum < agg.parent_listed_price;
+  `;
+
+  return { success: true, count: updates.length };
 }
 
 export async function syncSingleItemWithOracle(id: string) {
-  const supabase = await createClient()
+
 
   const oracle_api_url = process.env.PLAYERINDEX_API_URL || process.env.ORACLE_API_URL || 'https://api.playerindexdata.com/fintech'
   const oracle_api_key = process.env.PLAYERINDEX_API_KEY || process.env.ORACLE_API_KEY
@@ -117,17 +106,19 @@ export async function syncSingleItemWithOracle(id: string) {
   }
 
   // Fetch discount percentage
-  const { data: settings } = await (supabase as any).from('store_settings').select('oracle_discount_percentage').eq('id', 1).single()
+  const { rows: settingsRows } = await sql`SELECT oracle_discount_percentage FROM store_settings WHERE id = 1`; const settings = settingsRows[0]
   const discountRate = settings?.oracle_discount_percentage || 0;
 
-  const { data: item, error: inventoryError } = await supabase
-    .from('inventory')
-    .select('*')
-    .eq('id', id)
-    .single()
+  let item, inventoryError;
+  try {
+    const { rows } = await sql`SELECT * FROM inventory WHERE id = ${id}`
+    item = rows[0]
+  } catch (err) {
+    inventoryError = err
+  }
 
   if (inventoryError || !item) {
-    throw new Error('Failed to fetch item: ' + (inventoryError?.message || 'Item not found'))
+    throw new Error('Failed to fetch item: ' + ((inventoryError as any)?.message || 'Item not found'))
   }
 
   try {
@@ -164,11 +155,7 @@ export async function syncSingleItemWithOracle(id: string) {
     if (data.target_price && data.target_price > 0) {
       const new_price = data.target_price * (1 - (discountRate / 100))
 
-      const { error: updateError } = await supabase
-        .from('inventory')
-        // @ts-ignore
-        .update({ listed_price: new_price, oracle_projection: data.target_price, oracle_trend_percentage: data.trend_percentage || null })
-        .eq('id', (item as any).id)
+      let updateError; try { await sql`UPDATE inventory SET listed_price = ${new_price}, oracle_projection = ${data.target_price}, oracle_trend_percentage = ${data.trend_percentage || null} WHERE id = ${item.id}` } catch (err) { updateError = err }
 
       if (!updateError) {
         return { success: true, message: `Repriced to $${new_price.toFixed(2)}`, new_price }
@@ -185,7 +172,7 @@ export async function syncSingleItemWithOracle(id: string) {
 }
 
 export async function evaluateItemWithOracle(payload: any) {
-  const supabase = await createClient()
+
   const oracle_api_url = process.env.ORACLE_API_URL || 'https://api.playerindexdata.com/fintech'
   const oracle_api_key = process.env.PLAYERINDEX_API_KEY || process.env.ORACLE_API_KEY
 
@@ -194,7 +181,7 @@ export async function evaluateItemWithOracle(payload: any) {
   }
 
   // Fetch discount percentage
-  const { data: settings } = await (supabase as any).from('store_settings').select('oracle_discount_percentage').eq('id', 1).single()
+  const { rows: settingsRows } = await sql`SELECT oracle_discount_percentage FROM store_settings WHERE id = 1`; const settings = settingsRows[0]
   const discountRate = settings?.oracle_discount_percentage || 0;
 
   try {
@@ -343,32 +330,32 @@ export async function getBatchOraclePrices(cards: any[]) {
 }
 
 export async function applyOracleDiscount(id: string) {
-  const supabase = await createClient()
-  const { data: settings } = await (supabase as any).from('store_settings').select('oracle_discount_percentage').eq('id', 1).single()
+
+  const { rows: settingsRows } = await sql`SELECT oracle_discount_percentage FROM store_settings WHERE id = 1`; const settings = settingsRows[0]
   const discountRate = settings?.oracle_discount_percentage || 0;
   
-  const { data: item } = await supabase.from('inventory').select('oracle_projection').eq('id', id).single()
+  const { rows } = await sql`SELECT oracle_projection FROM inventory WHERE id = ${id}`; const item = rows[0];
   // @ts-ignore
   if (item?.oracle_projection) {
        const new_price = item.oracle_projection * (1 - (discountRate / 100))
-       await (supabase.from('inventory') as any).update({ listed_price: new_price }).eq('id', id)
+       await sql`UPDATE inventory SET listed_price = ${new_price} WHERE id = ${id}`
        return { success: true, new_price }
   }
   return { success: false, message: 'No oracle projection' }
 }
 
 export async function applyOracleDiscountAll() {
-  const supabase = await createClient()
-  const { data: settings } = await (supabase as any).from('store_settings').select('oracle_discount_percentage').eq('id', 1).single()
+
+  const { rows: settingsRows } = await sql`SELECT oracle_discount_percentage FROM store_settings WHERE id = 1`; const settings = settingsRows[0]
   const discountRate = settings?.oracle_discount_percentage || 0;
   
-  const { data: items } = await (supabase as any).from('inventory').select('id, oracle_projection').not('oracle_projection', 'is', null)
+  const { rows: items } = await sql`SELECT id, oracle_projection FROM inventory WHERE oracle_projection IS NOT NULL`
   let count = 0
   if (items) {
       for (const item of items) {
           if (item.oracle_projection) {
               const new_price = item.oracle_projection * (1 - (discountRate / 100))
-              await (supabase.from('inventory') as any).update({ listed_price: new_price }).eq('id', item.id)
+              await sql`UPDATE inventory SET listed_price = ${new_price} WHERE id = ${item.id}`
               count++
           }
       }
@@ -377,19 +364,27 @@ export async function applyOracleDiscountAll() {
 }
 
 export async function applyCorrection(id: string, item: any) {
-  const supabase = await createClient()
-  await (supabase.from('inventory') as any).update({ ...item, needs_correction: false }).eq('id', id)
+  const keys = Object.keys(item);
+  if (keys.length > 0) {
+    for (const k of keys) {
+      if (!ALLOWED_COLUMNS.includes(k)) {
+        throw new Error(`Security Violation: Unauthorized column update detected - ${k}`);
+      }
+    }
+    for (const [k, v] of Object.entries(item)) {
+      await sql.query(`UPDATE inventory SET ${k} = $1 WHERE id = $2`, [v, id]);
+    }
+  }
+  await sql`UPDATE inventory SET needs_correction = false WHERE id = ${id}`;
   return { success: true }
 }
 
 export async function approvePriceOnly(id: string, item: any) {
-  const supabase = await createClient()
-  await (supabase.from('inventory') as any).update({ listed_price: item.listed_price, needs_price_approval: false }).eq('id', id)
+  await sql`UPDATE inventory SET listed_price = ${item.listed_price}, needs_price_approval = false WHERE id = ${id}`
   return { success: true }
 }
 
 export async function denyCorrection(id: string) {
-  const supabase = await createClient()
-  await (supabase.from('inventory') as any).update({ needs_correction: false, needs_price_approval: false }).eq('id', id)
+  await sql`UPDATE inventory SET needs_correction = false, needs_price_approval = false WHERE id = ${id}`
   return { success: true }
 }

@@ -6,16 +6,27 @@ export async function proxy(request: NextRequest) {
     request,
   })
 
+  // 1. API Key Setup Check
+  const apiKey = process.env.PLAYERINDEX_API_KEY;
+  if (request.nextUrl.pathname.startsWith('/admin')) {
+    if (!apiKey) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/setup';
+      return NextResponse.redirect(url);
+    }
+  }
+
+  // 2. Supabase Auth Check
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://localhost:54321',
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'test',
     {
       cookies: {
         getAll() {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({
             request,
           })
