@@ -44,7 +44,7 @@ export default async function RootLayout({
       data-theme={settings?.site_theme || 'dark'}
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-background text-foreground selection:bg-cyan-500/30">
+      <body className="min-h-full flex flex-col bg-background text-foreground selection:bg-brand/30">
         <CartProvider>
           <Navbar settings={settings} />
           <main className="flex-grow flex flex-col">

@@ -22,12 +22,12 @@ export function ProductCard({ item }: ProductCardProps) {
 
   return (
     <>
-      <div className="bg-zinc-900 rounded-xl shadow-md border border-zinc-800 overflow-hidden flex flex-col group transition-all hover:shadow-lg hover:border-zinc-700">
+      <div className="bg-surface rounded-xl shadow-md border border-border overflow-hidden flex flex-col group transition-all hover:shadow-lg hover:border-muted">
         
         {/* Dual Image Container */}
         <Link 
            href={`/item/${item.id}`}
-           className="relative aspect-[2.5/3.5] w-full bg-zinc-950 perspective-1000 cursor-pointer block"
+           className="relative aspect-[2.5/3.5] w-full bg-background perspective-1000 cursor-pointer block"
         >
           {isAvailable && (item as any).oracle_projection && (item as any).oracle_projection > 0 && item.listed_price && item.listed_price < (item as any).oracle_projection && (
             <div className="absolute top-2 left-2 z-20 bg-indigo-900 text-indigo-300 text-xs px-2.5 py-1 rounded-full border border-indigo-700 font-bold shadow-[0_0_12px_rgba(79,70,229,0.4)] pointer-events-none flex items-center gap-1">
@@ -37,7 +37,7 @@ export function ProductCard({ item }: ProductCardProps) {
           <div className={`w-full h-full relative transition-transform duration-700 transform-style-3d ${item.back_image_url ? 'lg:group-hover:rotate-y-180' : ''}`}>
             
             {/* FRONT */}
-            <div className="absolute inset-0 backface-hidden flex items-center justify-center p-6 bg-zinc-950">
+            <div className="absolute inset-0 backface-hidden flex items-center justify-center p-6 bg-background">
               {item.image_url ? (
                 <img 
                   src={item.image_url} 
@@ -46,16 +46,16 @@ export function ProductCard({ item }: ProductCardProps) {
                   loading="lazy"
                 />
               ) : (
-                <div className="text-zinc-600 font-bold tracking-widest uppercase text-xs border border-zinc-800 px-4 py-2 rounded-lg">No Image</div>
+                <div className="text-muted font-bold tracking-widest uppercase text-xs border border-border px-4 py-2 rounded-lg">No Image</div>
               )}
               {item.back_image_url && (
-                 <div className="absolute bottom-2 right-2 bg-zinc-950/80 text-cyan-400 text-[10px] uppercase tracking-widest font-bold px-3 py-1.5 rounded-full backdrop-blur-md lg:hidden pointer-events-none border border-zinc-800">Tap to flip</div>
+                 <div className="absolute bottom-2 right-2 bg-background/80 text-brand-hover text-[10px] uppercase tracking-widest font-bold px-3 py-1.5 rounded-full backdrop-blur-md lg:hidden pointer-events-none border border-border">Tap to flip</div>
               )}
             </div>
 
             {/* BACK */}
             {item.back_image_url && (
-              <div className="absolute inset-0 backface-hidden rotate-y-180 flex items-center justify-center p-6 bg-zinc-950 border-4 border-zinc-900/50">
+              <div className="absolute inset-0 backface-hidden rotate-y-180 flex items-center justify-center p-6 bg-background border-4 border-zinc-900/50">
                  <img 
                     src={item.back_image_url} 
                     alt={`${item.player_name} back`}
@@ -77,13 +77,13 @@ export function ProductCard({ item }: ProductCardProps) {
         </Link>
 
         {/* Details Footer */}
-        <div className="p-5 flex flex-col flex-grow border-t border-zinc-800 bg-zinc-900">
-          <Link href={`/item/${item.id}`} className="hover:text-cyan-400 transition-colors">
+        <div className="p-5 flex flex-col flex-grow border-t border-border bg-surface">
+          <Link href={`/item/${item.id}`} className="hover:text-brand-hover transition-colors">
             <h3 className="font-extrabold text-lg text-white leading-tight tracking-tight">
               {item.player_name}
             </h3>
           </Link>
-          <span className="text-xs font-bold text-zinc-500 mt-1 uppercase tracking-widest">
+          <span className="text-xs font-bold text-muted mt-1 uppercase tracking-widest">
             {item.card_set} • #{item.card_number}{(item as any).print_run ? ` / ${(item as any).print_run}` : ''}
           </span>
           <div className="flex flex-wrap gap-2 mt-2 mb-4 flex-grow font-semibold">
@@ -93,12 +93,12 @@ export function ProductCard({ item }: ProductCardProps) {
               </span>
             )}
             {item.parallel_name && item.parallel_name.toLowerCase() !== 'base' && (
-              <span className="text-[10px] text-cyan-300 bg-cyan-900/40 border border-cyan-700/50 px-2 py-0.5 rounded-full uppercase tracking-wider">
+              <span className="text-[10px] text-brand bg-brand/20 border border-brand/40 px-2 py-0.5 rounded-full uppercase tracking-wider">
                 {item.parallel_name}
               </span>
             )}
             {(!item.insert_name && !item.parallel_name && item.parallel_insert_type && item.parallel_insert_type.toLowerCase() !== 'base') && (
-              <span className="text-[10px] text-slate-300 bg-slate-800 border border-slate-700 px-2 py-0.5 rounded-full uppercase tracking-wider">
+              <span className="text-[10px] text-muted bg-surface-hover border border-border px-2 py-0.5 rounded-full uppercase tracking-wider">
                 {item.parallel_insert_type}
               </span>
             )}
@@ -153,7 +153,7 @@ export function ProductCard({ item }: ProductCardProps) {
               <div className="grid grid-cols-2 gap-2 w-full">
                      <button 
                         onClick={(e) => { e.stopPropagation(); setIsTradeModalOpen(true); }}
-                        className="w-full text-xs font-bold py-3 rounded-lg transition-all shadow-md active:scale-95 bg-zinc-950 hover:bg-zinc-800 text-zinc-300 border border-zinc-700 hover:border-zinc-500 uppercase tracking-widest flex items-center justify-center"
+                        className="w-full text-xs font-bold py-3 rounded-lg transition-all shadow-md active:scale-95 bg-background hover:bg-surface-hover text-foreground border border-border hover:border-muted uppercase tracking-widest flex items-center justify-center"
                      >
                         Propose Trade
                      </button>
@@ -163,7 +163,7 @@ export function ProductCard({ item }: ProductCardProps) {
                     className={`w-full text-sm font-bold py-3 rounded-lg transition-all shadow-md active:scale-95 flex items-center justify-center ${
                       isInCart 
                         ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-900 cursor-default shadow-none' 
-                        : 'bg-white hover:bg-cyan-500 hover:text-white text-zinc-950 border border-zinc-200 hover:border-cyan-500'
+                        : 'bg-white hover:bg-brand-hover hover:text-white text-background border border-border hover:border-brand-hover'
                     }`}
                   >
                     {isInCart ? 'In Cart' : 'Add to Cart'}

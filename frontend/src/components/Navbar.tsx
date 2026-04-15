@@ -10,13 +10,15 @@ export function Navbar({ settings }: { settings: StoreSettings }) {
 
   return (
     <div className="flex flex-col w-full sticky top-0 z-50">
-      <a href="mailto:hello@playerindexdata.com" className="block relative z-[70] w-full bg-gradient-to-r from-indigo-600 to-cyan-600 hover:opacity-90 transition-opacity">
-        <div className="py-2 px-4 text-center">
-          <p className="text-white text-xs sm:text-sm font-bold tracking-wide">
-            Want to escape eBay? Claim your free zero-fee card shop website. Complete with AI Scanner & Live Auction Block.
-          </p>
-        </div>
-      </a>
+      {process.env.NEXT_PUBLIC_IS_MASTER_ORCHESTRATOR === 'true' && (
+        <a href="https://playerindexdata.com/claim" className="block relative z-[70] w-full bg-gradient-to-r from-indigo-600 to-cyan-600 hover:opacity-90 transition-opacity">
+          <div className="py-2 px-4 text-center">
+            <p className="text-white text-xs sm:text-sm font-bold tracking-wide">
+              Escape sellers fees and own your own custom card store starting at just $5/month. Complete with Live Auctions.
+            </p>
+          </div>
+        </a>
+      )}
       {settings.site_announcement && (
         <div className="relative z-[60] overflow-hidden bg-gradient-to-r from-violet-600 via-fuchsia-600 to-orange-600 shadow-md">
           <div className="absolute inset-0 bg-black/10 mix-blend-overlay pointer-events-none"></div>
@@ -35,24 +37,24 @@ export function Navbar({ settings }: { settings: StoreSettings }) {
           </div>
         </div>
       )}
-      <nav className="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-md relative z-50">
+      <nav className="border-b border-border bg-surface/80 backdrop-blur-md relative z-50">
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             <Link href="/" className="flex flex-col justify-center">
-              <span className="font-black text-xl tracking-tight text-white leading-tight">
+              <span className="font-black text-xl tracking-tight text-foreground leading-tight">
                 {settings.site_name}
               </span>
               {settings.site_author && (
-                <span className="text-xs text-zinc-500 tracking-wide leading-tight">
+                <span className="text-xs text-muted tracking-wide leading-tight">
                   by {settings.site_author}
                 </span>
               )}
             </Link>
             <div className="flex items-center gap-4 sm:gap-6">
-              <Link href="/" className="text-sm font-bold text-zinc-400 hover:text-white transition-colors">
+              <Link href="/" className="text-sm font-bold text-muted hover:text-foreground transition-colors">
                 Shop
               </Link>
-              <Link href="/sold" className="text-sm font-bold text-zinc-400 hover:text-white transition-colors">
+              <Link href="/sold" className="text-sm font-bold text-muted hover:text-foreground transition-colors">
                 Past Sales
               </Link>
               <Link href="/auction" className="text-sm font-bold text-red-500 hover:text-red-400 transition-colors flex items-center gap-2">
@@ -62,14 +64,14 @@ export function Navbar({ settings }: { settings: StoreSettings }) {
                 </span>
                 Live Auctions
               </Link>
-              <Link href="/faq" className="text-sm font-bold text-zinc-400 hover:text-white transition-colors">
+              <Link href="/faq" className="text-sm font-bold text-muted hover:text-foreground transition-colors">
                 FAQ
               </Link>
-              <div className="h-6 w-px bg-zinc-800 mx-1"></div>
-              <button onClick={() => setIsCartOpen(true)} className="relative p-2 text-zinc-400 hover:bg-zinc-900 hover:text-cyan-400 rounded-full transition-all group">
+              <div className="h-6 w-px bg-border mx-1"></div>
+              <button onClick={() => setIsCartOpen(true)} className="relative p-2 text-muted hover:bg-surface-hover hover:text-brand rounded-full transition-all group">
                 <ShoppingCart className="w-5 h-5 transition-transform group-hover:scale-110" />
                 {cartItems.length > 0 && (
-                  <span className="absolute top-0 right-0 w-[18px] h-[18px] bg-cyan-500 text-zinc-950 text-[10px] font-black flex items-center justify-center rounded-full shadow-sm select-none transform translate-x-0.5 -translate-y-0.5 border border-zinc-950">
+                  <span className="absolute top-0 right-0 w-[18px] h-[18px] bg-brand text-background text-[10px] font-black flex items-center justify-center rounded-full shadow-sm select-none transform translate-x-0.5 -translate-y-0.5 border border-surface">
                     {cartItems.length}
                   </span>
                 )}

@@ -74,10 +74,10 @@ export function AdminDashboard() {
       if (price !== null) {
         setFormData(prev => ({ ...prev, oracle_price: price.toFixed(2) }))
       } else {
-        setError('Oracle evaluation returned no comps.')
+        setError('Player Index evaluation returned no comps.')
       }
     } catch (err: any) {
-      setError(err.message || 'Error communicating with Oracle.')
+      setError(err.message || 'Error communicating with Player Index.')
     } finally {
       setIsPricing(false)
     }
@@ -199,7 +199,7 @@ export function AdminDashboard() {
           3. Determine Value
           <button onClick={handleEvaluateOracle} disabled={isPricing || !formData.player_name} className="bg-purple-600 text-white text-xs font-bold px-3 py-1.5 rounded-md hover:bg-purple-700 disabled:opacity-50 flex items-center gap-1 transition-colors">
             {isPricing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
-            Auto-Price with Oracle
+            Auto-Price with Player Index
           </button>
         </label>
         <div className="mb-4">

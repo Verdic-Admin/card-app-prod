@@ -1,16 +1,17 @@
-import { sql } from '@vercel/postgres';
+import pool from '@/utils/db';
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { LiveAuctionStudio } from '@/components/admin/LiveAuctionStudio'
+import { InstructionTrigger } from '@/components/admin/DraggableGuide'
 
 
 export const dynamic = 'force-dynamic'
 
 export default async function AuctionStudioPage() {
-  const { rows: inventory } = await sql`SELECT * FROM inventory ORDER BY player_name ASC`;
+  const { rows: inventory } = await pool.query(`SELECT * FROM inventory ORDER BY player_name ASC`);
 
   // Fetch Oracle discount percentage and stream settings
-  const { rows: storeRows } = await sql`SELECT live_stream_url, projection_timeframe FROM store_settings WHERE id = 1`;
+  const { rows: storeRows } = await pool.query(`SELECT live_stream_url, projection_timeframe FROM store_settings WHERE id = 1`);
   const settings = storeRows[0] || {};
 
   const liveStreamUrl = settings?.live_stream_url || null
@@ -21,18 +22,26 @@ export default async function AuctionStudioPage() {
       <div className="flex justify-between items-center mb-10">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <Link href="/admin" className="text-slate-400 hover:text-indigo-600 font-bold transition-colors">
+            <Link href="/admin" className="text-muted hover:text-indigo-600 font-bold transition-colors">
               ← Back to Admin
             </Link>
           </div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 flex items-center gap-3">
+          <h1 className="text-3xl font-extrabold tracking-tight text-foreground flex items-center gap-3">
             <span className="relative flex h-4 w-4">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500"></span>
             </span>
             Live Auction Studio
+              <InstructionTrigger 
+                 title="Live Auction Setup Guide"
+                 steps={[
+                    { title: "Step 1: Configure Stream", content: "First, navigate to your 'Store Operations' settings and past your YouTube or Twitch Live URL. This synchronizes the Edge platform so buyers can view your stream directly alongside the bidding UI." },
+                    { title: "Step 2: Staging the Block", content: "Identify which items from your inventory you plan to auction today. Switch their status to 'Pending Block'. This queues them up locally in this studio without immediately sending out push notifications." },
+                    { title: "Step 3: Going Live", content: "Once on stream, you can 'Push' an item from your Pending Block to 'Active'. This instantly displays the specific card to all connected viewers and begins accepting real-time bids routed directly to your ledger." }
+                 ]}
+              />
           </h1>
-          <p className="text-slate-500 mt-1 font-medium">Manage streams, stage pending block inventory, and go live.</p>
+          <p className="text-muted mt-1 font-medium">Manage streams, stage pending block inventory, and go live.</p>
         </div>
       </div>
 

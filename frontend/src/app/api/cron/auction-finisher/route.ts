@@ -1,4 +1,4 @@
-import { sql } from '@vercel/postgres';
+import pool from '@/utils/db';
 import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 
@@ -13,13 +13,13 @@ export async function GET(request: Request) {
 
     console.log("-> Running Auction Finisher Cron...");
 
-    const { rows: expiredItems } = await sql`
+    const { rows: expiredItems } = await pool.query(`
       SELECT id, current_bid, auction_reserve_price 
       FROM inventory 
       WHERE is_auction = true 
         AND auction_status = 'live' 
         AND auction_end_time < NOW()
-    `;
+    `);
 
     if (!expiredItems || expiredItems.length === 0) {
       return NextResponse.json({ success: true, message: 'No expired auctions to process.' });
@@ -34,23 +34,23 @@ export async function GET(request: Request) {
 
        if (bid >= reserve) {
           // Reserve met
-          await sql`
+          await pool.query(`
             UPDATE inventory 
             SET status = 'sold',
-                listed_price = ${bid},
+                listed_price = $1,
                 auction_status = 'ended'
-            WHERE id = ${item.id}
-          `;
+            WHERE id = $2
+          `, [bid, item.id]);
           soldCount++;
        } else {
           // Reserve not met
-          await sql`
+          await pool.query(`
             UPDATE inventory 
             SET is_auction = false,
                 auction_status = 'ended',
                 status = 'available'
-            WHERE id = ${item.id}
-          `;
+            WHERE id = $1
+          `, [item.id]);
           failedCount++;
        }
     }

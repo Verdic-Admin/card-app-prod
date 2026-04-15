@@ -351,7 +351,7 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
   }
 
   const handleApplyAllOracle = async () => {
-    if (!window.confirm(`Apply Oracle pricing (${discountRate}% below Player Index) to ALL items with projections?`)) return
+    if (!window.confirm(`Apply Player Index pricing (${discountRate}% below Player Index) to ALL items with projections?`)) return
     setIsApplyingAll(true)
     try {
       const result: any = await applyOracleDiscountAll()
@@ -693,9 +693,9 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
               <div>
                 <h2 className="text-xl font-black text-indigo-900 flex items-center gap-2">
                   <span className="bg-indigo-600 text-white w-6 h-6 rounded flex items-center justify-center text-xs">{pendingCorrections.length}</span>
-                  Oracle Catalog Clarifications Needed
+                  Player Index Clarifications Needed
                 </h2>
-                <p className="text-sm text-indigo-700 mt-1 font-medium">The Oracle matched your listings to its official catalog. Review its suggestions below.</p>
+                <p className="text-sm text-indigo-700 mt-1 font-medium">The Player Index matched your listings to its official catalog. Review its suggestions below.</p>
               </div>
               <div className="flex items-center gap-3 ml-4">
                 <button 
@@ -726,7 +726,7 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                 <thead className="bg-white sticky top-0 z-10 shadow-[0_1px_0_rgba(200,200,200,0.5)]">
                   <tr>
                     <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-widest text-[10px]">Your Listing Details</th>
-                    <th className="px-5 py-3 font-bold text-indigo-500 uppercase tracking-widest text-[10px] border-l border-indigo-50 bg-indigo-50/30">Oracle "Did You Mean?" Suggestion</th>
+                    <th className="px-5 py-3 font-bold text-indigo-500 uppercase tracking-widest text-[10px] border-l border-indigo-50 bg-indigo-50/30">Player Index "Did You Mean?" Suggestion</th>
                     <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-widest text-[10px]">Proj Target</th>
                     <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-widest text-[10px] text-right">Action</th>
                   </tr>
@@ -764,7 +764,7 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                           <>
                             <div className="font-bold text-indigo-900 leading-tight">
                               {c.did_you_mean.player_name && c.did_you_mean.player_name !== original?.player_name 
-                                  ? <span className="text-emerald-700 tooltip" title="Oracle Corrected Spelling">{c.did_you_mean.player_name}</span> 
+                                  ? <span className="text-emerald-700 tooltip" title="Player Index Corrected Spelling">{c.did_you_mean.player_name}</span> 
                                   : original?.player_name}
                             </div>
                             <div className="font-bold text-indigo-900 leading-tight mt-0.5">{c.did_you_mean.card_set} {c.did_you_mean.card_number ? <span className="text-slate-500">#{c.did_you_mean.card_number}</span> : ''}</div>

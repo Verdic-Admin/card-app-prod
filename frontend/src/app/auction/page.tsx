@@ -1,4 +1,4 @@
-import { sql } from '@vercel/postgres';
+import pool from '@/utils/db';
 import Link from 'next/link'
 import { LiveAuctionGrid } from '@/components/LiveAuctionGrid';
 
@@ -14,19 +14,25 @@ function getEmbedUrl(url: string | null) {
   }
   if (url.includes('twitch.tv/')) {
     const channel = url.split('twitch.tv/')[1];
-    return `https://player.twitch.tv/?channel=${channel}&parent=${process.env.NEXT_PUBLIC_SITE_DOMAIN || 'localhost'}`;
+    let parentDomain = 'localhost';
+    try {
+      if (process.env.NEXT_PUBLIC_SITE_URL) {
+         parentDomain = new URL(process.env.NEXT_PUBLIC_SITE_URL).hostname;
+      }
+    } catch(e) {}
+    return `https://player.twitch.tv/?channel=${channel}&parent=${parentDomain}`;
   }
   return url;
 }
 
 export default async function LiveAuctionPage() {
-  const { rows: storeRows } = await sql`SELECT live_stream_url FROM store_settings WHERE id = 1`;
+  const { rows: storeRows } = await pool.query(`SELECT live_stream_url FROM store_settings WHERE id = 1`);
   const settings = storeRows[0] || {};
 
   const liveStreamUrl = settings?.live_stream_url
   const embedUrl = getEmbedUrl(liveStreamUrl)
 
-  const { rows: items } = await sql`SELECT * FROM inventory WHERE is_auction = true AND auction_status = 'live' ORDER BY player_name ASC`;
+  const { rows: items } = await pool.query(`SELECT * FROM inventory WHERE is_auction = true AND auction_status = 'live' ORDER BY player_name ASC`);
 
   return (
     <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -38,12 +44,12 @@ export default async function LiveAuctionPage() {
           </span>
           Live Auctions
         </h1>
-        <p className="text-zinc-400 font-medium">Watch the stream and place your bids.</p>
+        <p className="text-muted font-medium">Watch the stream and place your bids.</p>
       </div>
 
       <div className="mb-12">
         {embedUrl ? (
-          <div className="aspect-w-16 aspect-h-9 bg-zinc-900 rounded-2xl overflow-hidden shadow-2xl border border-zinc-800">
+          <div className="aspect-w-16 aspect-h-9 bg-surface rounded-2xl overflow-hidden shadow-2xl border border-border">
             <iframe 
               src={embedUrl}
               frameBorder="0"
@@ -53,16 +59,16 @@ export default async function LiveAuctionPage() {
             ></iframe>
           </div>
         ) : (
-          <div className="bg-zinc-900 rounded-2xl p-12 text-center border border-zinc-800 shadow-xl">
+          <div className="bg-surface rounded-2xl p-12 text-center border border-border shadow-xl">
             <div className="text-5xl mb-4">📺</div>
             <h2 className="text-2xl font-bold text-white mb-2">No Live Auction currently running.</h2>
-            <p className="text-zinc-400">Next show is Sunday! Check back later.</p>
+            <p className="text-muted">Next show is Sunday! Check back later.</p>
           </div>
         )}
       </div>
 
       <div>
-        <h2 className="text-2xl font-bold text-white mb-6 border-b border-zinc-800 pb-2">Currently on the Block</h2>
+        <h2 className="text-2xl font-bold text-white mb-6 border-b border-border pb-2">Currently on the Block</h2>
         <LiveAuctionGrid initialItems={items as any} />
       </div>
     </div>

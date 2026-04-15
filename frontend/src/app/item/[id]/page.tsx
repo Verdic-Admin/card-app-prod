@@ -1,4 +1,4 @@
-import { sql } from '@vercel/postgres';
+import pool from '@/utils/db';
 import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
@@ -12,7 +12,7 @@ type PageProps = { params: Promise<{ id: string }> }
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params
   
-  const { rows } = await sql`SELECT * FROM inventory WHERE id = ${id}`;
+  const { rows } = await pool.query(`SELECT * FROM inventory WHERE id = $1`, [id]);
   const item = rows[0];
 
   if (!item) {
@@ -59,7 +59,7 @@ export default async function ItemPage({ params }: PageProps) {
   let item;
   let error;
   try {
-     const { rows } = await sql`SELECT * FROM inventory WHERE id = ${id}`;
+     const { rows } = await pool.query(`SELECT * FROM inventory WHERE id = $1`, [id]);
      item = rows[0];
   } catch(e) {
      error = e;
@@ -69,7 +69,7 @@ export default async function ItemPage({ params }: PageProps) {
 
   // ── LOT PAGE: render parent lot + child card grid ───────────────────────
   if (item.is_lot) {
-    const { rows: children } = await sql`SELECT * FROM inventory WHERE lot_id = ${item.id} AND status = 'available'`;
+    const { rows: children } = await pool.query(`SELECT * FROM inventory WHERE lot_id = $1 AND status = 'available'`, [item.id]);
 
     const childSum = children.reduce((acc: number, c: any) => acc + (parseFloat(c.listed_price) || 0), 0);
     const lotPrice = parseFloat(item.listed_price ?? item.avg_price ?? 0);
@@ -80,21 +80,21 @@ export default async function ItemPage({ params }: PageProps) {
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-20">
         {/* Lot Header */}
         <div className="mb-10">
-          <span className="inline-flex items-center gap-2 bg-cyan-950 text-cyan-400 text-xs font-black px-3 py-1.5 rounded-full border border-cyan-800 mb-4 uppercase tracking-widest">
+          <span className="inline-flex items-center gap-2 bg-cyan-950 text-brand text-xs font-black px-3 py-1.5 rounded-full border border-cyan-800 mb-4 uppercase tracking-widest">
             📦 Lot Bundle
           </span>
           <h1 className="text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight mb-3">
             {item.player_name}
           </h1>
           {item.card_set && (
-            <p className="text-zinc-400 font-semibold text-lg mb-6">{item.card_set}</p>
+            <p className="text-muted font-semibold text-lg mb-6">{item.card_set}</p>
           )}
 
           <div className="flex flex-wrap items-center gap-4">
             <span className="text-5xl font-black text-white tracking-tighter">
               ${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}
             </span>
-            <span className="text-zinc-500 font-bold text-sm">
+            <span className="text-muted font-bold text-sm">
               {children?.length ?? 0} cards included
             </span>
           </div>
@@ -118,10 +118,10 @@ export default async function ItemPage({ params }: PageProps) {
         </div>
 
         {/* Divider */}
-        <div className="border-t border-zinc-800 mb-10" />
+        <div className="border-t border-border mb-10" />
 
         {/* Child cards Carousel */}
-        <h2 className="text-xl font-black text-zinc-300 mb-6 uppercase tracking-widest">
+        <h2 className="text-xl font-black text-foreground mb-6 uppercase tracking-widest">
           Cards In This Lot
         </h2>
         {children && children.length > 0 ? (
@@ -138,7 +138,7 @@ export default async function ItemPage({ params }: PageProps) {
             <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-zinc-950 to-transparent" />
           </div>
         ) : (
-          <div className="py-20 text-center text-zinc-500 font-medium">
+          <div className="py-20 text-center text-muted font-medium">
              No individual cards are currently linked to this lot.
           </div>
         )}
@@ -149,7 +149,7 @@ export default async function ItemPage({ params }: PageProps) {
   // ── INDIVIDUAL CARD PAGE: fetch parent lot if this card is part of one ──
   let parentLot: typeof item | null = null
   if (item.lot_id) {
-    const { rows: lotRows } = await sql`SELECT * FROM inventory WHERE id = ${item.lot_id}`;
+    const { rows: lotRows } = await pool.query(`SELECT * FROM inventory WHERE id = $1`, [item.lot_id]);
     const lot = lotRows[0];
     parentLot = lot ?? null
   }
@@ -189,20 +189,20 @@ export default async function ItemPage({ params }: PageProps) {
         {/* Images */}
         <div className="space-y-4">
           {item.image_url && (
-            <div className="rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-950 shadow-2xl aspect-[2.5/3.5] flex items-center justify-center relative group">
+            <div className="rounded-2xl overflow-hidden border border-border bg-background shadow-2xl aspect-[2.5/3.5] flex items-center justify-center relative group">
               <ImageMagnifier src={item.image_url} alt={`${item.player_name} front`} />
               <div className="absolute inset-0 ring-1 ring-inset ring-white/10 rounded-2xl pointer-events-none z-10" />
             </div>
           )}
           {item.back_image_url && (
-            <div className="rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-950 shadow-xl aspect-[2.5/3.5] flex items-center justify-center relative group">
+            <div className="rounded-2xl overflow-hidden border border-border bg-background shadow-xl aspect-[2.5/3.5] flex items-center justify-center relative group">
               <ImageMagnifier src={item.back_image_url} alt={`${item.player_name} back`} />
             </div>
           )}
           {item.coined_image_url && (
             <div className="rounded-2xl overflow-hidden border-2 border-emerald-500/50 bg-emerald-950/20 shadow-xl aspect-[2.5/3.5] flex items-center justify-center p-2 relative">
-              <div className="absolute top-4 right-4 bg-emerald-500 text-zinc-950 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-lg z-10 flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-zinc-950 animate-pulse" /> Validated
+              <div className="absolute top-4 right-4 bg-emerald-500 text-foreground text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-lg z-10 flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-background animate-pulse" /> Validated
               </div>
               <img
                 src={item.coined_image_url}
@@ -220,23 +220,23 @@ export default async function ItemPage({ params }: PageProps) {
               {item.player_name}
             </h1>
             {item.team_name && (
-              <p className="text-zinc-400 font-semibold text-base">{item.team_name}</p>
+              <p className="text-muted font-semibold text-base">{item.team_name}</p>
             )}
           </div>
 
-          <div className="space-y-1 text-sm text-zinc-400 font-semibold border-t border-zinc-800 pt-4">
-            {item.card_set && <p><span className="text-zinc-500">Set:</span> {item.card_set}</p>}
-            {item.card_number && <p><span className="text-zinc-500">Card #:</span> {item.card_number}</p>}
-            {(item as any).print_run && <p><span className="text-zinc-500">Numbered To:</span> /{(item as any).print_run}</p>}
+          <div className="space-y-1 text-sm text-muted font-semibold border-t border-border pt-4">
+            {item.card_set && <p><span className="text-muted">Set:</span> {item.card_set}</p>}
+            {item.card_number && <p><span className="text-muted">Card #:</span> {item.card_number}</p>}
+            {(item as any).print_run && <p><span className="text-muted">Numbered To:</span> /{(item as any).print_run}</p>}
             {item.parallel_insert_type && (
-              <p><span className="text-zinc-500">Parallel / Insert:</span>{' '}
-                <span className="text-cyan-400 font-bold">{item.parallel_insert_type}</span>
+              <p><span className="text-muted">Parallel / Insert:</span>{' '}
+                <span className="text-brand font-bold">{item.parallel_insert_type}</span>
               </p>
             )}
           </div>
 
           {/* Pricing */}
-          <div className="border-t border-zinc-800 pt-4">
+          <div className="border-t border-border pt-4">
             {(item as any).oracle_projection && (item as any).oracle_projection > 0 ? (
               <div>
                 <p className="text-[11px] uppercase tracking-widest text-indigo-400 font-bold mb-1">

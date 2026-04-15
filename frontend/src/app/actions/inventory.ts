@@ -1,8 +1,8 @@
 "use server";
 
 import { revalidatePath } from 'next/cache'
-import { sql } from '@vercel/postgres'
-import { put, del } from '@vercel/blob'
+import pool from '@/utils/db';
+import { put, del } from '@/utils/storage';
 
 // Authentication check
 function checkAuth() {
@@ -52,26 +52,26 @@ export async function addCardAction(formData: FormData) {
     } catch { }
   }
 
-  const { rows } = await sql`
+  const { rows } = await pool.query(`
     INSERT INTO inventory (
       player_name, team_name, card_set, insert_name, parallel_name, card_number, 
       high_price, low_price, avg_price, listed_price, cost_basis, accepts_offers, 
       image_url, back_image_url, status
     ) VALUES (
-      ${payload.player_name}, ${payload.team_name}, ${payload.card_set}, ${payload.insert_name},
-      ${payload.parallel_name}, ${payload.card_number}, ${payload.high_price}, ${payload.low_price},
-      ${payload.avg_price}, ${payload.listed_price || payload.avg_price}, ${payload.cost_basis || 0}, ${payload.accepts_offers || false},
-      ${blob.url}, ${backImageUrl}, 'available'
+      $1, $2, $3, $4,
+      $5, $6, $7, $8,
+      $9, $10, $11, $12,
+      $13, $14, 'available'
     ) RETURNING id
-  `;
+  `, [payload.player_name, payload.team_name, payload.card_set, payload.insert_name, payload.parallel_name, payload.card_number, payload.high_price, payload.low_price, payload.avg_price, payload.listed_price || payload.avg_price, payload.cost_basis || 0, payload.accepts_offers || false, blob.url, backImageUrl]);
   const insertedRow = rows[0];
 
 
   try {
     const shopId = process.env.NEXT_PUBLIC_SHOP_ID
-    const siteDomain = process.env.NEXT_PUBLIC_SITE_DOMAIN
-    if (!shopId || !siteDomain) throw new Error("Syndication configuration missing")
-    const fullUrl = `https://${siteDomain}/product/${insertedRow?.id || 'new'}`
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
+    if (!shopId || !siteUrl) throw new Error("Syndication configuration missing")
+    const fullUrl = `${siteUrl}/product/${insertedRow?.id || 'new'}`
     
     await fetch('https://api.playerindexdata.com/fintech/syndication/webhook', {
       method: 'POST',
@@ -102,23 +102,23 @@ export async function batchCommitAction(items: any[]) {
   for (const item of items) {
     const parallel_insert_type = [item.insert_name, item.parallel_name].filter(v => v && String(v).toLowerCase() !== 'base').join(' ') || 'Base';
     try {
-      const { rows } = await sql`
+      const { rows } = await pool.query(`
         INSERT INTO inventory (
           player_name, card_set, insert_name, parallel_name, parallel_insert_type,
           listed_price, avg_price, cost_basis, accepts_offers, image_url, back_image_url, status
         ) VALUES (
-          ${item.player_name}, ${item.card_set}, ${item.insert_name}, ${item.parallel_name}, ${parallel_insert_type},
-          ${item.price || 0}, ${item.price || 0}, 0, true, ${item.side_a_url}, ${item.side_b_url}, 'available'
+          $1, $2, $3, $4, $5,
+          $6, $7, 0, true, $8, $9, 'available'
         ) RETURNING id
-      `;
+      `, [item.player_name, item.card_set, item.insert_name, item.parallel_name, parallel_insert_type, item.price || 0, item.price || 0, item.side_a_url, item.side_b_url]);
       const insertedRow = rows[0];
 
     // Fire webhook
     try {
       const shopId = process.env.NEXT_PUBLIC_SHOP_ID
-      const siteDomain = process.env.NEXT_PUBLIC_SITE_DOMAIN
-      if (!shopId || !siteDomain) throw new Error("Syndication configuration missing")
-      const fullUrl = `https://${siteDomain}/product/${insertedRow.id}`
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
+      if (!shopId || !siteUrl) throw new Error("Syndication configuration missing")
+      const fullUrl = `${siteUrl}/product/${insertedRow.id}`
       await fetch('https://api.playerindexdata.com/fintech/syndication/webhook', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -152,12 +152,12 @@ export async function vercelBatchInsertInventory(items: any[]) {
      const status = String(item.status)
      const trend_data = JSON.stringify(item.pricing?.trend_points || [])
      const player_index_url = item.pricing?.player_index_url || ''
-     await sql`
+     await pool.query(`
        INSERT INTO inventory 
          (player_name, card_set, listed_price, market_price, image_url, status, trend_data, player_index_url)
        VALUES 
-         (${item.player_name}, ${item.card_set}, ${price}, ${price}, '', ${status}, ${trend_data}::jsonb, ${player_index_url})
-     `;
+         ($1, $2, $3, $4, '', $5, $6::jsonb, $7)
+     `, [item.player_name, item.card_set, price, price, status, trend_data, player_index_url]);
   }
   revalidatePath('/')
   revalidatePath('/admin')
@@ -174,7 +174,7 @@ export async function vercelBatchUpdatePrices(updates: { id: string, listed_pric
   const playerIndexUrls = updates.map(u => u.player_index_url || '');
 
   try {
-    await sql`
+    await pool.query(`
       UPDATE inventory AS i
       SET 
         listed_price = u.listed_price,
@@ -182,14 +182,14 @@ export async function vercelBatchUpdatePrices(updates: { id: string, listed_pric
         trend_data = u.trend_data,
         player_index_url = u.player_index_url
       FROM UNNEST(
-        ${ids as any}::UUID[], 
-        ${listedPrices as any}::NUMERIC[], 
-        ${marketPrices as any}::NUMERIC[],
-        ${trendData as any}::JSONB[],
-        ${playerIndexUrls as any}::TEXT[]
+        $1::UUID[], 
+        $2::NUMERIC[], 
+        $3::NUMERIC[],
+        $4::JSONB[],
+        $5::TEXT[]
       ) AS u(id, listed_price, market_price, trend_data, player_index_url)
       WHERE i.id = u.id;
-    `;
+    `, [ids as any, listedPrices as any, marketPrices as any, trendData as any, playerIndexUrls as any]);
     revalidatePath('/');
     revalidatePath('/admin');
     return { success: true };
@@ -209,7 +209,7 @@ export async function createLotAction(
   checkAuth();
   
   // 1. Sum cost_basis of all child cards
-  const { rows: children } = await sql`SELECT image_url, cost_basis FROM inventory WHERE id = ANY(${itemIds as any}::uuid[])`;
+  const { rows: children } = await pool.query(`SELECT image_url, cost_basis FROM inventory WHERE id = ANY($1::uuid[])`, [itemIds as any]);
 
   const totalCostBasis = children.reduce(
     (sum: number, c: any) => sum + Number(c.cost_basis ?? 0),
@@ -259,15 +259,15 @@ export async function createLotAction(
   }
 
   // 2. Insert the parent Lot row
-  const { rows } = await sql`
+  const { rows } = await pool.query(`
       INSERT INTO inventory (player_name, listed_price, avg_price, cost_basis, is_lot, accepts_offers, status, image_url)
-      VALUES (${lotTitle}, ${lotPrice}, ${lotPrice}, ${totalCostBasis}, true, false, 'available', ${finalImageUrl})
+      VALUES ($1, $2, $3, $4, true, false, 'available', $5)
       RETURNING id
-  `;
+  `, [lotTitle, lotPrice, lotPrice, totalCostBasis, finalImageUrl]);
   const lotId = rows[0].id;
 
   // 3. Link child cards to this lot
-  await sql`UPDATE inventory SET lot_id = ${lotId} WHERE id = ANY(${itemIds as any}::uuid[])`;
+  await pool.query(`UPDATE inventory SET lot_id = $1 WHERE id = ANY($2::uuid[])`, [lotId, itemIds as any]);
 
   revalidatePath('/')
   revalidatePath('/admin')
@@ -278,19 +278,19 @@ export async function updateLotChildren(lotId: string, itemIds: string[]) {
   checkAuth();
 
   // clear all linked
-  await sql`UPDATE inventory SET lot_id = null WHERE lot_id = ${lotId}`;
+  await pool.query(`UPDATE inventory SET lot_id = null WHERE lot_id = $1`, [lotId]);
 
   if (itemIds.length > 0) {
      // link new
-     await sql`UPDATE inventory SET lot_id = ${lotId} WHERE id = ANY(${itemIds as any}::uuid[])`;
+     await pool.query(`UPDATE inventory SET lot_id = $1 WHERE id = ANY($2::uuid[])`, [lotId, itemIds as any]);
   
      // recalculate cost_basis
-     const { rows: children } = await sql`SELECT sum(cost_basis) as total_basis FROM inventory WHERE lot_id = ${lotId}`;
+     const { rows: children } = await pool.query(`SELECT sum(cost_basis) as total_basis FROM inventory WHERE lot_id = $1`, [lotId]);
      const totalBasis = children[0]?.total_basis || 0;
-     await sql`UPDATE inventory SET cost_basis = ${totalBasis} WHERE id = ${lotId}`;
+     await pool.query(`UPDATE inventory SET cost_basis = $1 WHERE id = $2`, [totalBasis, lotId]);
   } else {
      // If empty, cost_basis = 0
-     await sql`UPDATE inventory SET cost_basis = 0 WHERE id = ${lotId}`;
+     await pool.query(`UPDATE inventory SET cost_basis = 0 WHERE id = $1`, [lotId]);
   }
 
   revalidatePath('/');
@@ -303,10 +303,10 @@ export async function breakLotAction(lotId: string) {
 
   
   // 1. Unlink all child cards
-  await sql`UPDATE inventory SET lot_id = null WHERE lot_id = ${lotId}`;
+  await pool.query(`UPDATE inventory SET lot_id = null WHERE lot_id = $1`, [lotId]);
 
   // 2. Delete the lot row itself
-  await sql`DELETE FROM inventory WHERE id = ${lotId}`;
+  await pool.query(`DELETE FROM inventory WHERE id = $1`, [lotId]);
 
   revalidatePath('/')
   revalidatePath('/admin')
@@ -324,7 +324,7 @@ export async function toggleCardStatus(id: string, currentStatus: string) {
     payload.sold_at = null
   }
 
-  await sql`UPDATE inventory SET status = ${newStatus}, sold_at = ${payload.sold_at} WHERE id = ${id}`;
+  await pool.query(`UPDATE inventory SET status = $1, sold_at = $2 WHERE id = $3`, [newStatus, payload.sold_at, id]);
 
   revalidatePath('/')
   revalidatePath('/admin')
@@ -336,7 +336,7 @@ export async function editCardAction(id: string, payload: any) {
 
     
   // Manual generic update for now (or loop over keys)
-  if(payload.listed_price) await sql`UPDATE inventory SET listed_price = ${payload.listed_price} WHERE id = ${id}`;
+  if(payload.listed_price) await pool.query(`UPDATE inventory SET listed_price = $1 WHERE id = $2`, [payload.listed_price, id]);
 
   revalidatePath('/')
   revalidatePath('/admin')
@@ -354,7 +354,7 @@ export async function deleteCardAction(id: string, imageUrl?: string | null) {
       console.warn("Failed to delete blob from vercel:", e)
     }
   }
-  await sql`DELETE FROM inventory WHERE id = ${id}`;
+  await pool.query(`DELETE FROM inventory WHERE id = $1`, [id]);
 
   revalidatePath('/')
   revalidatePath('/admin')
@@ -374,7 +374,7 @@ export async function bulkDeleteCardsAction(items: {id: string, image_url: strin
   // 2. Delete all records from DB in a single ultra-fast operation
   if (items.length > 0) {
       const ids = items.map(i => i.id);
-      await sql`DELETE FROM inventory WHERE id = ANY(${ids as any}::uuid[])`;
+      await pool.query(`DELETE FROM inventory WHERE id = ANY($1::uuid[])`, [ids as any]);
   }
 
   revalidatePath('/')
@@ -393,7 +393,7 @@ export async function rotateCardImageAction(
   if (!newFile) throw new Error('Missing rotated image file')
 
   // Fetch the current record so we can delete the old storage file
-  const { rows: records } = await sql`SELECT image_url, back_image_url FROM inventory WHERE id = ${id}`;
+  const { rows: records } = await pool.query(`SELECT image_url, back_image_url FROM inventory WHERE id = $1`, [id]);
   const record = records[0];
 
   const oldUrl: string | null = side === 'front' ? record?.image_url : record?.back_image_url;
@@ -414,9 +414,9 @@ export async function rotateCardImageAction(
   const newUrl = blob.url;
 
   if (side === 'front') {
-      await sql`UPDATE inventory SET image_url = ${newUrl} WHERE id = ${id}`;
+      await pool.query(`UPDATE inventory SET image_url = $1 WHERE id = $2`, [newUrl, id]);
   } else {
-      await sql`UPDATE inventory SET back_image_url = ${newUrl} WHERE id = ${id}`;
+      await pool.query(`UPDATE inventory SET back_image_url = $1 WHERE id = $2`, [newUrl, id]);
   }
 
   revalidatePath('/')
@@ -429,7 +429,7 @@ export async function bulkUpdateMetricsAction(ids: string[], costBasis: number, 
 
   
   if (ids.length > 0) {
-    await sql`UPDATE inventory SET cost_basis = ${costBasis}, accepts_offers = ${acceptsOffers} WHERE id = ANY(${ids as any}::uuid[])`;
+    await pool.query(`UPDATE inventory SET cost_basis = $1, accepts_offers = $2 WHERE id = ANY($3::uuid[])`, [costBasis, acceptsOffers, ids as any]);
   }
 
   revalidatePath('/')
@@ -439,14 +439,14 @@ export async function bulkUpdateMetricsAction(ids: string[], costBasis: number, 
 
 export async function updateLiveStreamUrl(url: string | null) {
   checkAuth();
-    await sql`UPDATE store_settings SET live_stream_url = ${url} WHERE id = 1`;
+    await pool.query(`UPDATE store_settings SET live_stream_url = $1 WHERE id = 1`, [url]);
   revalidatePath('/admin')
   revalidatePath('/auction')
 }
 
 export async function updateProjectionTimeframe(timeframe: string) {
   checkAuth();
-    await sql`UPDATE store_settings SET projection_timeframe = ${timeframe} WHERE id = 1`;
+    await pool.query(`UPDATE store_settings SET projection_timeframe = $1 WHERE id = 1`, [timeframe]);
   revalidatePath('/admin')
   revalidatePath('/auction')
 }
@@ -456,7 +456,7 @@ export async function sendToAuctionBlock(ids: string[], formData?: FormData) {
   if (ids.length === 0) return;
 
   for (const id of ids) {
-     const { rows: itemRows } = await sql`SELECT is_lot, lot_id FROM inventory WHERE id = ${id}`;
+     const { rows: itemRows } = await pool.query(`SELECT is_lot, lot_id FROM inventory WHERE id = $1`, [id]);
      if (itemRows.length === 0) continue;
      const item = itemRows[0];
      
@@ -483,20 +483,20 @@ export async function sendToAuctionBlock(ids: string[], formData?: FormData) {
      }
 
      // Mark parent as auction
-     await sql`
+     await pool.query(`
        UPDATE inventory 
        SET is_auction = true, 
            auction_status = 'pending',
-           auction_reserve_price = COALESCE(${reservePrice}, auction_reserve_price),
-           auction_end_time = COALESCE(${endTime}, auction_end_time),
-           auction_description = COALESCE(${description}, auction_description),
-           coined_image_url = COALESCE(${coinedImageUrl}, coined_image_url)
-       WHERE id = ${id}
-     `;
+           auction_reserve_price = COALESCE($1, auction_reserve_price),
+           auction_end_time = COALESCE($2, auction_end_time),
+           auction_description = COALESCE($3, auction_description),
+           coined_image_url = COALESCE($4, coined_image_url)
+       WHERE id = $5
+     `, [reservePrice, endTime, description, coinedImageUrl, id]);
 
      // Child State Management
      if (item.is_lot) {
-         await sql`UPDATE inventory SET status = 'auction_staged' WHERE lot_id = ${id}`;
+         await pool.query(`UPDATE inventory SET status = 'auction_staged' WHERE lot_id = $1`, [id]);
      }
   }
 
@@ -505,30 +505,30 @@ export async function sendToAuctionBlock(ids: string[], formData?: FormData) {
 
 export async function placeBidAction(itemId: string, bidderEmail: string, bidAmount: number) {
   // Using an atomic transaction ensures no race conditions on read/write of current_bid
-  // Vercel Postgres does NOT have transaction blocks directly via `sql`, we must use pooled client OR single raw query string with returning.
+  // Vercel Postgres does NOT have transaction blocks directly via `pool.query(`, we must use pooled client OR single raw query string with returning.
   // Actually, standard UPDATE ... RETURNING handles atomicity for single rows.
 
-  const { rows } = await sql`
+  const { rows } = await pool.query(`
      UPDATE inventory 
      SET 
-        current_bid = ${bidAmount},
+        current_bid = $1,
         bidder_count = bidder_count + 1
-     WHERE id = ${itemId} 
-       AND (current_bid IS NULL OR current_bid < ${bidAmount})
+     WHERE id = $2 
+       AND (current_bid IS NULL OR current_bid < $1)
        AND is_auction = true
        AND auction_status = 'live'
      RETURNING id
-  `;
+  `, [bidAmount, itemId]);
 
   if (rows.length === 0) {
      throw new Error("409 Conflict: Bid is too low or auction has ended.");
   }
 
   // Insert the bid log
-  await sql`
+  await pool.query(`
      INSERT INTO auction_bids (item_id, bidder_email, bid_amount) 
-     VALUES (${itemId}, ${bidderEmail}, ${bidAmount})
-  `;
+     VALUES ($1, $2, $3)
+  `, [itemId, bidderEmail, bidAmount]);
 
   revalidatePath('/auction');
   return { success: true };
@@ -542,15 +542,15 @@ export async function updateStagedAuction(itemId: string, formData: FormData) {
   const description = formData.get('description') as string;
   const file = formData.get('coinedImage') as File;
   
-  if (reservePrice) await sql`UPDATE inventory SET auction_reserve_price = ${Number(reservePrice)} WHERE id = ${itemId}`;
-  if (endTime) await sql`UPDATE inventory SET auction_end_time = ${endTime} WHERE id = ${itemId}`;
-  if (description) await sql`UPDATE inventory SET auction_description = ${description} WHERE id = ${itemId}`;
+  if (reservePrice) await pool.query(`UPDATE inventory SET auction_reserve_price = $1 WHERE id = $2`, [Number(reservePrice), itemId]);
+  if (endTime) await pool.query(`UPDATE inventory SET auction_end_time = $1 WHERE id = $2`, [endTime, itemId]);
+  if (description) await pool.query(`UPDATE inventory SET auction_description = $1 WHERE id = $2`, [description, itemId]);
   
   if (file && file.size > 0) {
     const fileExt = file.name.split('.').pop();
     const fileName = `auction-coin-${Date.now()}.${fileExt}`;
     const blob = await put(`card-images/${fileName}`, file, { access: 'public' });
-    await sql`UPDATE inventory SET coined_image_url = ${blob.url} WHERE id = ${itemId}`;
+    await pool.query(`UPDATE inventory SET coined_image_url = $1 WHERE id = $2`, [blob.url, itemId]);
   }
   
   revalidatePath('/admin')
@@ -559,7 +559,7 @@ export async function updateStagedAuction(itemId: string, formData: FormData) {
 export async function goLiveWithAuctions(itemIds: string[]) {
   checkAuth();
     if (itemIds.length > 0) {
-    await sql`UPDATE inventory SET auction_status = 'live' WHERE id = ANY(${itemIds as any}::uuid[])`;
+    await pool.query(`UPDATE inventory SET auction_status = 'live' WHERE id = ANY($1::uuid[])`, [itemIds as any]);
   }
   revalidatePath('/admin')
   revalidatePath('/auction')
@@ -569,7 +569,7 @@ export async function generateBatchCodes(ids: string[]) {
   checkAuth();
     for (const id of ids) {
     const code = `PI-${Math.floor(1000 + Math.random() * 9000)}`
-    await sql`UPDATE inventory SET verification_code = ${code} WHERE id = ${id}`;
+    await pool.query(`UPDATE inventory SET verification_code = $1 WHERE id = $2`, [code, id]);
   }
   revalidatePath('/admin')
 }
@@ -583,21 +583,21 @@ export async function uploadVerifiedFlipUI(id: string, formData: FormData) {
   const fileExt = file.name.split('.').pop()
   const fileName = `video-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
   const blob = await put(`card-images/${fileName}`, file, { access: 'public' });
-  await sql`UPDATE inventory SET video_url = ${blob.url}, is_verified_flip = true WHERE id = ${id}`;
+  await pool.query(`UPDATE inventory SET video_url = $1, is_verified_flip = true WHERE id = $2`, [blob.url, id]);
   revalidatePath('/admin')
   revalidatePath('/auction')
 }
 
 export async function removeFromAuctionBlock(id: string) {
   checkAuth();
-    await sql`UPDATE inventory SET is_auction = false, auction_status = 'pending' WHERE id = ${id}`;
+    await pool.query(`UPDATE inventory SET is_auction = false, auction_status = 'pending' WHERE id = $1`, [id]);
   revalidatePath('/admin')
   revalidatePath('/auction')
 }
 
 export async function setAuctionStatus(id: string, status: 'pending' | 'live' | 'ended') {
   checkAuth();
-    await sql`UPDATE inventory SET auction_status = ${status} WHERE id = ${id}`;
+    await pool.query(`UPDATE inventory SET auction_status = $1 WHERE id = $2`, [status, id]);
   revalidatePath('/admin')
   revalidatePath('/auction')
 }

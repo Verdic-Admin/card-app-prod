@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useCart } from '@/context/CartContext'
-import { X, ShoppingCart, Trash2, Handshake, Loader2, CheckCircle2 } from 'lucide-react'
-import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js'
-import { createPayPalOrder, capturePayPalOrder } from '@/app/actions/checkout'
+import { X, ShoppingCart, Trash2, Handshake, Loader2, CheckCircle2, ArrowRight } from 'lucide-react'
+import { submitManualCheckout } from '@/app/actions/checkout'
 import { submitTradeOffer } from '@/app/actions/trades'
 import { TradeModal } from '@/components/TradeModal'
 import { StoreSettings } from '@/app/actions/settings'
@@ -15,6 +14,8 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [tradeSubmitting, setTradeSubmitting] = useState(false)
   const [cartError, setCartError] = useState<string | null>(null)
+  const [checkoutStage, setCheckoutStage] = useState<'cart' | 'form' | 'success'>('cart')
+  const [checkoutForm, setCheckoutForm] = useState({ name: '', email: '', address: '' })
 
   const cashItems = cartItems.filter(i => !i.isTradeProposal);
   const tradeItems = cartItems.filter(i => i.isTradeProposal);
@@ -112,23 +113,23 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
   }
 
   const renderItem = (item: any) => (
-    <div key={item.cartItemId} className="flex gap-4 p-3 bg-zinc-900 rounded-2xl border border-zinc-800 shadow-sm relative pr-12 transition-all hover:border-zinc-700">
-      <div className="w-16 h-16 bg-zinc-950 rounded-lg overflow-hidden flex-shrink-0 border border-zinc-800 relative shadow-inner flex items-center justify-center p-0.5">
+    <div key={item.cartItemId} className="flex gap-4 p-3 bg-surface rounded-2xl border border-border shadow-sm relative pr-12 transition-all hover:border-border">
+      <div className="w-16 h-16 bg-background rounded-lg overflow-hidden flex-shrink-0 border border-border relative shadow-inner flex items-center justify-center p-0.5">
          <img src={item.image_url!} className="w-full h-full object-cover rounded-md" />
       </div>
       <div className="flex flex-col flex-1 py-1 pr-1">
-        <span className="font-extrabold text-sm text-white leading-tight">{item.player_name}</span>
-        <span className="text-xs font-semibold text-zinc-400 mt-0.5 line-clamp-1">{item.card_set}</span>
-        <span className="text-[10px] uppercase font-bold text-cyan-500 tracking-widest mt-1">{item.parallel_insert_type}</span>
+        <span className="font-extrabold text-sm text-foreground leading-tight">{item.player_name}</span>
+        <span className="text-xs font-semibold text-muted mt-0.5 line-clamp-1">{item.card_set}</span>
+        <span className="text-[10px] uppercase font-bold text-brand tracking-widest mt-1">{item.parallel_insert_type}</span>
         
         {item.isTradeProposal ? (
            <div className="mt-auto flex items-center gap-2 flex-wrap pt-1">
-              <span className="text-[9px] font-black text-white bg-cyan-700 px-2 py-0.5 rounded uppercase tracking-widest leading-none border border-cyan-500 shadow-sm">Trade Proposal</span>
+              <span className="text-[9px] font-black text-foreground bg-brand-hover border-transparent px-2 py-0.5 rounded uppercase tracking-widest leading-none border border-brand shadow-sm">Trade Proposal</span>
               
               {item.tradeDetails && item.tradeDetails.offerImageUrls.length > 0 && (
                  <div className="flex items-center gap-1 opacity-90">
                     {item.tradeDetails.offerImageUrls.map((url: string, idx: number) => (
-                       <div key={idx} className="w-5 h-5 rounded hover:scale-150 transition-transform origin-left border border-zinc-700 overflow-hidden shadow-sm">
+                       <div key={idx} className="w-5 h-5 rounded hover:scale-150 transition-transform origin-left border border-border overflow-hidden shadow-sm">
                           <img src={url} className="w-full h-full object-cover" />
                        </div>
                     ))}
@@ -136,17 +137,46 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
               )}
            </div>
         ) : (
-           <span className="font-black text-white mt-auto tracking-tight pt-1">${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}</span>
+           <span className="font-black text-foreground mt-auto tracking-tight pt-1">${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}</span>
         )}
       </div>
 
-      <button onClick={() => removeFromCart(item.cartItemId!)} className="absolute top-1/2 -translate-y-1/2 right-3 p-2 text-zinc-600 hover:text-red-400 hover:bg-red-950 rounded-xl transition-colors">
+      <button onClick={() => removeFromCart(item.cartItemId!)} className="absolute top-1/2 -translate-y-1/2 right-3 p-2 text-muted hover:text-red-400 hover:bg-red-950 rounded-xl transition-colors">
         <Trash2 className="w-5 h-5" />
       </button>
     </div>
   )
 
-
+  const handleManualCheckout = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCartError(null);
+    setCheckoutLoading(true);
+    try {
+      const isValid = await validateCartCompleteness();
+      if (!isValid) {
+        setCartError("Whoops! Some items in your bundle just sold. Please review your cart.");
+        setCheckoutStage('cart');
+        setCheckoutLoading(false);
+        return;
+      }
+      
+      const res = await submitManualCheckout(
+        cashItems.map(i => i.id),
+        checkoutForm.name,
+        checkoutForm.email,
+        checkoutForm.address
+      );
+      
+      if (res.success) {
+        setCheckoutStage('success');
+      }
+    } catch (err: any) {
+      console.error(err);
+      setCartError(err.message || "Checkout failed. Please try again.");
+    } finally {
+      setCheckoutLoading(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[100] overflow-hidden flex justify-end">
@@ -154,21 +184,21 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
       <div className="absolute inset-0 bg-black/80 backdrop-blur-md transition-opacity" onClick={() => setIsCartOpen(false)} />
       
       {/* Drawer */}
-      <div className="relative w-full max-w-md h-full bg-zinc-950 shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col animate-in slide-in-from-right duration-300 border-l border-zinc-800">
-        <div className="flex items-center justify-between p-6 border-b border-zinc-800 bg-zinc-950">
-          <h2 className="text-xl font-black flex items-center gap-2 text-white tracking-tight">
-            <ShoppingCart className="w-5 h-5 text-cyan-400" /> Your Bundle
+      <div className="relative w-full max-w-md h-full bg-background shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col animate-in slide-in-from-right duration-300 border-l border-border">
+        <div className="flex items-center justify-between p-6 border-b border-border bg-background">
+          <h2 className="text-xl font-black flex items-center gap-2 text-foreground tracking-tight">
+            <ShoppingCart className="w-5 h-5 text-brand-hover" /> Your Bundle
           </h2>
-          <button onClick={() => setIsCartOpen(false)} className="p-2 hover:bg-zinc-800 rounded-full transition-colors text-zinc-400 hover:text-white">
+          <button onClick={() => setIsCartOpen(false)} className="p-2 hover:bg-surface-hover rounded-full transition-colors text-muted hover:text-foreground">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-zinc-950">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-background">
           {cartItems.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-zinc-600 space-y-4">
-               <div className="w-20 h-20 bg-zinc-900 border border-zinc-800 rounded-full flex items-center justify-center shadow-inner">
-                 <ShoppingCart className="w-10 h-10 text-zinc-700" />
+            <div className="h-full flex flex-col items-center justify-center text-muted space-y-4">
+               <div className="w-20 h-20 bg-surface border border-border rounded-full flex items-center justify-center shadow-inner">
+                 <ShoppingCart className="w-10 h-10 text-muted" />
                </div>
                <p className="font-bold tracking-wide">Your bundle staging area is empty</p>
             </div>
@@ -182,7 +212,7 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
               
               {cashItems.length > 0 && (
                 <div className="space-y-3">
-                  <h3 className="text-[10px] font-black uppercase text-zinc-500 tracking-widest px-2 pb-1 border-b border-zinc-800">Cash Purchases</h3>
+                  <h3 className="text-[10px] font-black uppercase text-muted tracking-widest px-2 pb-1 border-b border-border">Cash Purchases</h3>
                   <div className="space-y-4">
                      {cashItems.map(renderItem)}
                   </div>
@@ -191,7 +221,7 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
 
               {tradeItems.length > 0 && (
                 <div className="space-y-3">
-                  <h3 className="text-[10px] font-black uppercase text-cyan-500 tracking-widest px-2 pb-1 border-b border-zinc-800">Trade Escrow</h3>
+                  <h3 className="text-[10px] font-black uppercase text-brand tracking-widest px-2 pb-1 border-b border-border">Trade Escrow</h3>
                   <div className="space-y-4">
                      {tradeItems.map(renderItem)}
                   </div>
@@ -202,88 +232,116 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
         </div>
 
         {cartItems.length > 0 && (
-          <div className="p-5 bg-zinc-950 border-t border-zinc-800 z-20 space-y-4 shadow-[0_-15px_30px_rgba(0,0,0,0.5)]">
+          <div className="p-5 bg-background border-t border-border z-20 space-y-4 shadow-[0_-15px_30px_rgba(0,0,0,0.5)]">
              
              {cashItems.length > 0 && (
-                <div className="bg-zinc-900/40 p-5 rounded-2xl border border-zinc-800/60 shadow-inner">
+                <div className="bg-surface/40 p-5 rounded-2xl border border-border/60 shadow-inner">
                   <div className="flex justify-between items-center mb-4">
-                    <span className="text-zinc-400 font-bold uppercase tracking-widest text-[10px]">Cash Total</span>
+                    <span className="text-muted font-bold uppercase tracking-widest text-[10px]">Cash Total</span>
                     <div className="flex items-center gap-3">
                        {timeLeft !== null && timeLeft > 0 && (
-                          <span className={`${timeLeft < 120000 ? 'text-red-400 animate-pulse' : 'text-amber-400'} text-[11px] font-black bg-black/50 px-2 py-1 rounded shadow-inner border border-zinc-800`}>
+                          <span className={`${timeLeft < 120000 ? 'text-red-400 animate-pulse' : 'text-amber-400'} text-[11px] font-black bg-black/50 px-2 py-1 rounded shadow-inner border border-border`}>
                              ⏳ {formatTime(timeLeft)}
                           </span>
                        )}
                        {timeLeft === 0 && (
-                          <span className="text-red-500 animate-pulse text-[11px] font-black bg-black/50 px-2 py-1 rounded shadow-inner border border-zinc-800">
+                          <span className="text-red-500 animate-pulse text-[11px] font-black bg-black/50 px-2 py-1 rounded shadow-inner border border-border">
                              EXPIRED
                           </span>
                        )}
-                       <span className="text-2xl font-black text-white tracking-tighter">${cartTotal.toFixed(2)}</span>
+                       <span className="text-2xl font-black text-foreground tracking-tighter">${cartTotal.toFixed(2)}</span>
                     </div>
                   </div>
 
                   {cartTotal < settings.cart_minimum && (
-                     <div className="bg-zinc-950 rounded-xl p-3 border border-zinc-800 shadow-sm relative overflow-hidden mb-4">
-                       <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1.5 flex justify-between items-center">
+                     <div className="bg-background rounded-xl p-3 border border-border shadow-sm relative overflow-hidden mb-4">
+                       <h4 className="text-[10px] font-black text-muted uppercase tracking-widest mb-1.5 flex justify-between items-center">
                          <span>Minimum: ${settings.cart_minimum.toFixed(2)}</span>
-                         <span className="text-cyan-400 bg-zinc-900 px-2 py-0.5 rounded shadow-sm border border-zinc-800">${(settings.cart_minimum - cartTotal).toFixed(2)} Away</span>
+                         <span className="text-brand-hover bg-surface px-2 py-0.5 rounded shadow-sm border border-border">${(settings.cart_minimum - cartTotal).toFixed(2)} Away</span>
                        </h4>
-                       <div className="w-full bg-zinc-900 rounded-full h-2 overflow-hidden border border-zinc-800">
-                          <div className="bg-cyan-500 h-2 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (cartTotal / settings.cart_minimum) * 100)}%` }}></div>
+                       <div className="w-full bg-surface rounded-full h-2 overflow-hidden border border-border">
+                          <div className="bg-brand h-2 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (cartTotal / settings.cart_minimum) * 100)}%` }}></div>
                        </div>
                      </div>
                   )}
                   
                   <div className="mt-4 relative z-0">
-                    <PayPalScriptProvider options={{ clientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "test" }}>
-                      <PayPalButtons 
+                    {checkoutStage === 'cart' && (
+                      <button 
+                        onClick={() => setCheckoutStage('form')}
                         disabled={cartTotal < settings.cart_minimum || checkoutLoading}
-                        style={{ layout: "vertical", shape: "rect", color: "gold" }}
-                        createOrder={async () => {
-                          setCartError(null);
-                          const isValid = await validateCartCompleteness();
-                          
-                          if (!isValid) {
-                            setCartError("Whoops! Some items in your bundle just sold to a competitive buyer. Please review your updated cart.");
-                            throw new Error("Cart items unavailable");
-                          }
+                        className="w-full bg-brand hover:bg-brand-hover text-white font-black py-4 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md active:scale-[0.98] disabled:opacity-50 text-[15px]"
+                      >
+                        Proceed to Checkout <ArrowRight className="w-5 h-5" />
+                      </button>
+                    )}
 
-                          const { orderId } = await createPayPalOrder(cashItems.map(i => i.id));
-                          return orderId;
-                        }}
-                        onApprove={async (data) => {
-                          try {
-                            const res = await capturePayPalOrder(data.orderID, cashItems.map(i => i.id));
-                            if (res.success) {
-                               clearCart();
-                               setIsCartOpen(false);
-                               setCartError(null);
-                               alert("Payment Successful! Thank you for your purchase.");
-                            }
-                          } catch (err: any) {
-                            console.error(err);
-                            setCartError("Failed to capture funds. Please contact support.");
-                          }
-                        }}
-                        onError={(err) => {
-                          console.error(err);
-                          setCartError("PayPal Checkout failed or was aborted.");
-                        }}
-                      />
-                    </PayPalScriptProvider>
+                    {checkoutStage === 'form' && (
+                      <form onSubmit={handleManualCheckout} className="space-y-3 bg-background p-4 rounded-xl border border-border shadow-inner">
+                        <input required type="text" placeholder="Full Name" value={checkoutForm.name} onChange={e => setCheckoutForm({...checkoutForm, name: e.target.value})} className="w-full bg-surface border border-border rounded outline-none p-2.5 text-foreground placeholder-zinc-500" />
+                        <input required type="email" placeholder="Email Address" value={checkoutForm.email} onChange={e => setCheckoutForm({...checkoutForm, email: e.target.value})} className="w-full bg-surface border border-border rounded outline-none p-2.5 text-foreground placeholder-zinc-500" />
+                        <textarea required placeholder="Shipping Address" value={checkoutForm.address} onChange={e => setCheckoutForm({...checkoutForm, address: e.target.value})} className="w-full bg-surface border border-border rounded outline-none p-2.5 text-foreground placeholder-zinc-500 resize-none h-20" />
+                        <div className="flex gap-2 pt-2">
+                           <button type="button" onClick={() => setCheckoutStage('cart')} className="flex-1 bg-surface-hover hover:bg-zinc-700 text-foreground font-bold py-3 rounded text-sm transition-colors">Back</button>
+                           <button type="submit" disabled={checkoutLoading} className="flex-[2] bg-brand hover:bg-brand-hover text-white font-black py-3 rounded flex items-center justify-center gap-2 transition-colors disabled:opacity-50 text-sm">
+                             {checkoutLoading ? <Loader2 className="w-4 h-4 animate-spin"/> : 'Place Order'}
+                           </button>
+                        </div>
+                      </form>
+                    )}
+
+                    {checkoutStage === 'success' && (
+                      <div className="bg-emerald-950/30 p-5 rounded-xl border border-emerald-900/50 text-center space-y-4 animate-in fade-in zoom-in-95">
+                         <div className="w-12 h-12 bg-emerald-900/50 rounded-full flex items-center justify-center mx-auto border border-emerald-500/30">
+                            <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+                         </div>
+                         <div>
+                            <h3 className="text-emerald-400 font-black text-lg">Order Reserved!</h3>
+                            <p className="text-emerald-200/80 text-xs mt-1 leading-relaxed">{settings.payment_instructions}</p>
+                         </div>
+                         <div className="space-y-2">
+                             {settings.payment_venmo && (
+                                <a href={settings.payment_venmo} target="_blank" rel="noopener noreferrer" className="block w-full bg-[#008CFF] hover:bg-[#0074D4] text-foreground font-black py-3 rounded-lg transition-colors text-sm shadow-md">
+                                   Pay ${cartTotal.toFixed(2)} via Venmo
+                                </a>
+                             )}
+                             {settings.payment_paypal && (
+                                <a href={settings.payment_paypal} target="_blank" rel="noopener noreferrer" className="block w-full bg-[#003087] hover:bg-[#001C53] text-foreground font-black py-3 rounded-lg transition-colors text-sm shadow-md">
+                                   Pay ${cartTotal.toFixed(2)} via PayPal
+                                </a>
+                             )}
+                             {settings.payment_cashapp && (
+                                <a href={settings.payment_cashapp} target="_blank" rel="noopener noreferrer" className="block w-full bg-[#00D632] hover:bg-[#00A827] text-foreground font-black py-3 rounded-lg transition-colors text-sm shadow-md">
+                                   Pay ${cartTotal.toFixed(2)} via CashApp
+                                </a>
+                             )}
+                             {settings.payment_zelle && (
+                                <a href={(settings.payment_zelle.includes('@') ? `mailto:${settings.payment_zelle}` : `tel:${settings.payment_zelle}`)} target="_blank" rel="noopener noreferrer" className="block w-full bg-[#7411E2] hover:bg-[#5C0DB3] text-foreground font-black py-3 rounded-lg transition-colors text-sm shadow-md">
+                                   Pay ${cartTotal.toFixed(2)} via Zelle ({settings.payment_zelle})
+                                </a>
+                             )}
+                         </div>
+                         <button onClick={() => {
+                            clearCart();
+                            setIsCartOpen(false);
+                            setCheckoutStage('cart');
+                         }} className="text-muted text-xs hover:text-foreground underline underline-offset-2 w-full text-center py-2">
+                            I've sent the payment. Close window.
+                         </button>
+                      </div>
+                    )}
                   </div>
                 </div>
              )}
 
              {tradeItems.length > 0 && (
-                <div className="bg-cyan-950/10 p-5 rounded-2xl border border-cyan-900/20 shadow-inner">
+                <div className="bg-transparent p-5 rounded-2xl border border-brand/40 shadow-inner">
                   <div className="flex justify-between items-center mb-4">
-                    <span className="text-cyan-600 font-black uppercase tracking-widest text-[10px]">Trade Action</span>
-                    <span className="text-sm font-black text-cyan-400 tracking-tight flex items-center gap-1"><Handshake className="w-4 h-4"/> {tradeItems.length} Proposal{tradeItems.length > 1 ? 's' : ''}</span>
+                    <span className="text-brand font-black uppercase tracking-widest text-[10px]">Trade Action</span>
+                    <span className="text-sm font-black text-brand-hover tracking-tight flex items-center gap-1"><Handshake className="w-4 h-4"/> {tradeItems.length} Proposal{tradeItems.length > 1 ? 's' : ''}</span>
                   </div>
                   
-                  <button onClick={handleTradeCheckout} disabled={tradeSubmitting} className="w-full bg-cyan-600 hover:bg-cyan-500 text-zinc-950 font-black py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md active:scale-[0.98] disabled:opacity-50 text-[15px]">
+                  <button onClick={handleTradeCheckout} disabled={tradeSubmitting} className="w-full bg-brand hover:bg-brand-hover text-white font-black py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md active:scale-[0.98] disabled:opacity-50 text-[15px]">
                     {tradeSubmitting ? <Loader2 className="w-5 h-5 animate-spin"/> : 'Submit Trade Offers'}
                   </button>
                 </div>

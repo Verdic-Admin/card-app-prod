@@ -1,17 +1,17 @@
 "use server";
-import { sql } from '@vercel/postgres';
+import pool from '@/utils/db';
 
-import { put, del } from '@vercel/blob';
+import { put, del } from '@/utils/storage';
 
 // Executes the user-requested Pre-Flight check right before PayPal generated. 
 // Protects the single-item cart model from ghost carts perfectly.
 export async function validateCartCompleteness(itemIds: string[]) {
-  const { rows: updatedData } = await sql`
+  const { rows: updatedData } = await pool.query(`
       UPDATE inventory 
-      SET status = 'pending_checkout', checkout_expires_at = ${new Date(Date.now() + 10 * 60000).toISOString()}
-      WHERE id = ANY(${itemIds as any}::uuid[]) AND status = 'available'
+      SET status = 'pending_checkout', checkout_expires_at = $1
+      WHERE id = ANY($2::uuid[]) AND status = 'available'
       RETURNING id
-  `;
+  `, [new Date(Date.now() + 10 * 60000).toISOString(), itemIds]);
 
   const lockedIds = updatedData?.map((d: any) => d.id) || []
   const missingOrSold = itemIds.filter(id => !lockedIds.includes(id))
@@ -32,7 +32,7 @@ export async function submitTradeOffer(formData: FormData) {
   
   if (Array.isArray(target_items) && target_items.length > 0) {
     const itemIds = target_items.map((i: any) => i.id || i);
-    const { rows } = await sql`SELECT id, listed_price, market_price FROM inventory WHERE id = ANY(${itemIds as any}::uuid[])`;
+    const { rows } = await pool.query(`SELECT id, listed_price, market_price FROM inventory WHERE id = ANY($1::uuid[])`, [itemIds]);
     target_items = target_items.map((t: any) => {
        const itemId = t.id || t;
        const dbItem = rows.find(r => r.id === itemId);
@@ -64,42 +64,16 @@ export async function submitTradeOffer(formData: FormData) {
   const final_image_urls = attached_image_urls.length > 0 ? attached_image_urls.join(',') : null;
 
   try {
-     await sql`
+     await pool.query(`
         INSERT INTO trade_offers (buyer_name, buyer_email, offer_text, target_items, attached_image_url, status)
-        VALUES (${buyer_name}, ${buyer_email}, ${offer_text}, ${JSON.stringify(target_items)}, ${final_image_urls}, 'pending')
-     `;
+        VALUES ($1, $2, $3, $4, $5, 'pending')
+     `, [buyer_name, buyer_email, offer_text, JSON.stringify(target_items), final_image_urls]);
   } catch (error: any) {
     console.error("PG Error Data:", error)
     return { success: false, error: `Database Insert Fault: ${error.message}. Is your attached_image_url column properly created as type Text?` }
   }
 
-  // Instantly send a Discord notification via webhook
-  if (process.env.DISCORD_WEBHOOK_URL) {
-    try {
-      const embed: any = {
-        title: `New Trade Offer from ${buyer_name}`,
-        color: 3447003, // Blue embed color
-        description: `**Email:** ${buyer_email}\n**Offer:** ${offer_text || "*No offer text provided*"}\n\n**Action Required:** Login to your secure Vercel Admin Dashboard to instantly review exactly what items they requested from your store!`,
-        timestamp: new Date().toISOString(),
-      };
 
-      if (final_image_urls) {
-        const urls = final_image_urls.split(',');
-        embed.image = { url: urls[0] }; // Display the first attached image
-        if (urls.length > 1) {
-          embed.description += `\n\n**Additional Images:**\n${urls.slice(1).map((u, i) => `[Image ${i + 2}](${u})`).join('\n')}`;
-        }
-      }
-
-      await fetch(process.env.DISCORD_WEBHOOK_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: null, embeds: [embed] })
-      });
-    } catch(e) {
-      console.warn("Failed to dispatch Discord webhook notification:", e)
-    }
-  }
 
   return { success: true }
 }
@@ -110,7 +84,7 @@ export async function clearTradeImageStorage(tradeOfferId: string, imageUrl: str
       const urls = imageUrl.split(',');
       await del(urls);
     }
-    await sql`UPDATE trade_offers SET attached_image_url = null WHERE id = ${tradeOfferId}`;
+    await pool.query(`UPDATE trade_offers SET attached_image_url = null WHERE id = $1`, [tradeOfferId]);
     return { success: true }
   } catch (error: any) {
     console.error("Failed to clear trade image storage:", error)
@@ -119,7 +93,7 @@ export async function clearTradeImageStorage(tradeOfferId: string, imageUrl: str
 }
 
 export async function getAllTradeOffers() {
-  const { rows } = await sql`SELECT * FROM trade_offers ORDER BY created_at DESC`;
+  const { rows } = await pool.query(`SELECT * FROM trade_offers ORDER BY created_at DESC`);
   return rows;
 }
 
@@ -128,10 +102,35 @@ export async function deleteTradeOfferRecord(id: string, imageUrl: string | null
     if (imageUrl) {
       await del(imageUrl);
     }
-    await sql`DELETE FROM trade_offers WHERE id = ${id}`;
+    await pool.query(`DELETE FROM trade_offers WHERE id = $1`, [id]);
     return { success: true }
   } catch (error: any) {
     console.error("Failed to delete trade offer:", error)
     throw new Error(error.message)
+  }
+}
+export async function approveManualPayment(offerId: string) {
+  try {
+     const { rows } = await pool.query(`SELECT target_items FROM trade_offers WHERE id = $1 LIMIT 1`, [offerId]);
+     if (!rows.length) throw new Error("Order not found.");
+     
+     const items = typeof rows[0].target_items === 'string' 
+         ? JSON.parse(rows[0].target_items) 
+         : rows[0].target_items;
+         
+     const itemIds = items.map((i: any) => i.id);
+     
+     // 1. Mark inventory as Sold
+     if (itemIds.length > 0) {
+        await pool.query(`UPDATE inventory SET status = 'sold', sold_at = NOW() WHERE id = ANY($1::uuid[])`, [itemIds]);
+     }
+     
+     // 2. Mark order as confirmed and complete
+     await pool.query(`UPDATE trade_offers SET status = 'completed' WHERE id = $1`, [offerId]);
+     
+     return { success: true };
+  } catch (error: any) {
+     console.error(error);
+     return { success: false, error: error.message };
   }
 }

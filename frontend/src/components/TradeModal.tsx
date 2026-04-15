@@ -68,38 +68,38 @@ export function TradeModal({ isOpen, onClose, cartItems, onSuccess, targetCard }
     <div className="fixed inset-0 z-[120] overflow-hidden flex items-center justify-center p-4 md:py-10">
       <div className="absolute inset-0 bg-black/80 backdrop-blur-md transition-opacity" onClick={onClose} />
       
-      <div className="relative w-full max-w-2xl bg-zinc-950 rounded-2xl shadow-2xl flex flex-col max-h-full animate-in fade-in zoom-in-95 duration-200 border border-zinc-800 overflow-hidden">
-        <div className="flex justify-between items-center p-5 md:p-6 border-b border-zinc-900 bg-zinc-950/95 backdrop-blur z-20 sticky top-0">
-          <h2 className="text-xl md:text-2xl font-black text-white flex items-center gap-3 tracking-tight">
+      <div className="relative w-full max-w-2xl bg-background rounded-2xl shadow-2xl flex flex-col max-h-full animate-in fade-in zoom-in-95 duration-200 border border-border overflow-hidden">
+        <div className="flex justify-between items-center p-5 md:p-6 border-b border-zinc-900 bg-background/95 backdrop-blur z-20 sticky top-0">
+          <h2 className="text-xl md:text-2xl font-black text-foreground flex items-center gap-3 tracking-tight">
             <Handshake className="w-6 h-6 text-cyan-400" /> Propose a Trade
           </h2>
-          <button type="button" onClick={onClose} className="p-2 hover:bg-zinc-800 rounded-full transition-colors focus:ring-2 focus:ring-cyan-500 outline-none">
-            <X className="w-5 h-5 text-zinc-500" />
+          <button type="button" onClick={onClose} className="p-2 hover:bg-surface-hover rounded-full transition-colors focus:ring-2 focus:ring-cyan-500 outline-none">
+            <X className="w-5 h-5 text-muted" />
           </button>
         </div>
 
-        <div className="p-5 md:p-6 overflow-y-auto z-10 custom-scrollbar bg-zinc-950">
+        <div className="p-5 md:p-6 overflow-y-auto z-10 custom-scrollbar bg-background">
           {tradeSuccess ? (
             <div className="text-center py-16 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <CheckCircle2 className="w-20 h-20 text-cyan-400 mx-auto mb-6 drop-shadow-[0_0_15px_rgba(34,211,238,0.5)]" />
-              <h3 className="text-2xl font-black text-white mb-2">Offer Drafted!</h3>
-              <p className="text-zinc-400 font-medium text-lg">Your trade proposal has securely moved into your bundle. Open your cart to finalize submission.</p>
+              <h3 className="text-2xl font-black text-foreground mb-2">Offer Drafted!</h3>
+              <p className="text-muted font-medium text-lg">Your trade proposal has securely moved into your bundle. Open your cart to finalize submission.</p>
             </div>
           ) : (
             <form onSubmit={handleTradeSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                   <label className="text-[10px] font-black text-zinc-500 ml-1 mb-1 block uppercase tracking-widest">Your Name</label>
-                   <input required type="text" placeholder="John Doe" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full p-3 text-sm font-medium border border-zinc-800 rounded-xl focus:ring-2 focus:ring-cyan-500 outline-none bg-zinc-900 focus:bg-zinc-800 text-white placeholder:text-zinc-600 transition-colors shadow-inner" />
+                   <label className="text-[10px] font-black text-muted ml-1 mb-1 block uppercase tracking-widest">Your Name</label>
+                   <input required type="text" placeholder="John Doe" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full p-3 text-sm font-medium border border-border rounded-xl focus:ring-2 focus:ring-cyan-500 outline-none bg-surface focus:bg-surface-hover text-foreground placeholder:text-muted transition-colors shadow-inner" />
                 </div>
                 <div>
-                   <label className="text-[10px] font-black text-zinc-500 ml-1 mb-1 block uppercase tracking-widest">Email Address</label>
-                   <input required type="email" placeholder="john@example.com" value={form.email} onChange={e => setForm({...form, email: e.target.value})} className="w-full p-3 text-sm font-medium border border-zinc-800 rounded-xl focus:ring-2 focus:ring-cyan-500 outline-none bg-zinc-900 focus:bg-zinc-800 text-white placeholder:text-zinc-600 transition-colors shadow-inner" />
+                   <label className="text-[10px] font-black text-muted ml-1 mb-1 block uppercase tracking-widest">Email Address</label>
+                   <input required type="email" placeholder="john@example.com" value={form.email} onChange={e => setForm({...form, email: e.target.value})} className="w-full p-3 text-sm font-medium border border-border rounded-xl focus:ring-2 focus:ring-cyan-500 outline-none bg-surface focus:bg-surface-hover text-foreground placeholder:text-muted transition-colors shadow-inner" />
                 </div>
               </div>
 
               <div className="space-y-4">
-                <h4 className="flex items-center justify-between text-sm font-black text-white border-b border-zinc-800 pb-2">
+                <h4 className="flex items-center justify-between text-sm font-black text-foreground border-b border-border pb-2">
                    Trade Offer Attachment
                    {targetCard ? (
                       <span className="text-xs font-black text-cyan-300 bg-cyan-950/80 px-2.5 py-1 rounded-md tracking-wide border border-cyan-800 flex-shrink-0 ml-2 text-right">Targeting: {targetCard.card_set} {targetCard.player_name}</span>
@@ -109,26 +109,26 @@ export function TradeModal({ isOpen, onClose, cartItems, onSuccess, targetCard }
                 </h4>
               </div>
 
-              <div className="pt-4 border-t border-zinc-800">
-                 <label className="text-xs font-bold text-zinc-500 ml-1 mb-1 block">Offer Details / Trade Components</label>
-                 <textarea required placeholder="Describe your offer here (e.g., I will trade these 4 slabs for your 1/1...)" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} className="w-full p-2.5 text-sm font-medium border border-zinc-800 rounded-xl focus:ring-2 focus:ring-cyan-500 outline-none min-h-[80px] resize-none bg-zinc-900 focus:bg-zinc-800 text-white placeholder:text-zinc-600 transition-colors shadow-inner" />
+              <div className="pt-4 border-t border-border">
+                 <label className="text-xs font-bold text-muted ml-1 mb-1 block">Offer Details / Trade Components</label>
+                 <textarea required placeholder="Describe your offer here (e.g., I will trade these 4 slabs for your 1/1...)" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} className="w-full p-2.5 text-sm font-medium border border-border rounded-xl focus:ring-2 focus:ring-cyan-500 outline-none min-h-[80px] resize-none bg-surface focus:bg-surface-hover text-foreground placeholder:text-muted transition-colors shadow-inner" />
               </div>
 
               <div>
-                 <label className="text-xs font-bold text-zinc-500 ml-1 mb-1 block">Attach Photos (Optional but recommended)</label>
-                 <input type="file" multiple accept="image/*" onChange={handleImageUpload} className="w-full text-sm font-medium text-zinc-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-zinc-800 file:text-cyan-400 hover:file:bg-zinc-700 cursor-pointer border border-zinc-800 rounded-xl bg-zinc-900 transition-colors" />
-                 <p className="text-[10px] text-zinc-500 italic mt-2 ml-1">Bundle offer? You can upload as many trade items for this card as you want. Just select multiple photos.</p>
+                 <label className="text-xs font-bold text-muted ml-1 mb-1 block">Attach Photos (Optional but recommended)</label>
+                 <input type="file" multiple accept="image/*" onChange={handleImageUpload} className="w-full text-sm font-medium text-muted file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-surface-hover file:text-cyan-400 hover:file:bg-zinc-700 cursor-pointer border border-border rounded-xl bg-surface transition-colors" />
+                 <p className="text-[10px] text-muted italic mt-2 ml-1">Bundle offer? You can upload as many trade items for this card as you want. Just select multiple photos.</p>
                  
                  {previews.length > 0 && (
-                   <div className="mt-4 border border-zinc-800/50 bg-zinc-900/50 p-3 rounded-xl border-dashed">
+                   <div className="mt-4 border border-border/50 bg-surface/50 p-3 rounded-xl border-dashed">
                      <p className="text-[10px] font-black tracking-widest uppercase text-cyan-400 mb-3 flex items-center gap-2">
                         <CheckCircle2 className="w-3.5 h-3.5" /> {previews.length} photos attached to this offer
                      </p>
                      <div className="grid grid-cols-4 sm:grid-cols-5 gap-3">
                      {previews.map((src, idx) => (
-                        <div key={idx} className="relative aspect-square w-full bg-zinc-900 rounded-lg border border-zinc-700 overflow-hidden shadow-inner group transition-all hover:border-cyan-500">
+                        <div key={idx} className="relative aspect-square w-full bg-surface rounded-lg border border-border overflow-hidden shadow-inner group transition-all hover:border-cyan-500">
                            <img src={src} className="w-full h-full object-cover" />
-                           <button type="button" onClick={() => removeImage(idx)} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                           <button type="button" onClick={() => removeImage(idx)} className="absolute top-1 right-1 bg-red-500 text-foreground rounded-full p-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                               <X className="w-3 h-3" />
                            </button>
                         </div>

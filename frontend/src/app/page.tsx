@@ -1,4 +1,4 @@
-import { sql } from '@vercel/postgres';
+import pool from '@/utils/db';
 import type { Metadata } from "next";
 import { Hero } from "@/components/Hero";
 import { CardGrid } from "@/components/CardGrid";
@@ -63,7 +63,7 @@ export default async function Home(props: { searchParams: Promise<{ [key: string
   const settings = await getStoreSettings();
 
   // 1. Dynamically extract the highly precise lists of available teams and years that actually exist in the DB right now
-  const { rows: filterData } = await sql`SELECT DISTINCT team_name FROM inventory WHERE status = 'available' AND team_name IS NOT NULL`;
+  const { rows: filterData } = await pool.query(`SELECT DISTINCT team_name FROM inventory WHERE status = 'available' AND team_name IS NOT NULL`);
   const availableTeams = filterData.map(d => d.team_name).sort();
 
   // 2. Base Query Builder using Next.js pure SearchParams to natively enable shareable Deep Links instantly
@@ -115,17 +115,17 @@ export default async function Home(props: { searchParams: Promise<{ [key: string
 
   if (!hasFilters && items.length === 0) {
     return (
-      <div className="min-h-[80vh] flex items-center justify-center bg-zinc-950 px-4">
+      <div className="min-h-[80vh] flex items-center justify-center bg-background px-4">
         <div className="max-w-2xl w-full text-center">
-          <div className="w-24 h-24 mx-auto mb-8 bg-zinc-900 border border-zinc-800 rounded-full flex items-center justify-center shadow-2xl">
-            <svg className="w-10 h-10 text-cyan-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="w-24 h-24 mx-auto mb-8 bg-surface border border-border rounded-full flex items-center justify-center shadow-2xl">
+            <svg className="w-10 h-10 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
             </svg>
           </div>
-          <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight mb-4">{settings.site_name}</h1>
-          <p className="text-xl text-zinc-400 mb-8 font-medium">Coming Soon</p>
-          <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-2xl p-6 md:p-8">
-            <p className="text-zinc-500">
+          <h1 className="text-4xl md:text-5xl font-black text-foreground tracking-tight mb-4">{settings.site_name}</h1>
+          <p className="text-xl text-muted mb-8 font-medium">Coming Soon</p>
+          <div className="bg-surface/50 border border-border/50 rounded-2xl p-6 md:p-8">
+            <p className="text-muted">
               We are currently scanning and organizing our initial inventory. 
               Check back shortly as we go live with our first batch of premium cards!
             </p>
@@ -144,8 +144,8 @@ export default async function Home(props: { searchParams: Promise<{ [key: string
 
         <div className="flex-1 w-full min-w-0">
           <div className="mb-8 flex items-center justify-between">
-            <h2 className="text-2xl font-black tracking-tight text-white">Available Inventory</h2>
-            <span className="bg-cyan-950 text-cyan-400 text-xs font-bold px-3 py-1 rounded-full inline-flex items-center gap-2 flex-shrink-0 border border-cyan-900/50">
+            <h2 className="text-2xl font-black tracking-tight text-foreground">Available Inventory</h2>
+            <span className="bg-cyan-950 text-brand-hover text-xs font-bold px-3 py-1 rounded-full inline-flex items-center gap-2 flex-shrink-0 border border-cyan-900/50">
               <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
               {items?.length || 0} Cards
             </span>

@@ -1,11 +1,12 @@
-
-const { createClient } = require('@vercel/postgres');
+const { Client } = require('pg');
 
 async function init() {
-  const client = createClient();
+  const client = new Client({
+    connectionString: process.env.DATABASE_URL,
+  });
   await client.connect();
 
-  console.log("Connected to Vercel Postgres:", process.env.POSTGRES_URL);
+  console.log("Connected to standard Postgres using DATABASE_URL");
 
   await client.query(`
     CREATE TABLE IF NOT EXISTS inventory (
@@ -50,6 +51,32 @@ async function init() {
             );
   `);
   console.log("Created shop_config");
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS admin_users (
+                id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                email TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                reset_token TEXT,
+                reset_token_expires_at TIMESTAMP WITH TIME ZONE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+  `);
+  console.log("Created admin_users");
+
+  // Bootstrap the initial Admin User if provided by the Master Orchestrator
+  if (process.env.ADMIN_EMAIL && process.env.INITIAL_ADMIN_PASSWORD) {
+    console.log("Bootstrapping initial admin user...");
+    // Attempt to insert the admin user. If the email already exists, do nothing securely.
+    await client.query(`
+      INSERT INTO admin_users (email, password_hash)
+      VALUES ($1, $2)
+      ON CONFLICT (email) DO NOTHING
+    `, [process.env.ADMIN_EMAIL, process.env.INITIAL_ADMIN_PASSWORD]);
+    console.log("Admin user bootstrapped successfully.");
+  } else {
+    console.log("No ADMIN_EMAIL or INITIAL_ADMIN_PASSWORD provided to bootstrap.");
+  }
 
   await client.query(`
     CREATE TABLE IF NOT EXISTS store_settings (

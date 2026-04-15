@@ -1,5 +1,5 @@
 "use server";
-import { sql } from '@vercel/postgres';
+import pool from '@/utils/db';
 
 
 const ALLOWED_COLUMNS = [
@@ -25,11 +25,11 @@ export async function createDraftCardsAction(cards: any[]) {
   const results = [];
   try {
      for (const item of payload) {
-        const { rows } = await sql`
+        const { rows } = await pool.query(`
            INSERT INTO scan_staging (player_name, card_set, card_number, insert_name, parallel_name, print_run, image_url, back_image_url, listed_price, market_price)
-           VALUES (${item.player_name}, ${item.card_set}, ${item.card_number}, ${item.insert_name}, ${item.parallel_name}, ${item.print_run}, ${item.image_url}, ${item.back_image_url}, ${item.listed_price}, ${item.market_price})
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
            RETURNING id, player_name, card_set, card_number, insert_name, parallel_name, print_run, image_url, back_image_url, listed_price, market_price
-        `;
+        `, [item.player_name, item.card_set, item.card_number, item.insert_name, item.parallel_name, item.print_run, item.image_url, item.back_image_url, item.listed_price, item.market_price]);
         if (rows.length > 0) results.push(rows[0]);
      }
   } catch (error) {
@@ -64,7 +64,7 @@ export async function updateDraftCardAction(id: string, updates: any) {
            }
         }
         for (const [k, v] of Object.entries(payload)) {
-           await sql.query(`UPDATE scan_staging SET ${k} = $1 WHERE id = $2`, [v, id]);
+           await pool.query(`UPDATE scan_staging SET ${k} = $1 WHERE id = $2`, [v, id]);
         }
      }
   } catch (error) {
@@ -79,7 +79,7 @@ export async function publishDraftCardsAction(ids: string[]) {
   // 1. Read approved rows from staging
   let staged = [];
   try {
-     const { rows } = await sql`SELECT player_name, card_set, card_number, insert_name, parallel_name, print_run, image_url, back_image_url, listed_price, market_price FROM scan_staging WHERE id = ANY(${ids as any}::uuid[])`;
+     const { rows } = await pool.query(`SELECT player_name, card_set, card_number, insert_name, parallel_name, print_run, image_url, back_image_url, listed_price, market_price FROM scan_staging WHERE id = ANY($1::uuid[])`, [ids as any]);
      staged = rows;
   } catch (error) {
      console.error(error);
@@ -93,10 +93,10 @@ export async function publishDraftCardsAction(ids: string[]) {
   // 2. Insert into live inventory
   try {
       for (const s of staged) {
-          await sql`
+          await pool.query(`
              INSERT INTO inventory (player_name, card_set, card_number, insert_name, parallel_name, print_run, image_url, back_image_url, listed_price, market_price, status)
-             VALUES (${s.player_name}, ${s.card_set}, ${s.card_number}, ${s.insert_name}, ${s.parallel_name}, ${s.print_run}, ${s.image_url}, ${s.back_image_url}, ${s.listed_price}, ${s.market_price}, 'available')
-          `;
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'available')
+          `, [s.player_name, s.card_set, s.card_number, s.insert_name, s.parallel_name, s.print_run, s.image_url, s.back_image_url, s.listed_price, s.market_price]);
       }
   } catch (insertError) {
       console.error(insertError);
@@ -105,7 +105,7 @@ export async function publishDraftCardsAction(ids: string[]) {
 
   // 3. Remove from staging
   try {
-      await sql`DELETE FROM scan_staging WHERE id = ANY(${ids as any}::uuid[])`;
+      await pool.query(`DELETE FROM scan_staging WHERE id = ANY($1::uuid[])`, [ids as any]);
   } catch (deleteError) {
       console.error("Warning: cards minted but staging cleanup failed:", deleteError)
       throw new Error("Failed to clean up staging area after publishing")

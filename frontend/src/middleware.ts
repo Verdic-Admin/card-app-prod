@@ -13,19 +13,11 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    // 2. Force the visitor to provide the admin password
-    const basicAuth = request.headers.get('authorization');
-    if (adminPassword) {
-      // Note: Basic Auth header is 'Basic <base64>' -> index 1
-      const authValue = basicAuth ? basicAuth.split(' ')[1] : '';
-      const expectedAuth = btoa(`admin:${adminPassword}`);
-      
-      if (authValue !== expectedAuth) {
-        return new NextResponse('Unauthorized Access', {
-          status: 401,
-          headers: { 'WWW-Authenticate': 'Basic realm="Secure Admin Dashboard"' }
-        });
-      }
+    // 2. Force the visitor to be authenticated via the login cookie
+    const hasSession = request.cookies.has("admin_session");
+    if (!hasSession) {
+      url.pathname = '/login';
+      return NextResponse.redirect(url);
     }
   }
 

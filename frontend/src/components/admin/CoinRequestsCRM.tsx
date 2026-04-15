@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { fulfillCoinRequest, getPendingCoinRequests } from '@/app/actions/coins'
+import { InstructionTrigger } from '@/components/admin/DraggableGuide'
 
 type CoinRequest = {
   id: string;

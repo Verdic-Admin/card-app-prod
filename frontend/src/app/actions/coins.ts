@@ -1,7 +1,7 @@
 "use server";
-import { sql } from '@vercel/postgres';
+import pool from '@/utils/db';
 
-import { put } from '@vercel/blob';
+import { put } from '@/utils/storage';
 import { revalidatePath } from 'next/cache'
 function checkAuth() {
   if (!process.env.PLAYERINDEX_API_KEY) throw new Error("Unauthorized to access Admin operations");
@@ -9,10 +9,10 @@ function checkAuth() {
 
 export async function submitCoinRequest(itemId: string, email: string) {
   try {
-    await sql`
+    await pool.query(`
       INSERT INTO coin_requests (item_id, buyer_email, status)
-      VALUES (${itemId}, ${email}, 'pending')
-    `;
+      VALUES ($1, $2, 'pending')
+    `, [itemId, email]);
   } catch (error: any) {
     throw new Error(`Failed to submit coin request: ${error.message}`)
   }
@@ -36,10 +36,10 @@ export async function fulfillCoinRequest(requestId: string, itemId: string, form
   }
 
   // 1. Stamp inventory
-  await sql`UPDATE inventory SET coined_image_url = ${coinedImageUrl} WHERE id = ${itemId}`;
+  await pool.query(`UPDATE inventory SET coined_image_url = $1 WHERE id = $2`, [coinedImageUrl, itemId]);
 
   // 2. Resolve request
-  await sql`UPDATE coin_requests SET status = 'fulfilled' WHERE id = ${requestId}`;
+  await pool.query(`UPDATE coin_requests SET status = 'fulfilled' WHERE id = $1`, [requestId]);
 
   revalidatePath('/admin')
   revalidatePath(`/item/${itemId}`)
@@ -49,12 +49,12 @@ export async function fulfillCoinRequest(requestId: string, itemId: string, form
 export async function getPendingCoinRequests() {
   checkAuth();
   
-  const { rows } = await sql`
+  const { rows } = await pool.query(`
      SELECT c.*, row_to_json(i.*) as inventory
      FROM coin_requests c
      LEFT JOIN inventory i ON c.item_id = i.id
      WHERE c.status = 'pending'
      ORDER BY c.created_at DESC
-  `;
+  `);
   return rows;
 }

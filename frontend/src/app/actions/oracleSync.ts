@@ -1,7 +1,7 @@
 "use server";
 
 
-import { sql } from '@vercel/postgres'
+import pool from '@/utils/db';
 import { vercelBatchUpdatePrices } from '@/app/actions/inventory'
 
 const ALLOWED_COLUMNS = [
@@ -20,7 +20,7 @@ function toTitleCase(str: string) {
 
 export async function syncInventoryWithOracle() {
   console.log("-> Fetching active inventory from Vercel Postgres...");
-  const { rows: inventory } = await sql`SELECT id FROM inventory WHERE status = 'available'`;
+  const { rows: inventory } = await pool.query(`SELECT id FROM inventory WHERE status = 'available'`);
   
   if (!inventory || inventory.length === 0) {
     console.log("-> 0 items found, aborting.");
@@ -32,7 +32,7 @@ export async function syncInventoryWithOracle() {
   // Fetch discount percentage from shop_config
   let discountRate = 0;
   try {
-    const { rows: configRows } = await sql`SELECT discount_rate FROM shop_config LIMIT 1`;
+    const { rows: configRows } = await pool.query(`SELECT discount_rate FROM shop_config LIMIT 1`);
     if (configRows.length > 0) {
       discountRate = parseFloat(configRows[0].discount_rate) || 0;
     }
@@ -79,7 +79,7 @@ export async function syncInventoryWithOracle() {
   await vercelBatchUpdatePrices(updates);
 
   console.log(`-> Checking Lot-Aware Pricing Validity...`);
-  await sql`
+  await pool.query(`
     UPDATE inventory i
     SET needs_price_approval = true
     FROM (
@@ -90,7 +90,7 @@ export async function syncInventoryWithOracle() {
       GROUP BY parent.id, parent.listed_price
     ) as agg
     WHERE i.id = agg.parent_id AND agg.children_sum < agg.parent_listed_price;
-  `;
+  `);
 
   return { success: true, count: updates.length };
 }
@@ -106,12 +106,12 @@ export async function syncSingleItemWithOracle(id: string) {
   }
 
   // Fetch discount percentage
-  const { rows: settingsRows } = await sql`SELECT oracle_discount_percentage FROM store_settings WHERE id = 1`; const settings = settingsRows[0]
+  const { rows: settingsRows } = await pool.query(`SELECT oracle_discount_percentage FROM store_settings WHERE id = 1`); const settings = settingsRows[0]
   const discountRate = settings?.oracle_discount_percentage || 0;
 
   let item, inventoryError;
   try {
-    const { rows } = await sql`SELECT * FROM inventory WHERE id = ${id}`
+    const { rows } = await pool.query(`SELECT * FROM inventory WHERE id = $1`, [id])
     item = rows[0]
   } catch (err) {
     inventoryError = err
@@ -155,12 +155,12 @@ export async function syncSingleItemWithOracle(id: string) {
     if (data.target_price && data.target_price > 0) {
       const new_price = data.target_price * (1 - (discountRate / 100))
 
-      let updateError; try { await sql`UPDATE inventory SET listed_price = ${new_price}, oracle_projection = ${data.target_price}, oracle_trend_percentage = ${data.trend_percentage || null} WHERE id = ${item.id}` } catch (err) { updateError = err }
+      let updateError; try { await pool.query(`UPDATE inventory SET listed_price = $1, oracle_projection = $2, oracle_trend_percentage = $3 WHERE id = $4`, [new_price, data.target_price, data.trend_percentage || null, item.id]) } catch (err) { updateError = err }
 
       if (!updateError) {
         return { success: true, message: `Repriced to $${new_price.toFixed(2)}`, new_price }
       } else {
-        return { success: false, message: `Failed to update price in Supabase.` }
+        return { success: false, message: `Failed to update price in Postgres database.` }
       }
     } else {
       return { success: false, message: `Oracle returned invalid target_price.` }
@@ -181,7 +181,7 @@ export async function evaluateItemWithOracle(payload: any) {
   }
 
   // Fetch discount percentage
-  const { rows: settingsRows } = await sql`SELECT oracle_discount_percentage FROM store_settings WHERE id = 1`; const settings = settingsRows[0]
+  const { rows: settingsRows } = await pool.query(`SELECT oracle_discount_percentage FROM store_settings WHERE id = 1`); const settings = settingsRows[0]
   const discountRate = settings?.oracle_discount_percentage || 0;
 
   try {
@@ -331,14 +331,14 @@ export async function getBatchOraclePrices(cards: any[]) {
 
 export async function applyOracleDiscount(id: string) {
 
-  const { rows: settingsRows } = await sql`SELECT oracle_discount_percentage FROM store_settings WHERE id = 1`; const settings = settingsRows[0]
+  const { rows: settingsRows } = await pool.query(`SELECT oracle_discount_percentage FROM store_settings WHERE id = 1`); const settings = settingsRows[0]
   const discountRate = settings?.oracle_discount_percentage || 0;
   
-  const { rows } = await sql`SELECT oracle_projection FROM inventory WHERE id = ${id}`; const item = rows[0];
+  const { rows } = await pool.query(`SELECT oracle_projection FROM inventory WHERE id = $1`, [id]); const item = rows[0];
   // @ts-ignore
   if (item?.oracle_projection) {
        const new_price = item.oracle_projection * (1 - (discountRate / 100))
-       await sql`UPDATE inventory SET listed_price = ${new_price} WHERE id = ${id}`
+       await pool.query(`UPDATE inventory SET listed_price = $1 WHERE id = $2`, [new_price, id])
        return { success: true, new_price }
   }
   return { success: false, message: 'No oracle projection' }
@@ -346,16 +346,16 @@ export async function applyOracleDiscount(id: string) {
 
 export async function applyOracleDiscountAll() {
 
-  const { rows: settingsRows } = await sql`SELECT oracle_discount_percentage FROM store_settings WHERE id = 1`; const settings = settingsRows[0]
+  const { rows: settingsRows } = await pool.query(`SELECT oracle_discount_percentage FROM store_settings WHERE id = 1`); const settings = settingsRows[0]
   const discountRate = settings?.oracle_discount_percentage || 0;
   
-  const { rows: items } = await sql`SELECT id, oracle_projection FROM inventory WHERE oracle_projection IS NOT NULL`
+  const { rows: items } = await pool.query(`SELECT id, oracle_projection FROM inventory WHERE oracle_projection IS NOT NULL`)
   let count = 0
   if (items) {
       for (const item of items) {
           if (item.oracle_projection) {
               const new_price = item.oracle_projection * (1 - (discountRate / 100))
-              await sql`UPDATE inventory SET listed_price = ${new_price} WHERE id = ${item.id}`
+              await pool.query(`UPDATE inventory SET listed_price = $1 WHERE id = $2`, [new_price, item.id])
               count++
           }
       }
@@ -372,19 +372,19 @@ export async function applyCorrection(id: string, item: any) {
       }
     }
     for (const [k, v] of Object.entries(item)) {
-      await sql.query(`UPDATE inventory SET ${k} = $1 WHERE id = $2`, [v, id]);
+      await pool.query(`UPDATE inventory SET ${k} = $1 WHERE id = $2`, [v, id]);
     }
   }
-  await sql`UPDATE inventory SET needs_correction = false WHERE id = ${id}`;
+  await pool.query(`UPDATE inventory SET needs_correction = false WHERE id = $1`, [id]);
   return { success: true }
 }
 
 export async function approvePriceOnly(id: string, item: any) {
-  await sql`UPDATE inventory SET listed_price = ${item.listed_price}, needs_price_approval = false WHERE id = ${id}`
+  await pool.query(`UPDATE inventory SET listed_price = $1, needs_price_approval = false WHERE id = $2`, [item.listed_price, id])
   return { success: true }
 }
 
 export async function denyCorrection(id: string) {
-  await sql`UPDATE inventory SET needs_correction = false, needs_price_approval = false WHERE id = ${id}`
+  await pool.query(`UPDATE inventory SET needs_correction = false, needs_price_approval = false WHERE id = $1`, [id])
   return { success: true }
 }

@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getAllTradeOffers, deleteTradeOfferRecord, clearTradeImageStorage } from '@/app/actions/trades'
-import { Download, Trash2, ImageIcon, CheckSquare, Square, RefreshCcw } from 'lucide-react'
+import { getAllTradeOffers, deleteTradeOfferRecord, clearTradeImageStorage, approveManualPayment } from '@/app/actions/trades'
+import { Download, Trash2, ImageIcon, CheckSquare, Square, RefreshCcw, DollarSign, PackageCheck, Handshake } from 'lucide-react'
+import { InstructionTrigger } from '@/components/admin/DraggableGuide'
 
 type TradeOffer = {
   id: string
@@ -82,6 +83,14 @@ export function TradeLeadsCRM() {
      await loadData()
   }
 
+  const handleApprovePayment = async (offerId: string) => {
+     if (!window.confirm("Are you sure you have received the funds? This will definitively mark the inventory items as SOLD.")) return;
+     setIsLoading(true);
+     await approveManualPayment(offerId);
+     await loadData();
+     alert("Order Paid & Marked as Sold!");
+  }
+
   const toggleSelect = (id: string) => {
      const next = new Set(selectedIds)
      if (next.has(id)) next.delete(id)
@@ -99,10 +108,17 @@ export function TradeLeadsCRM() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-              Trade Leads CRM
+              Trade & Order Inbox
+              <InstructionTrigger 
+                 title="Trade & Order Inbox Rules"
+                 steps={[
+                    { title: "Pending Offers", content: "Buyers submit counter-offer trajectories across your storefront. Acceptances strictly lock the new price temporarily for *their* specific email address to avoid marketplace collisions." },
+                    { title: "Manual Verification", content: "Rejecting an offer permanently deletes the attempt. Make sure your email notifications are live so you don't miss 24-hour expiry timers on inbound hits." }
+                 ]}
+              />
            </h2>
            <p className="text-sm font-medium text-slate-500">
-              Zero-cost footprint. Clear active images when done, export your localized leads.
+              Manage incoming trade proposals and verify pending cash checkouts seamlessly.
            </p>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -148,14 +164,38 @@ export function TradeLeadsCRM() {
                    {new Date(offer.created_at).toLocaleDateString()}
                 </td>
                 <td className="px-4 py-4">
+                   <div className="flex items-center gap-2 mb-1">
+                      {offer.status === 'pending_payment' ? (
+                         <span className="bg-amber-100 text-amber-700 font-black text-[10px] px-2 py-0.5 rounded-full uppercase tracking-widest border border-amber-200 shadow-sm flex items-center gap-1"><DollarSign className="w-3 h-3"/> Checkout Order</span>
+                      ) : offer.status === 'completed' ? (
+                         <span className="bg-emerald-100 text-emerald-700 font-black text-[10px] px-2 py-0.5 rounded-full uppercase tracking-widest border border-emerald-200 shadow-sm flex items-center gap-1"><PackageCheck className="w-3 h-3"/> Paid & Confirmed</span>
+                      ) : (
+                         <span className="bg-cyan-100 text-cyan-700 font-black text-[10px] px-2 py-0.5 rounded-full uppercase tracking-widest border border-cyan-200 shadow-sm flex items-center gap-1"><Handshake className="w-3 h-3"/> Trade Proposal</span>
+                      )}
+                   </div>
                    <div className="font-bold text-slate-900">{offer.buyer_name}</div>
                    <div className="text-slate-500">{offer.buyer_email}</div>
                 </td>
-                <td className="px-4 py-4 text-slate-600 min-w-[250px] whitespace-pre-wrap">
-                   {offer.offer_text}
+                <td className="px-4 py-4 text-slate-600 min-w-[250px] whitespace-pre-wrap font-medium">
+                   {offer.status === 'pending_payment' ? (
+                      <div className="p-3 bg-amber-50/50 rounded-lg border border-amber-100">
+                         {offer.offer_text.split('\n').map((line, i) => <div key={i}>{line}</div>)}
+                      </div>
+                   ) : (
+                      offer.offer_text
+                   )}
                 </td>
                 <td className="px-4 py-4 text-slate-600">
-                   <span className="bg-slate-100 text-slate-700 font-bold px-2 py-1 rounded">{offer.target_items.length} items</span>
+                   <div className="flex flex-col gap-2">
+                       <span className="bg-slate-100/80 text-slate-700 font-bold px-3 py-1.5 rounded border border-slate-200 text-xs inline-block text-center shadow-sm w-fit">
+                          {offer.target_items.length} item{offer.target_items.length > 1 ? 's' : ''}
+                       </span>
+                       {offer.status === 'pending_payment' && (
+                          <button onClick={() => handleApprovePayment(offer.id)} className="bg-emerald-500 hover:bg-emerald-600 text-white font-black px-3 py-2 rounded shadow-md border border-emerald-600 active:scale-95 transition-all w-fit flex items-center gap-1 text-xs">
+                             <CheckSquare className="w-3 h-3" /> Approve Payment
+                          </button>
+                       )}
+                   </div>
                 </td>
                 <td className="px-4 py-4 whitespace-nowrap">
                    {offer.attached_image_url ? (

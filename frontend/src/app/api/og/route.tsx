@@ -1,5 +1,5 @@
 import { ImageResponse } from 'next/og';
-import { sql } from '@vercel/postgres';
+import pool from '@/utils/db';
 import { getStoreSettings } from '@/app/actions/settings';
 
 export const runtime = 'nodejs';

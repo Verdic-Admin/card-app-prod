@@ -1,6 +1,6 @@
 "use server";
 
-import { sql } from "@vercel/postgres";
+import pool from '@/utils/db';
 import { revalidatePath } from "next/cache";
 
 export async function initializeStore() {
@@ -10,7 +10,7 @@ export async function initializeStore() {
         }
         
         // Create inventory table
-        await sql`
+        await pool.query(`
             CREATE TABLE IF NOT EXISTS inventory (
                 id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
                 player_name TEXT NOT NULL,
@@ -48,10 +48,10 @@ export async function initializeStore() {
                 bidder_count INT DEFAULT 0,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
-        `;
+        `);
 
         // Create auction_bids table
-        await sql`
+        await pool.query(`
             CREATE TABLE IF NOT EXISTS auction_bids (
                 id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
                 item_id UUID,
@@ -59,32 +59,32 @@ export async function initializeStore() {
                 bid_amount NUMERIC(10, 2) NOT NULL,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
-        `;
+        `);
         // Create shop_config table
-        await sql`
+        await pool.query(`
             CREATE TABLE IF NOT EXISTS shop_config (
                 id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
                 playerindex_api_key TEXT,
                 discount_rate NUMERIC(5, 2) DEFAULT 0.0,
                 updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
-        `;
+        `);
 
         // Create store_settings table (referenced by oracleSync/admin)
-        await sql`
+        await pool.query(`
             CREATE TABLE IF NOT EXISTS store_settings (
                 id INT PRIMARY KEY,
                 oracle_discount_percentage NUMERIC(5, 2) DEFAULT 0.0,
                 live_stream_url TEXT,
                 projection_timeframe TEXT DEFAULT '90-Day'
             );
-        `;
-        await sql`
+        `);
+        await pool.query(`
             INSERT INTO store_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
-        `;
+        `);
 
         // Create trade_offers table (referenced by trades.ts)
-        await sql`
+        await pool.query(`
             CREATE TABLE IF NOT EXISTS trade_offers (
                 id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
                 buyer_name TEXT NOT NULL,
@@ -95,10 +95,10 @@ export async function initializeStore() {
                 status TEXT DEFAULT 'pending',
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
-        `;
+        `);
 
         // Create coin_requests table (referenced by coins.ts)
-        await sql`
+        await pool.query(`
              CREATE TABLE IF NOT EXISTS coin_requests (
                 id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
                 item_id UUID,
@@ -106,10 +106,10 @@ export async function initializeStore() {
                 status TEXT DEFAULT 'pending',
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
-        `;
+        `);
 
         // Create draft_cards table (referenced by drafts.ts)
-        await sql`
+        await pool.query(`
             CREATE TABLE IF NOT EXISTS draft_cards (
                 id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
                 player_name TEXT NOT NULL,
@@ -120,7 +120,7 @@ export async function initializeStore() {
                 side_b_url TEXT,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
-        `;
+        `);
 
         revalidatePath("/");
         return { success: true, message: "Store initialized successfully" };

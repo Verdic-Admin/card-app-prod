@@ -5,8 +5,7 @@ import QRCode from 'react-qr-code'
 export function AuctionQRCode({ isVisible, toggleVisibility }: { isVisible: boolean, toggleVisibility: () => void }) {
   if (!isVisible) return null;
   
-  const siteDomain = process.env.NEXT_PUBLIC_SITE_DOMAIN || 'localhost:3000';
-  const url = `https://${siteDomain}/auction`;
+  const url = process.env.NEXT_PUBLIC_SITE_URL ? `${process.env.NEXT_PUBLIC_SITE_URL}/auction` : 'http://localhost:3000/auction';
 
   return (
     <div className="bg-black p-6 rounded-xl text-white font-mono flex flex-col items-center justify-center border-4 border-slate-900 shadow-2xl relative">

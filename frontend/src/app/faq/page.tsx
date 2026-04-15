@@ -37,18 +37,18 @@ const faqs = [
 
 export default function FaqPage() {
   return (
-    <div className="min-h-screen bg-zinc-950 py-16 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-background py-16 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto">
 
         {/* Page Header */}
         <div className="mb-12 text-center">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-cyan-950 border border-cyan-900/60 mb-5">
-            <MessageCircleQuestion className="w-7 h-7 text-cyan-400" />
+            <MessageCircleQuestion className="w-7 h-7 text-brand" />
           </div>
           <h1 className="text-4xl font-black tracking-tight text-white mb-3">
             Shipping & FAQ
           </h1>
-          <p className="text-zinc-400 text-base leading-relaxed max-w-xl mx-auto">
+          <p className="text-muted text-base leading-relaxed max-w-xl mx-auto">
             Everything you need to know before you buy. We built this store to be the
             most trustworthy sports card experience outside of eBay.
           </p>
@@ -59,17 +59,17 @@ export default function FaqPage() {
           {faqs.map(({ icon: Icon, question, answer }) => (
             <div
               key={question}
-              className="group bg-zinc-900 border border-zinc-800 rounded-2xl p-6 sm:p-8 hover:border-cyan-900/70 transition-colors duration-200"
+              className="group bg-surface border border-border rounded-2xl p-6 sm:p-8 hover:border-brand/70 transition-colors duration-200"
             >
               <div className="flex items-start gap-4">
-                <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-zinc-800 group-hover:bg-cyan-950 border border-zinc-700 group-hover:border-cyan-900/60 flex items-center justify-center transition-colors duration-200">
-                  <Icon className="w-5 h-5 text-zinc-400 group-hover:text-cyan-400 transition-colors duration-200" />
+                <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-surface md:bg-surface-hover group-hover:bg-cyan-950 border border-border group-hover:border-brand/60 flex items-center justify-center transition-colors duration-200">
+                  <Icon className="w-5 h-5 text-muted group-hover:text-brand transition-colors duration-200" />
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-white mb-2 leading-snug">
                     {question}
                   </h2>
-                  <p className="text-zinc-400 leading-relaxed text-sm sm:text-base">
+                  <p className="text-muted leading-relaxed text-sm sm:text-base">
                     {answer}
                   </p>
                 </div>
@@ -80,13 +80,13 @@ export default function FaqPage() {
 
         {/* CTA Footer */}
         <div className="mt-12 rounded-2xl bg-cyan-950/40 border border-cyan-900/50 p-6 sm:p-8 text-center">
-          <p className="text-zinc-300 font-semibold mb-1">Still have a question?</p>
-          <p className="text-zinc-500 text-sm mb-5">
+          <p className="text-foreground font-semibold mb-1">Still have a question?</p>
+          <p className="text-muted text-sm mb-5">
             Reach out directly — we respond fast.
           </p>
           <Link
             href="/"
-            className="inline-flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-black text-sm px-6 py-3 rounded-xl transition-colors duration-150"
+            className="inline-flex items-center gap-2 bg-brand hover:bg-brand-hover text-foreground font-black text-sm px-6 py-3 rounded-xl transition-colors duration-150"
           >
             Browse the Store
           </Link>
