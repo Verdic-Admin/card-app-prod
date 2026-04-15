@@ -1,7 +1,31 @@
 .env
+.env.local
+.env.*.local
+node_modules/
+.next/
+out/
+build/
+coverage/
+
+# AI and internal documentation
+.agents/
+docs/
+scripts/
+notebooklm_sources/
+skills-lock.json
+*.code-workspace
 __pycache__/
 *.pyc
+
+# Local data & temp
 scanned_cards.csv
 tmp/
-notebooklm_sources/
 venv/
+
+# Hacky scripts inside frontend
+frontend/fix_*.js
+frontend/fix_*.mjs
+frontend/patch_*.js
+frontend/refactor*.js
+frontend/shim1.js
+frontend/init_db.js
