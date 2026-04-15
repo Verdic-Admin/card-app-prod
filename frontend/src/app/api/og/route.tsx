@@ -39,7 +39,7 @@ export async function GET(request: Request) {
     }
     queryStr += " LIMIT 1";
 
-    const { rows } = await sql.query(queryStr, values);
+    const { rows } = await pool.query(queryStr, values);
     if (rows && rows.length > 0 && rows[0].image_url) {
       cardImageUrl = rows[0].image_url;
     }
