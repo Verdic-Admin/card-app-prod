@@ -9,25 +9,53 @@ export async function loginAction(prevState: any, formData: FormData) {
   
   if (!email || !password) return { error: "Email and password required" };
 
+  const apiKey = process.env.PLAYERINDEX_API_KEY;
+  if (!apiKey) {
+    return { error: "Storefront is missing its API Key. Please redeploy with a provisioning token." };
+  }
+
   const client = new Client({ connectionString: process.env.DATABASE_URL });
-  await client.connect();
+  let siteName = 'White-Label Store';
   
   try {
-    const res = await client.query("SELECT * FROM admin_users WHERE email = $1", [email]);
-    if (res.rows.length === 0) return { error: "Invalid credentials" };
+    await client.connect();
+    const res = await client.query("SELECT site_name FROM store_settings LIMIT 1");
+    if (res.rows.length > 0 && res.rows[0].site_name) {
+      siteName = res.rows[0].site_name;
+    }
+  } catch(e) {
+    // If we can't get the site name, we'll gracefully fall back
+    console.error("Failed to read site_name:", e);
+  } finally {
+    await client.end();
+  }
+  
+  try {
+    // Delegate to Master Player Index server
+    const masterResp = await fetch('https://playerindexdata.com/api/auth/store-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        password,
+        api_key: apiKey,
+        store_name: siteName
+      })
+    });
+
+    const data = await masterResp.json();
+
+    if (!masterResp.ok || !data.valid) {
+      return { error: data.error || "Invalid Player Index credentials or API Key ownership" };
+    }
     
-    // Note: In a production setting with real users, you must use bcrypt here. 
-    // Since this is just the admin bootstrap hash for now, we do a direct match.
-    if (res.rows[0].password_hash !== password) return { error: "Invalid credentials" };
-    
+    // Auth succeeded globally, issue local session!
     const cookieStore = await cookies();
     cookieStore.set("admin_session", email, { httpOnly: true, path: '/' });
     
     return { success: true };
   } catch(e) {
-    console.error(e);
-    return { error: "Database error occurred" };
-  } finally {
-    await client.end(); // close pg connection
+    console.error("SSO Error:", e);
+    return { error: "Failed to connect to Player Index Authentication servers" };
   }
 }
