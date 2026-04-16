@@ -100,7 +100,7 @@ export default async function Home(props: { searchParams: Promise<{ [key: string
      }
 
      queryStr += " ORDER BY player_name ASC";
-     const { rows } = await sql.query(queryStr, values);
+     const { rows } = await pool.query(queryStr, values);
      items = rows;
   } catch (err) {
      error = err;

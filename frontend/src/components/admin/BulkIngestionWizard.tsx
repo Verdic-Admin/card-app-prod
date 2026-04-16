@@ -36,7 +36,7 @@ export function BulkIngestionWizard() {
   }
 
   const handleUpload = async () => {
-    const filesToProcess = uploadMode === 'batch' ? images : [singleFront, singleBack].filter(f => f);
+    const filesToProcess = uploadMode === 'batch' ? images : ([singleFront, singleBack].filter(Boolean) as File[]);
     if (filesToProcess.length === 0) return;
     setIsUploading(true)
     try {
