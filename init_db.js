@@ -57,6 +57,47 @@ async function init() {
   `);
   console.log("- Created shop_config");
 
+  // Manage ephemeral environment injection via persistent shop_config
+  let configRowResult = await client.query('SELECT * FROM shop_config LIMIT 1');
+  if (configRowResult.rows.length === 0) {
+      await client.query('INSERT INTO shop_config (discount_rate) VALUES (0.0)');
+      configRowResult = await client.query('SELECT * FROM shop_config LIMIT 1');
+  }
+  const configRow = configRowResult.rows[0];
+
+  let playerIndexApiKey = process.env.PLAYERINDEX_API_KEY || configRow.playerindex_api_key;
+  const provisioningToken = process.env.PROVISIONING_TOKEN;
+
+  if (!playerIndexApiKey && provisioningToken) {
+    console.log("Found PROVISIONING_TOKEN. Exchanging securely for API Key...");
+    try {
+      const resp = await fetch('https://playerindexdata.com/api/provisioning/exchange', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: provisioningToken })
+      });
+      const data = await resp.json();
+      if (data.api_key) {
+        playerIndexApiKey = data.api_key;
+        
+        // Save back to persistent DB to survive future container restarts
+        await client.query('UPDATE shop_config SET playerindex_api_key = $1 WHERE id = $2', [playerIndexApiKey, configRow.id]);
+        console.log("Successfully exchanged Provisioning Token and saved securely to database.");
+      } else {
+        console.error("Failed to exchange Provisioning Token:", data.error);
+      }
+    } catch (e) {
+      console.error("Error during Provisioning Token exchange:", e.message);
+    }
+  }
+
+  if (playerIndexApiKey) {
+     const fs = require('fs');
+     fs.writeFileSync('.env.production.local', `PLAYERINDEX_API_KEY=${playerIndexApiKey}\n`, { flag: 'a' });
+     console.log("Injected PLAYERINDEX_API_KEY into ephemeral build context.");
+  }
+
+
   await client.query(`
     CREATE TABLE IF NOT EXISTS store_settings (
                 id INT PRIMARY KEY,
