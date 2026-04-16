@@ -1,26 +1,20 @@
-# ⚾ Baseball Card Scanner & Store
+# ⚾ Welcome to Your Player Index Storefront!
 
-A full-stack Next.js application for scanning, pricing, and managing baseball cards. It uses the **Google Gemini API** to extract structured data from card images processing the entire pipeline directly in the browser via server actions.
+Congratulations! You are just 60 seconds away from launching your very own zero-fee, fully-automated sports card storefront. 
 
-## 🚀 Setup & Development
+Because you've chosen to securely host your store on Railway, you maintain **100% ownership** over your data, your inventory, and your transactions. No platform fees. No revenue sharing. 
 
-The main web application is located in the `frontend/` directory.
+### Instructions for Deployment:
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
+1. Look below at the **Variables** section. 
+2. Railway is prompting you for one single item: a **`PROVISIONING_TOKEN`**.
+3. Paste the unique token that you copied from the Player Index platform into that box.
+4. Click the purple **Deploy** button!
 
-For full details on the frontend application, view its README at `frontend/README.md`.
+### What Happens Next?
 
-## Project Structure
+Once you click **Deploy**, Railway's infrastructure will take over completely. 
 
-```text
-card-app-prod/
-├── frontend/                 # Next.js web application
-├── scripts/                  # Various testing and offline utility scripts
-├── migrations/               # Database SQL schemas
-├── .env                      # Global environment variables
-└── README.md                 # This file
-```
+The system will clone your codebase, build your private Postgres database, and execute a secure handshake with the Player Index Master Server using your token. It will automatically download your API Keys, configure your store name, and wire up Single-Sign On. 
+
+When the lights turn green, simply click the generated domain name and navigate to `/login` to access your new empire using your existing Player Index credentials!
