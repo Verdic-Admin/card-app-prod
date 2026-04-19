@@ -63,7 +63,13 @@ export default async function Home(props: { searchParams: Promise<{ [key: string
   const settings = await getStoreSettings();
 
   // 1. Dynamically extract the highly precise lists of available teams and years that actually exist in the DB right now
-  const { rows: filterData } = await pool.query(`SELECT DISTINCT team_name FROM inventory WHERE status = 'available' AND team_name IS NOT NULL`);
+  let filterData: any[] = [];
+  try {
+    const res = await pool.query(`SELECT DISTINCT team_name FROM inventory WHERE status = 'available' AND team_name IS NOT NULL`);
+    filterData = res.rows;
+  } catch (err: any) {
+    console.error("Filter DB Query Failed:", err.message);
+  }
   const availableTeams = filterData.map(d => d.team_name).sort();
 
   // 2. Base Query Builder using Next.js pure SearchParams to natively enable shareable Deep Links instantly
