@@ -77,13 +77,17 @@ async function init() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: provisioningToken })
       });
-      const data = await resp.json();
-      if (data.api_key) {
+      const raw = await resp.text();
+      let data = {};
+      try { data = JSON.parse(raw); } catch { /* non-JSON response */ }
+
+      if (resp.ok && data.api_key) {
         playerIndexApiKey = data.api_key;
         await client.query('UPDATE shop_config SET playerindex_api_key = $1 WHERE id = $2', [playerIndexApiKey, configRow.id]);
         console.log("Successfully exchanged Provisioning Token and saved securely to database.");
       } else {
-        console.error("Failed to exchange Provisioning Token:", data.error);
+        const msg = data.detail || data.error || raw.slice(0, 200) || `HTTP ${resp.status}`;
+        console.error(`Failed to exchange Provisioning Token [${resp.status}]: ${msg}`);
       }
     } catch (e) {
       console.error("Error during Provisioning Token exchange:", e.message);
