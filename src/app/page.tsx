@@ -16,9 +16,23 @@ function buildOgImageUrl(base: string, params: { q?: string; team?: string }) {
 
 type PageProps = { searchParams: Promise<{ [key: string]: string | undefined }> | any };
 
+const DEFAULT_SETTINGS = {
+  site_name: 'Player Index Store',
+  store_description: 'Zero-fee sports card storefront',
+  site_theme: 'dark',
+  projection_timeframe: '90-Day',
+  oracle_discount_percentage: 0,
+  live_stream_url: null,
+};
+
 export async function generateMetadata({ searchParams }: PageProps): Promise<Metadata> {
   const params = await searchParams;
-  const settings = await getStoreSettings();
+  let settings = DEFAULT_SETTINGS;
+  try {
+    settings = await getStoreSettings();
+  } catch (e) {
+    console.warn('getStoreSettings failed in generateMetadata:', e);
+  }
 
   const siteName = settings.site_name;
   const defaultDescription = settings.store_description;
@@ -60,7 +74,12 @@ export async function generateMetadata({ searchParams }: PageProps): Promise<Met
 export default async function Home(props: { searchParams: Promise<{ [key: string]: string | undefined }> | any }) {
   const searchParams = await props.searchParams;
 
-  const settings = await getStoreSettings();
+  let settings = DEFAULT_SETTINGS;
+  try {
+    settings = await getStoreSettings();
+  } catch (e) {
+    console.warn('getStoreSettings failed in Home:', e);
+  }
 
   // 1. Dynamically extract the highly precise lists of available teams and years that actually exist in the DB right now
   let filterData: any[] = [];

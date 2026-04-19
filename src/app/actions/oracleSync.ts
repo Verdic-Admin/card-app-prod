@@ -1,7 +1,8 @@
 "use server";
 
-
 import pool from '@/utils/db';
+
+const API_BASE_URL = process.env.API_BASE_URL || 'https://api.playerindexdata.com';
 import { vercelBatchUpdatePrices } from '@/app/actions/inventory'
 
 const ALLOWED_COLUMNS = [
@@ -42,10 +43,9 @@ export async function syncInventoryWithOracle() {
 
   console.log(`-> Batching ${cardIds.length} items to shop-api...`);
 
-  const batchPriceUrl = process.env.NEXT_PUBLIC_SHOP_API_URL || 'http://localhost:8000/fintech/shop-api/batch-price';
   const apiKey = process.env.PLAYERINDEX_API_KEY || '';
 
-  const res = await fetch(batchPriceUrl, {
+  const res = await fetch(`${API_BASE_URL}/fintech/shop-api/batch-price`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -98,11 +98,11 @@ export async function syncInventoryWithOracle() {
 export async function syncSingleItemWithOracle(id: string) {
 
 
-  const oracle_api_url = process.env.PLAYERINDEX_API_URL || process.env.ORACLE_API_URL || 'https://api.playerindexdata.com/fintech'
-  const oracle_api_key = process.env.PLAYERINDEX_API_KEY || process.env.ORACLE_API_KEY
+  const oracle_api_url = `${API_BASE_URL}/fintech`;
+  const oracle_api_key = process.env.PLAYERINDEX_API_KEY || process.env.ORACLE_API_KEY;
 
-  if (!oracle_api_url || !oracle_api_key) {
-    throw new Error('Oracle API credentials not configured in settings (.env.local).')
+  if (!oracle_api_key) {
+    throw new Error('PLAYERINDEX_API_KEY is not configured.');
   }
 
   // Fetch discount percentage
@@ -173,11 +173,11 @@ export async function syncSingleItemWithOracle(id: string) {
 
 export async function evaluateItemWithOracle(payload: any) {
 
-  const oracle_api_url = process.env.ORACLE_API_URL || 'https://api.playerindexdata.com/fintech'
-  const oracle_api_key = process.env.PLAYERINDEX_API_KEY || process.env.ORACLE_API_KEY
+  const oracle_api_url = `${API_BASE_URL}/fintech`;
+  const oracle_api_key = process.env.PLAYERINDEX_API_KEY || process.env.ORACLE_API_KEY;
 
   if (!oracle_api_key) {
-    throw new Error('Oracle API credentials not configured.')
+    throw new Error('PLAYERINDEX_API_KEY is not configured.');
   }
 
   // Fetch discount percentage
@@ -254,7 +254,7 @@ export async function getSingleOraclePrice(payload: {
     };
 
     const apiKey = process.env.PLAYERINDEX_API_KEY || '';
-    const response = await fetch('https://api.playerindexdata.com/fintech/api/v1/calculate', {
+    const response = await fetch(`${API_BASE_URL}/fintech/api/v1/calculate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -300,7 +300,7 @@ export async function getBatchOraclePrices(cards: any[]) {
       };
     });
 
-    const response = await fetch('https://api.playerindexdata.com/fintech/api/v1/b2b/calculate-batch', {
+    const response = await fetch(`${API_BASE_URL}/fintech/api/v1/b2b/calculate-batch`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

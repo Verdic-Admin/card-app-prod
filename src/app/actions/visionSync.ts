@@ -1,8 +1,10 @@
 "use server";
 
+const API_BASE_URL = process.env.API_BASE_URL || 'https://api.playerindexdata.com';
+
 export async function uploadImagesToScanner(formData: FormData) {
   const apiKey = process.env.PLAYERINDEX_API_KEY || '';
-  const response = await fetch('https://api.playerindexdata.com/scan/scanner/upload', {
+  const response = await fetch(`${API_BASE_URL}/scan/scanner/upload`, {
     method: 'POST',
     headers: { 'X-API-Key': apiKey },
     body: formData
@@ -18,7 +20,7 @@ export async function uploadImagesToScanner(formData: FormData) {
 
 export async function identifyCardPair(payload: { queue_id: string; side_a_url: string; side_b_url: string }) {
   const apiKey = process.env.PLAYERINDEX_API_KEY || '';
-  const response = await fetch('https://api.playerindexdata.com/identify/identify/card', {
+  const response = await fetch(`${API_BASE_URL}/identify/identify/card`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

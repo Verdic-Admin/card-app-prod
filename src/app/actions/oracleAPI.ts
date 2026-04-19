@@ -1,5 +1,7 @@
 'use server'
 
+const API_BASE_URL = process.env.API_BASE_URL || 'https://api.playerindexdata.com';
+
 export async function submitOracleRequest(url: string, options: RequestInit = {}) {
   const headers = new Headers(options.headers || {});
   
@@ -43,19 +45,16 @@ export async function submitOracleRequest(url: string, options: RequestInit = {}
 }
 
 export async function searchTaxonomyAction(query: string) {
-  const baseUrl = process.env.FINTECH_API_URL || 'http://localhost:8000/fintech';
-  return await submitOracleRequest(`${baseUrl}/v1/taxonomy/search?q=${encodeURIComponent(query)}`);
+  return await submitOracleRequest(`${API_BASE_URL}/fintech/v1/taxonomy/search?q=${encodeURIComponent(query)}`);
 }
 
 export async function submitBatchIngestAction(shopId: string, images: string[]) {
-  const endpoint = process.env.BATCH_ENDPOINT || 'http://localhost:8000/fintech/orchestrator/ingest/batch';
-  return await submitOracleRequest(endpoint, {
+  return await submitOracleRequest(`${API_BASE_URL}/fintech/orchestrator/ingest/batch`, {
     method: 'POST',
     body: JSON.stringify({ shop_id: shopId, images })
   });
 }
 
 export async function checkBatchStatusAction(jobId: string) {
-  const endpoint = process.env.STATUS_ENDPOINT || `http://localhost:8000/fintech/orchestrator/ingest/status/${jobId}`;
-  return await submitOracleRequest(endpoint);
+  return await submitOracleRequest(`${API_BASE_URL}/fintech/orchestrator/ingest/status/${jobId}`);
 }
