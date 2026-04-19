@@ -3,8 +3,20 @@
 export async function submitOracleRequest(url: string, options: RequestInit = {}) {
   const headers = new Headers(options.headers || {});
   
-  // Attach API Key Securely on Server-side only
-  const apiKey = process.env.PLAYERINDEX_API_KEY;
+  let apiKey = process.env.PLAYERINDEX_API_KEY;
+  
+  if (!apiKey) {
+    try {
+      const pool = (await import('@/utils/db')).default;
+      const { rows } = await pool.query('SELECT playerindex_api_key FROM shop_config LIMIT 1');
+      if (rows.length > 0) {
+        apiKey = rows[0].playerindex_api_key;
+      }
+    } catch (e) {
+      console.warn("Failed to retrieve fallback API key from database", e);
+    }
+  }
+
   if (apiKey) {
     headers.set("X-API-KEY", apiKey);
   }

@@ -9,16 +9,25 @@ export async function loginAction(prevState: any, formData: FormData) {
   
   if (!email || !password) return { error: "Email and password required" };
 
-  const apiKey = process.env.PLAYERINDEX_API_KEY;
-  if (!apiKey) {
-    return { error: "Storefront is missing its API Key. Please redeploy with a provisioning token." };
-  }
-
   const client = new Client({ connectionString: process.env.DATABASE_URL });
+  let apiKey = process.env.PLAYERINDEX_API_KEY;
   let siteName = 'White-Label Store';
   
   try {
     await client.connect();
+    
+    // Fetch API Key from database explicitly
+    if (!apiKey) {
+      const configRes = await client.query("SELECT playerindex_api_key FROM shop_config LIMIT 1");
+      if (configRes.rows.length > 0 && configRes.rows[0].playerindex_api_key) {
+        apiKey = configRes.rows[0].playerindex_api_key;
+      }
+    }
+
+    if (!apiKey) {
+      return { error: "Storefront is missing its API Key. Please redeploy with a provisioning token." };
+    }
+
     const res = await client.query("SELECT site_name FROM store_settings LIMIT 1");
     if (res.rows.length > 0 && res.rows[0].site_name) {
       siteName = res.rows[0].site_name;

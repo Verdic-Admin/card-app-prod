@@ -92,9 +92,7 @@ async function init() {
   }
 
   if (playerIndexApiKey) {
-     const fs = require('fs');
-     fs.writeFileSync('.env.production.local', `PLAYERINDEX_API_KEY=${playerIndexApiKey}\n`, { flag: 'a' });
-     console.log("Injected PLAYERINDEX_API_KEY into ephemeral build context.");
+     console.log("Database initialized securely. API Key available internally.");
   }
 
 
