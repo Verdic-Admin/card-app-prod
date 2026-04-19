@@ -68,12 +68,9 @@ async function init() {
   let playerIndexApiKey = process.env.PLAYERINDEX_API_KEY || configRow.playerindex_api_key;
   const provisioningToken = process.env.PROVISIONING_TOKEN;
 
-  const apiBaseUrl = process.env.API_BASE_URL;
+  const apiBaseUrl = process.env.API_BASE_URL || 'https://api.playerindexdata.com';
   if (!playerIndexApiKey && provisioningToken) {
-    if (!apiBaseUrl) {
-      console.warn("API_BASE_URL not set — skipping provisioning exchange.");
-    } else {
-    console.log("Found PROVISIONING_TOKEN. Exchanging securely for API Key...");
+    console.log(`Found PROVISIONING_TOKEN. Exchanging with ${apiBaseUrl} for permanent API key...`);
     try {
       const resp = await fetch(`${apiBaseUrl}/fintech/provisioning/exchange`, {
         method: 'POST',
@@ -83,8 +80,6 @@ async function init() {
       const data = await resp.json();
       if (data.api_key) {
         playerIndexApiKey = data.api_key;
-        
-        // Save back to persistent DB to survive future container restarts
         await client.query('UPDATE shop_config SET playerindex_api_key = $1 WHERE id = $2', [playerIndexApiKey, configRow.id]);
         console.log("Successfully exchanged Provisioning Token and saved securely to database.");
       } else {
@@ -93,7 +88,6 @@ async function init() {
     } catch (e) {
       console.error("Error during Provisioning Token exchange:", e.message);
     }
-    } // end apiBaseUrl check
   }
 
   if (playerIndexApiKey) {
