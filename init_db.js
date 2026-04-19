@@ -154,6 +154,6 @@ async function init() {
 }
 
 init().catch(err => {
-    console.error("Failed to initialize database:", err);
-    process.exit(1);
+    console.error("DB init warning (non-fatal):", err.message || err);
+    // Do NOT exit - let Next.js start regardless of DB init errors
 });
