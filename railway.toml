@@ -10,4 +10,3 @@ restartPolicyType = "on_failure"
 
 [deploy.environmentVariables]
 API_BASE_URL = "https://api.playerindexdata.com"
-ENABLE_STUB_ROUTERS = "1"

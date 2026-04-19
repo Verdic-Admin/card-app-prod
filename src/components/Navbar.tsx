@@ -11,10 +11,15 @@ export function Navbar({ settings }: { settings: StoreSettings }) {
   return (
     <div className="flex flex-col w-full sticky top-0 z-50">
       {process.env.NEXT_PUBLIC_IS_MASTER_ORCHESTRATOR === 'true' && (
-        <a href="https://playerindexdata.com/claim" className="block relative z-[70] w-full bg-gradient-to-r from-indigo-600 to-cyan-600 hover:opacity-90 transition-opacity">
+        <a
+          href={process.env.NEXT_PUBLIC_DEPLOY_URL || 'https://railway.com/new/template/playerindex'}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block relative z-[70] w-full bg-gradient-to-r from-indigo-600 to-cyan-600 hover:opacity-90 transition-opacity"
+        >
           <div className="py-2 px-4 text-center">
             <p className="text-white text-xs sm:text-sm font-bold tracking-wide">
-              Escape sellers fees and own your own custom card store starting at just $5/month. Complete with Live Auctions.
+              Escape seller fees — own your custom card store starting at $5/month. Live Auctions included. Click to deploy.
             </p>
           </div>
         </a>

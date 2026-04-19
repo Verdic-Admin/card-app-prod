@@ -3,6 +3,17 @@
 import pool from '@/utils/db';
 
 const API_BASE_URL = process.env.API_BASE_URL || 'https://api.playerindexdata.com';
+
+async function getApiKey(): Promise<string> {
+  if (process.env.PLAYERINDEX_API_KEY) return process.env.PLAYERINDEX_API_KEY;
+  try {
+    const { rows } = await pool.query('SELECT playerindex_api_key FROM shop_config LIMIT 1');
+    if (rows.length > 0 && rows[0].playerindex_api_key) return rows[0].playerindex_api_key;
+  } catch (e) {
+    console.warn('Failed to retrieve API key from database:', e);
+  }
+  return '';
+}
 import { vercelBatchUpdatePrices } from '@/app/actions/inventory'
 
 const ALLOWED_COLUMNS = [
@@ -21,14 +32,16 @@ function toTitleCase(str: string) {
 
 export async function syncInventoryWithOracle() {
   console.log("-> Fetching active inventory from Vercel Postgres...");
-  const { rows: inventory } = await pool.query(`SELECT id FROM inventory WHERE status = 'available'`);
-  
+  const { rows: inventory } = await pool.query(
+    `SELECT id, player_name, card_set, card_number, insert_name, parallel_name,
+            is_auto, is_relic, is_rookie, print_run
+     FROM inventory WHERE status = 'available'`
+  );
+
   if (!inventory || inventory.length === 0) {
     console.log("-> 0 items found, aborting.");
     return { success: true, count: 0, message: 'No available inventory to sync.' };
   }
-
-  const cardIds = inventory.map((i: any) => i.id);
 
   // Fetch discount percentage from shop_config
   let discountRate = 0;
@@ -41,17 +54,27 @@ export async function syncInventoryWithOracle() {
     console.warn("Could not fetch discount_rate", e);
   }
 
-  console.log(`-> Batching ${cardIds.length} items to shop-api...`);
+  console.log(`-> Batching ${inventory.length} items to shop-api...`);
 
-  const apiKey = process.env.PLAYERINDEX_API_KEY || '';
+  const apiKey = await getApiKey();
+
+  const cards = inventory.map((i: any) => ({
+    card_id: i.id,
+    player_name: i.player_name || '',
+    card_set: i.card_set || '',
+    card_number: i.card_number || '',
+    insert_name: i.insert_name || 'Base',
+    parallel_name: i.parallel_name || 'Base',
+    is_auto: Boolean(i.is_auto),
+    is_relic: Boolean(i.is_relic),
+    is_rookie: Boolean(i.is_rookie),
+    print_run: i.print_run ? Number(i.print_run) : null,
+  }));
 
   const res = await fetch(`${API_BASE_URL}/fintech/shop-api/batch-price`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-API-KEY': apiKey
-    },
-    body: JSON.stringify({ card_ids: cardIds, discount_rate: discountRate })
+    headers: { 'Content-Type': 'application/json', 'X-API-KEY': apiKey },
+    body: JSON.stringify({ cards, discount_rate: discountRate }),
   });
 
   if (!res.ok) {
@@ -99,10 +122,10 @@ export async function syncSingleItemWithOracle(id: string) {
 
 
   const oracle_api_url = `${API_BASE_URL}/fintech`;
-  const oracle_api_key = process.env.PLAYERINDEX_API_KEY || process.env.ORACLE_API_KEY;
+  const oracle_api_key = await getApiKey();
 
   if (!oracle_api_key) {
-    throw new Error('PLAYERINDEX_API_KEY is not configured.');
+    throw new Error('API key not configured. Please complete store provisioning.');
   }
 
   // Fetch discount percentage
@@ -174,10 +197,10 @@ export async function syncSingleItemWithOracle(id: string) {
 export async function evaluateItemWithOracle(payload: any) {
 
   const oracle_api_url = `${API_BASE_URL}/fintech`;
-  const oracle_api_key = process.env.PLAYERINDEX_API_KEY || process.env.ORACLE_API_KEY;
+  const oracle_api_key = await getApiKey();
 
   if (!oracle_api_key) {
-    throw new Error('PLAYERINDEX_API_KEY is not configured.');
+    throw new Error('API key not configured. Please complete store provisioning.');
   }
 
   // Fetch discount percentage
@@ -253,7 +276,7 @@ export async function getSingleOraclePrice(payload: {
       skip_fuzzy: true
     };
 
-    const apiKey = process.env.PLAYERINDEX_API_KEY || '';
+    const apiKey = await getApiKey();
     const response = await fetch(`${API_BASE_URL}/fintech/api/v1/calculate`, {
       method: 'POST',
       headers: {
@@ -278,8 +301,8 @@ export async function getSingleOraclePrice(payload: {
 
 export async function getBatchOraclePrices(cards: any[]) {
   try {
-    const apiKey = process.env.PLAYERINDEX_API_KEY || '';
-    
+    const apiKey = await getApiKey();
+
     // Map intuitive card props to Oracle B2B API payload shape
     const formattedItems = cards.map(c => {
       const rawFuzzyString = [
@@ -302,10 +325,7 @@ export async function getBatchOraclePrices(cards: any[]) {
 
     const response = await fetch(`${API_BASE_URL}/fintech/api/v1/b2b/calculate-batch`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': apiKey,
-      },
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
       // Backend expects "items" payload
       body: JSON.stringify({ items: formattedItems }),
     });

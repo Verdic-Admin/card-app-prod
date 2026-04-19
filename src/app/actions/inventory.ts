@@ -71,8 +71,8 @@ export async function addCardAction(formData: FormData) {
     const shopId = process.env.NEXT_PUBLIC_SHOP_ID
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
     if (!shopId || !siteUrl) throw new Error("Syndication configuration missing")
-    const fullUrl = `${siteUrl}/product/${insertedRow?.id || 'new'}`
-    
+    const fullUrl = `${siteUrl}/item/${insertedRow?.id || 'new'}`
+
     await fetch('https://api.playerindexdata.com/fintech/syndication/webhook', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -118,7 +118,7 @@ export async function batchCommitAction(items: any[]) {
       const shopId = process.env.NEXT_PUBLIC_SHOP_ID
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
       if (!shopId || !siteUrl) throw new Error("Syndication configuration missing")
-      const fullUrl = `${siteUrl}/product/${insertedRow.id}`
+      const fullUrl = `${siteUrl}/item/${insertedRow.id}`
       await fetch('https://api.playerindexdata.com/fintech/syndication/webhook', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

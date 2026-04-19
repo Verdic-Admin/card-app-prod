@@ -109,7 +109,29 @@ export function LiveAuctionGrid({ initialItems }: { initialItems: Item[] }) {
                 >
                   Bid Cash
                 </button>
-                <button onClick={() => alert('Trade offers coming soon!')} className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-2 rounded text-sm transition-colors shadow-lg">
+                <button
+                  onClick={async () => {
+                    const name = prompt('Your name:');
+                    if (!name) return;
+                    const email = prompt('Your email:');
+                    if (!email) return;
+                    const offer = prompt('Describe your trade offer (card(s), cash, or combo):');
+                    if (!offer) return;
+                    try {
+                      const { submitTradeOffer } = await import('@/app/actions/trades');
+                      const fd = new FormData();
+                      fd.append('name', name);
+                      fd.append('email', email);
+                      fd.append('offer', offer);
+                      fd.append('targetItems', JSON.stringify([item.id]));
+                      await submitTradeOffer(fd);
+                      alert('Trade offer submitted! The seller will reach out via email.');
+                    } catch (e: any) {
+                      alert(`Failed to submit trade: ${e.message}`);
+                    }
+                  }}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-2 rounded text-sm transition-colors shadow-lg"
+                >
                   Offer Trade
                 </button>
               </div>

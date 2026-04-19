@@ -6,7 +6,7 @@ export function Hero({ settings }: { settings: StoreSettings }) {
     <div className="bg-zinc-950 text-white py-20 sm:py-28 border-b border-zinc-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center flex flex-col items-center">
         <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-6 text-white leading-tight">
-          Zero-Fee Sports Card Storefront
+          {settings?.site_name || 'Zero-Fee Sports Card Storefront'}
         </h1>
         <p className="text-lg sm:text-xl text-zinc-400 max-w-2xl mx-auto whitespace-pre-wrap leading-relaxed font-medium">
           {settings?.store_description || 'Prices reflect direct-to-buyer savings. No hidden buyer premiums, just high-quality cards shipped directly to you.'}

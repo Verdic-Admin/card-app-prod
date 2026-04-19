@@ -3,7 +3,6 @@ import type { NextRequest } from "next/server";
 
 export function middleware(request: NextRequest) {
   const apiKey = process.env.PLAYERINDEX_API_KEY;
-  const adminPassword = process.env.ADMIN_PASSWORD;
   const url = request.nextUrl.clone();
 
   if (url.pathname.startsWith('/admin')) {

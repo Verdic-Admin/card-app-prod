@@ -36,22 +36,28 @@ export function AdminDashboard() {
     if (!file) return setError('Please upload an image first.')
     setIsScanning(true)
     setError('')
-    
+
     try {
-      const data = new FormData()
-      data.append('image', file)
-      
-      const res = await fetch('/api/scan', { method: 'POST', body: data })
-      if (!res.ok) throw new Error('AI Scan failed')
-      
-      const json = await res.json()
+      const { uploadAssetAction } = await import('@/app/actions/inventory')
+      const { identifyCardPair } = await import('@/app/actions/visionSync')
+
+      const fd = new FormData()
+      fd.append('file', file)
+      const { url: imageUrl } = await uploadAssetAction(fd)
+
+      const result = await identifyCardPair({
+        queue_id: `dashboard-${Date.now()}`,
+        side_a_url: imageUrl,
+        side_b_url: imageUrl,
+      })
+
       setFormData(prev => ({
         ...prev,
-        player_name: json.player_name || '',
-        card_set: json.card_set || '',
-        insert_name: json.insert_name || json.parallel_insert_type || '',
-        parallel_name: json.parallel_name || json.parallel_insert_type || '',
-        card_number: json.card_number || '',
+        player_name: result.player_name || prev.player_name,
+        card_set: result.card_set || prev.card_set,
+        insert_name: result.insert_name || prev.insert_name,
+        parallel_name: result.parallel_name || prev.parallel_name,
+        card_number: result.card_number || prev.card_number,
       }))
     } catch (err: any) {
       setError(err.message)
