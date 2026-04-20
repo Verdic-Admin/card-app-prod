@@ -642,3 +642,10 @@ export async function setAuctionStatus(id: string, status: 'pending' | 'live' | 
   revalidatePath('/admin')
   revalidatePath('/auction')
 }
+
+export async function deleteStagingCardsAction(ids: string[]) {
+  await checkAuth();
+  if (ids.length === 0) return { success: true };
+  await pool.query(`DELETE FROM scan_staging WHERE id = ANY($1::uuid[])`, [ids]);
+  return { success: true };
+}
