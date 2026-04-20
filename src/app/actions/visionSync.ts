@@ -23,6 +23,9 @@ export async function uploadImagesToScanner(formData: FormData) {
     body: formData,
   });
 
+  if (response.status === 402) {
+    throw new Error('credits_exhausted');
+  }
   if (!response.ok) {
     throw new Error(`Scanner upload failed: ${response.statusText}`);
   }

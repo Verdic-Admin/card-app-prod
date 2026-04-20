@@ -1,11 +1,19 @@
 'use client'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import {
-  Upload, Loader2, Play, CheckCircle2, Wand2, DollarSign,
-  ChevronDown, ChevronUp, RefreshCw, Trash2, Send, Eye, EyeOff
+  Upload, Loader2, Play, CheckCircle2, Wand2,
+  RefreshCw, Trash2, Send, Eye, EyeOff, Scissors
 } from 'lucide-react'
-import { uploadImagesToScanner, pollScannerResult, requestPricingAction } from '@/app/actions/visionSync'
-import { stageSingleCardAction, createDraftCardsAction, updateDraftCardAction, publishDraftCardsAction } from '@/app/actions/drafts'
+import { pollScannerResult, requestPricingAction } from '@/app/actions/visionSync'
+import {
+  stagePairedUploadAction,
+  listScanStagingAction,
+  submitStagingRowToScannerAction,
+  finalizeStagingScanAction,
+  promoteRawStagingToCroppedAction,
+  updateDraftCardAction,
+  publishDraftCardsAction,
+} from '@/app/actions/drafts'
 import { deleteStagingCardsAction } from '@/app/actions/inventory'
 import { submitBatchIngestAction, checkBatchStatusAction } from '@/app/actions/oracleAPI'
 import { TaxonomySearch } from '@/components/admin/TaxonomySearch'
@@ -24,9 +32,32 @@ interface StagingCard {
   listed_price: string
   image_url: string | null
   back_image_url: string | null
+  raw_front_url?: string | null
+  raw_back_url?: string | null
   confidence?: number
   ai_status?: string
   repricing?: boolean
+}
+
+function isPendingScan(c: StagingCard): boolean {
+  return !!c.raw_front_url && !c.image_url
+}
+
+function rowToStagingCard(row: Record<string, unknown>): StagingCard {
+  return {
+    id: String(row.id),
+    player_name:   String(row.player_name ?? ''),
+    card_set:      String(row.card_set ?? ''),
+    card_number:   String(row.card_number ?? ''),
+    insert_name:   String(row.insert_name ?? ''),
+    parallel_name: String(row.parallel_name ?? ''),
+    print_run:     row.print_run != null ? String(row.print_run) : '',
+    listed_price:  row.listed_price != null ? String(row.listed_price) : '',
+    image_url:     (row.image_url as string) ?? null,
+    back_image_url:(row.back_image_url as string) ?? null,
+    raw_front_url: (row.raw_front_url as string) ?? null,
+    raw_back_url:  (row.raw_back_url as string) ?? null,
+  }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -88,110 +119,169 @@ export function BulkIngestionWizard() {
   const [activeTab, setActiveTab] = useState<'ready' | 'correction'>('ready')
   const [isPublishing, setIsPublishing] = useState(false)
 
-  // Wizard step
+  // Wizard: 1 Upload → 2 Staging → 3 Crop (spinner) → 4 AI → 5 Review
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1)
+  const [isSendingToScanner, setIsSendingToScanner] = useState(false)
 
   const creditsExhausted = useCallback(() => {
     window.dispatchEvent(new CustomEvent('api-credits-exhausted'))
     window.location.href = '/admin/billing'
   }, [])
 
-  // ── Step 1 → 2: upload to scanner ────────────────────────────────────────
+  useEffect(() => {
+    listScanStagingAction()
+      .then((rows) => {
+        if (!rows?.length) return
+        setStaging((prev) => {
+          const merged = new Map<string, StagingCard>()
+          for (const p of prev) merged.set(p.id, p)
+          for (const r of rows as Record<string, unknown>[]) {
+            merged.set(String(r.id), rowToStagingCard(r))
+          }
+          return Array.from(merged.values()).sort((a, b) => (a.id < b.id ? 1 : -1))
+        })
+      })
+      .catch(() => {})
+  }, [])
+
+  const pollScannerUntilDone = useCallback(async (jobId: string) => {
+    for (;;) {
+      const res = await pollScannerResult(jobId)
+      if (res.status === 'processing' || res.status === 'pending') {
+        setScanProgress(`Cropping cards… (${res.total_pairs} pairs detected)`)
+        await new Promise((r) => setTimeout(r, 2000))
+        continue
+      }
+      if (res.status === 'failed') {
+        throw new Error(res.error || 'Scanner failed')
+      }
+      if (res.status === 'complete') {
+        if (!res.cards?.length) {
+          throw new Error('Scanner returned no card pairs.')
+        }
+        return res.cards
+      }
+      throw new Error(`Unexpected scanner status: ${res.status}`)
+    }
+  }, [])
+
+  // ── Step 1: paired upload → staging (free, no scanner) ─────────────────────
 
   const handleUpload = async () => {
     setIsUploading(true)
     try {
-      if (uploadMode === 'single') {
-        // ── Free path: upload directly to S3, skip scanner entirely ──────────
+      if (uploadMode === 'batch') {
+        if (!batchFront || !batchBack) return
+        const fd = new FormData()
+        fd.append('front', batchFront)
+        fd.append('back', batchBack)
+        fd.append('kind', 'matrix')
+        const row = await stagePairedUploadAction(fd)
+        const card = rowToStagingCard(row as Record<string, unknown>)
+        setStaging((prev) => [card, ...prev])
+        setSelectedIds((prev) => new Set([...prev, card.id]))
+      } else {
         if (!singleFront) return
         const fd = new FormData()
         fd.append('front', singleFront)
         if (singleBack) fd.append('back', singleBack)
-        const row = await stageSingleCardAction(fd)
-        const card: StagingCard = {
-          id: row.id,
-          player_name:   row.player_name   || '',
-          card_set:      row.card_set      || '',
-          card_number:   row.card_number   || '',
-          insert_name:   row.insert_name   || '',
-          parallel_name: row.parallel_name || '',
-          print_run:     row.print_run     || '',
-          listed_price:  row.listed_price?.toString() || '',
-          image_url:     row.image_url     || null,
-          back_image_url:row.back_image_url|| null,
-        }
-        setStaging([card])
-        setSelectedIds(new Set([card.id]))
-        setStep(3)
-      } else {
-        // ── Paid path: send to scanner for auto-crop/rotate ───────────────────
-        if (!batchFront || !batchBack) return
-        const fd = new FormData()
-        fd.append('fronts', batchFront)
-        fd.append('backs', batchBack)
-        const jobId = await uploadImagesToScanner(fd)
-        setScanJobId(jobId)
-        setScanProgress('Sending to scanner…')
-        setStep(2)
-        pollScanner(jobId)
+        fd.append('kind', 'single_pair')
+        const row = await stagePairedUploadAction(fd)
+        const card = rowToStagingCard(row as Record<string, unknown>)
+        setStaging((prev) => [card, ...prev])
+        setSelectedIds((prev) => new Set([...prev, card.id]))
       }
-    } catch (e: any) {
-      alert('Upload failed: ' + e.message)
+      setBatchFront(null)
+      setBatchBack(null)
+      setSingleFront(null)
+      setSingleBack(null)
+      setStep(2)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
+      alert('Upload failed: ' + msg)
     } finally {
       setIsUploading(false)
     }
   }
 
-  // ── Step 2: poll scanner until complete ───────────────────────────────────
+  // ── Staging: send selected raw pairs to scanner (1 credit per pair sent) ─
 
-  const pollScanner = (jobId: string) => {
-    const interval = setInterval(async () => {
-      try {
-        const res = await pollScannerResult(jobId)
-        if (res.status === 'processing' || res.status === 'pending') {
-          setScanProgress(`Cropping cards… (${res.total_pairs} found so far)`)
-          return
-        }
-        clearInterval(interval)
-        if (res.status === 'failed') {
-          alert('Scanner failed: ' + (res.error || 'unknown error'))
-          setStep(1)
-          return
-        }
-        // complete
-        if (!res.cards?.length) {
-          alert('Scanner returned no card pairs. Check your image quality and try again.')
-          setStep(1)
-          return
-        }
-        setScanProgress(`Found ${res.cards.length} card pairs. Saving to staging…`)
-        const drafted = await createDraftCardsAction(
-          res.cards.map(c => ({
-            side_a_url: c.side_a_url,
-            side_b_url: c.side_b_url,
-          }))
+  const handleSendSelectedToScanner = async () => {
+    const pending = staging.filter((c) => selectedIds.has(c.id) && isPendingScan(c))
+    if (!pending.length) {
+      alert('Select one or more uncropped uploads (orange badge). Each sheet uses a paired front + back.')
+      return
+    }
+    const missingBack = pending.filter((c) => !c.raw_back_url)
+    if (missingBack.length) {
+      alert('Scanner requires a back image for each selected upload. Add backs or use "Use as-is (no crop)" for front-only items.')
+      return
+    }
+    setIsSendingToScanner(true)
+    setStep(3)
+    try {
+      for (const card of pending) {
+        setScanProgress(`Uploading scan job…`)
+        const { job_id } = await submitStagingRowToScannerAction(card.id)
+        setScanJobId(job_id)
+        const cropped = await pollScannerUntilDone(job_id)
+        const newRows = await finalizeStagingScanAction(
+          card.id,
+          cropped.map((c) => ({ side_a_url: c.side_a_url, side_b_url: c.side_b_url }))
         )
-        const cards: StagingCard[] = drafted.map((row: any) => ({
-          id: row.id,
-          player_name: row.player_name || '',
-          card_set: row.card_set || '',
-          card_number: row.card_number || '',
-          insert_name: row.insert_name || '',
-          parallel_name: row.parallel_name || '',
-          print_run: row.print_run || '',
-          listed_price: row.listed_price?.toString() || '',
-          image_url: row.image_url || null,
-          back_image_url: row.back_image_url || null,
-        }))
-        setStaging(cards)
-        setSelectedIds(new Set(cards.map(c => c.id)))
-        setStep(3)
-      } catch (e: any) {
-        clearInterval(interval)
-        alert('Scanner poll error: ' + e.message)
-        setStep(1)
+        const added = (newRows as Record<string, unknown>[]).map((r) => rowToStagingCard(r))
+        setStaging((prev) => {
+          const rest = prev.filter((r) => r.id !== card.id)
+          return [...added, ...rest]
+        })
+        setSelectedIds((prev) => {
+          const n = new Set(prev)
+          n.delete(card.id)
+          added.forEach((a) => n.add(a.id))
+          return n
+        })
       }
-    }, 2000)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
+      if (msg === 'credits_exhausted' || msg.includes('402') || msg.toLowerCase().includes('insufficient')) {
+        creditsExhausted()
+        return
+      }
+      alert('Scanner error: ' + msg)
+    } finally {
+      setIsSendingToScanner(false)
+      setScanJobId(null)
+      setScanProgress('')
+      setStep(2)
+    }
+  }
+
+  const handlePromoteRawAsCropped = async () => {
+    const pending = staging.filter((c) => selectedIds.has(c.id) && isPendingScan(c))
+    if (!pending.length) {
+      alert('Select uncropped uploads to promote.')
+      return
+    }
+    try {
+      const ids = pending.map((c) => c.id)
+      await promoteRawStagingToCroppedAction(ids)
+      setStaging((prev) =>
+        prev.map((c) =>
+          ids.includes(c.id)
+            ? {
+                ...c,
+                image_url: c.raw_front_url ?? null,
+                back_image_url: c.raw_back_url ?? null,
+                raw_front_url: null,
+                raw_back_url: null,
+              }
+            : c
+        )
+      )
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
+      alert('Could not promote images: ' + msg)
+    }
   }
 
   // ── Step 3: staging field updates (auto-save on blur) ─────────────────────
@@ -233,8 +323,13 @@ export function BulkIngestionWizard() {
   const deselectAll = () => setSelectedIds(new Set())
 
   const handlePublishAsIs = async () => {
-    const ids = [...selectedIds]
-    if (!ids.length) return
+    const ids = staging
+      .filter((c) => selectedIds.has(c.id) && c.image_url)
+      .map((c) => c.id)
+    if (!ids.length) {
+      alert('Select cards that already have a front image (cropped or promoted).')
+      return
+    }
     setIsPublishingAsIs(true)
     try {
       await publishDraftCardsAction(ids)
@@ -269,9 +364,12 @@ export function BulkIngestionWizard() {
   // ── Step 3 → 4: send selected for AI identification ───────────────────────
 
   const handleIdentify = async () => {
-    const selected = staging.filter(c => selectedIds.has(c.id))
-    if (!selected.length) return
-    const urls = selected.map(c => c.image_url).filter(Boolean) as string[]
+    const selected = staging.filter((c) => selectedIds.has(c.id) && c.image_url)
+    if (!selected.length) {
+      alert('Select cropped cards with a front image (finish scanner or use as-is first).')
+      return
+    }
+    const urls = selected.map((c) => c.image_url).filter(Boolean) as string[]
     if (!urls.length) {
       alert('No image URLs available for selected cards.')
       return
@@ -287,7 +385,7 @@ export function BulkIngestionWizard() {
       pollIdent(jobId, selected)
     } catch (e: any) {
       alert('Identification failed: ' + e.message)
-      setStep(3)
+      setStep(2)
     }
   }
 
@@ -298,14 +396,14 @@ export function BulkIngestionWizard() {
       try {
         const res = await checkBatchStatusAction(jobId)
         if (res.error === 'credits_exhausted') { clearInterval(interval); creditsExhausted(); return }
-        if (!res.success) { clearInterval(interval); setStep(3); return }
+        if (!res.success) { clearInterval(interval); setStep(2); return }
         const data = res.data
         if (data.status === 'processing') {
           setIdentProgress(`AI identifying… (${data.progress || ''})`)
           return
         }
         clearInterval(interval)
-        if (data.status !== 'completed') { setStep(3); return }
+        if (data.status !== 'completed') { setStep(2); return }
 
         const allResults: any[] = [
           ...(data.summary?.ready_to_publish || []),
@@ -350,7 +448,7 @@ export function BulkIngestionWizard() {
       } catch (e: any) {
         clearInterval(interval)
         alert('Identification poll error: ' + e.message)
-        setStep(3)
+        setStep(2)
       }
     }, 3000)
   }
@@ -436,10 +534,10 @@ export function BulkIngestionWizard() {
 
   const stepLabels = [
     { num: 1, label: 'Upload' },
-    { num: 2, label: 'Cropping' },
-    { num: 3, label: 'Staging' },
-    { num: 4, label: 'Identifying' },
-    { num: 5, label: 'Review & Mint' },
+    { num: 2, label: 'Staging' },
+    { num: 3, label: 'Crop' },
+    { num: 4, label: 'AI' },
+    { num: 5, label: 'Mint' },
   ]
 
   return (
@@ -456,15 +554,15 @@ export function BulkIngestionWizard() {
             <InstructionTrigger
               title="AI Ingestion Instructions"
               steps={[
-                { title: "Step 1: Upload", content: "Upload a front matrix and a back matrix photo. Each sheet can contain up to 9 cards. Cards must be in the same position on both sheets so the AI can pair them." },
-                { title: "Step 2: Crop & Pair", content: "The platform scanner automatically detects, crops, and pairs each card front with its back. Results land in your Staging Area." },
-                { title: "Step 3: Staging", content: "Review cropped card images. Fill in details manually, use the catalog search to auto-fill, or send selected cards to AI for automatic identification." },
-                { title: "Step 4: AI Identification", content: "The AI engine reads OCR text and matches each card against the Player Index catalog. High-confidence matches are pre-filled automatically." },
-                { title: "Step 5: Review & Mint", content: "Edit any field, re-request pricing on individual cards, then publish selected cards to your live inventory." },
+                { title: "Step 1: Upload", content: "Upload a paired front and back (single card or full matrix sheet). Images are stored in staging first — no credits until you send a pair to the scanner for auto-crop." },
+                { title: "Step 2: Staging", content: "Each row is one front+back pair. Select rows and send them to the scanner to crop and rotate (1 credit per send), or use as-is to keep full images without cropping." },
+                { title: "Step 3: Crop", content: "While the scanner runs, cropped card images replace the raw pair with one row per detected card." },
+                { title: "Step 4: AI", content: "Send cropped cards to identification. Catalog search remains free." },
+                { title: "Step 5: Mint", content: "Review, re-price, then publish to inventory." },
               ]}
             />
           </h2>
-          <p className="text-sm font-medium text-muted">Scanner → Staging → AI → Inventory</p>
+          <p className="text-sm font-medium text-muted">Upload → Staging → Crop → AI → Inventory</p>
         </div>
       </div>
 
@@ -500,14 +598,19 @@ export function BulkIngestionWizard() {
           </div>
 
           {uploadMode === 'batch' ? (
-            <div className="grid grid-cols-2 gap-4">
-              <DropZone label="Front Matrix (up to 9 cards)" file={batchFront} id="batch-front" onFile={setBatchFront} />
-              <DropZone label="Back Matrix (same layout)" file={batchBack} id="batch-back" onFile={setBatchBack} />
-            </div>
+            <>
+              <p className="text-center text-xs text-muted font-medium -mt-2 mb-1">
+                Free to stage one sheet pair — select it in staging and send to scanner when ready (1 credit per send).
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <DropZone label="Front Matrix (up to 9 cards)" file={batchFront} id="batch-front" onFile={setBatchFront} />
+                <DropZone label="Back Matrix (same layout)" file={batchBack} id="batch-back" onFile={setBatchBack} />
+              </div>
+            </>
           ) : (
             <>
               <p className="text-center text-xs text-muted font-medium -mt-2 mb-1">
-                Free — images go straight to staging, no cropping or credit used.
+                Free to stage — add front + optional back, then crop with scanner (1 credit) or use as-is.
               </p>
               <div className="grid grid-cols-2 gap-4">
                 <DropZone label="Front Side" file={singleFront} id="single-front" onFile={setSingleFront} />
@@ -524,15 +627,13 @@ export function BulkIngestionWizard() {
             {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5" />}
             {isUploading
               ? 'Uploading…'
-              : uploadMode === 'single'
-                ? 'Add to Staging (Free)'
-                : 'Submit for Scanning (1 Credit)'}
+              : 'Add paired upload to staging (free)'}
           </button>
         </div>
       )}
 
-      {/* ── Step 2: Scanning spinner ────────────────────────────────────────── */}
-      {step === 2 && (
+      {/* ── Step 3: Scanning spinner ────────────────────────────────────────── */}
+      {step === 3 && (
         <div className="text-center py-20 animate-in fade-in">
           <Loader2 className="w-14 h-14 animate-spin text-brand mx-auto mb-5" />
           <h3 className="text-2xl font-black text-foreground mb-2">Scanning & Cropping</h3>
@@ -540,15 +641,19 @@ export function BulkIngestionWizard() {
         </div>
       )}
 
-      {/* ── Step 3: Staging area ────────────────────────────────────────────── */}
-      {step === 3 && (
+      {/* ── Step 2: Staging area ────────────────────────────────────────────── */}
+      {step === 2 && (
         <div className="space-y-5 animate-in fade-in">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
-              <p className="font-black text-foreground text-lg">{staging.length} cards in staging</p>
-              <p className="text-xs text-muted font-medium">Fill in details, use catalog search, or send to AI</p>
+              <p className="font-black text-foreground text-lg">{staging.length} item{staging.length !== 1 ? 's' : ''} in staging</p>
+              <p className="text-xs text-muted font-medium">Pair front+back, then crop (credit) or use as-is (free), then AI / publish</p>
             </div>
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex gap-2 flex-wrap items-center">
+              <button type="button" onClick={() => setStep(1)} className="text-xs font-black text-brand hover:underline">
+                + Add more uploads
+              </button>
+              <span className="text-muted text-xs">·</span>
               <button onClick={selectAll} className="text-xs font-bold text-brand hover:underline">Select All</button>
               <span className="text-muted text-xs">·</span>
               <button onClick={deselectAll} className="text-xs font-bold text-muted hover:underline">Deselect All</button>
@@ -556,15 +661,25 @@ export function BulkIngestionWizard() {
           </div>
 
           <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-            {staging.map(card => (
+            {staging.map(card => {
+              const pending = isPendingScan(card)
+              const displayFront = pending ? (card.raw_front_url ?? null) : (card.image_url ?? null)
+              const displayBack = pending ? (card.raw_back_url ?? null) : (card.back_image_url ?? null)
+              const showToggle = !!(displayFront && displayBack)
+              return (
               <div key={card.id}
                 className={`border rounded-xl p-4 bg-surface transition ${selectedIds.has(card.id) ? 'border-brand/50' : 'border-border opacity-60'}`}>
                 <div className="flex gap-4">
                   {/* Image */}
                   <div className="flex-shrink-0 w-20 space-y-1">
-                    {(showBack.has(card.id) ? card.back_image_url : card.image_url) ? (
+                    {pending && (
+                      <span className="block text-[9px] font-black uppercase tracking-wide text-orange-600 bg-orange-500/15 rounded px-1 py-0.5 text-center">
+                        Uncropped
+                      </span>
+                    )}
+                    {(showBack.has(card.id) ? displayBack : displayFront) ? (
                       <img
-                        src={(showBack.has(card.id) ? card.back_image_url : card.image_url)!}
+                        src={(showBack.has(card.id) ? displayBack : displayFront)!}
                         alt="card"
                         className="w-20 h-28 object-contain rounded-lg border border-border bg-surface"
                       />
@@ -573,8 +688,8 @@ export function BulkIngestionWizard() {
                         No image
                       </div>
                     )}
-                    {card.back_image_url && (
-                      <button onClick={() => toggleBack(card.id)}
+                    {showToggle && (
+                      <button type="button" onClick={() => toggleBack(card.id)}
                         className="flex items-center gap-1 text-[10px] text-muted hover:text-brand font-bold w-full justify-center">
                         {showBack.has(card.id) ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                         {showBack.has(card.id) ? 'Front' : 'Back'}
@@ -649,11 +764,29 @@ export function BulkIngestionWizard() {
                   </div>
                 </div>
               </div>
-            ))}
+            )
+            })}
           </div>
 
           {/* Action buttons */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-2">
+            <button
+              type="button"
+              onClick={handleSendSelectedToScanner}
+              disabled={isSendingToScanner || selectedIds.size === 0}
+              className="bg-amber-600 text-white font-black py-3 rounded-xl disabled:opacity-40 hover:bg-amber-700 transition flex items-center justify-center gap-2"
+            >
+              {isSendingToScanner ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scissors className="w-4 h-4" />}
+              Send to scanner
+            </button>
+            <button
+              type="button"
+              onClick={handlePromoteRawAsCropped}
+              disabled={selectedIds.size === 0}
+              className="bg-slate-600 text-white font-black py-3 rounded-xl disabled:opacity-40 hover:bg-slate-700 transition flex items-center justify-center gap-2 text-sm"
+            >
+              Use as-is (no crop)
+            </button>
             <button
               onClick={handleIdentify}
               disabled={selectedIds.size === 0}

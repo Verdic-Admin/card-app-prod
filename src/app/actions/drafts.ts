@@ -1,47 +1,88 @@
 "use server";
 import pool from '@/utils/db';
 import { put } from '@/utils/storage';
+import { uploadImagesToScanner } from '@/app/actions/visionSync';
 
+async function checkAuth() {
+  if (process.env.PLAYERINDEX_API_KEY) return;
+  const { rows } = await pool.query('SELECT playerindex_api_key FROM shop_config LIMIT 1');
+  if (!rows[0]?.playerindex_api_key) {
+    throw new Error('Unauthorized: No PLAYERINDEX_API_KEY available');
+  }
+}
 
 const ALLOWED_COLUMNS = [
-  'player_name', 'card_set', 'card_number', 'insert_name', 
+  'player_name', 'card_set', 'card_number', 'insert_name',
   'parallel_name', 'print_run', 'listed_price', 'market_price',
-  'image_url', 'back_image_url'
+  'image_url', 'back_image_url',
 ];
 
-/**
- * Free path — no scanner, no credit burn.
- * Uploads front + back directly to S3 and creates a single scan_staging row.
- * Used by the "Single Pair" mode in BulkIngestionWizard.
- */
-export async function stageSingleCardAction(formData: FormData) {
-  const front = formData.get('front') as File | null;
-  const back  = formData.get('back')  as File | null;
-  if (!front) throw new Error('No front image provided');
+function absAssetUrl(url: string): string {
+  if (!url) return url;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  const base = (process.env.NEXT_PUBLIC_SITE_URL || '').replace(/\/$/, '');
+  if (!base) return url;
+  return url.startsWith('/') ? `${base}${url}` : `${base}/${url}`;
+}
 
-  const ts   = Date.now();
+async function fetchImageAsFile(url: string, filename: string): Promise<File> {
+  const res = await fetch(absAssetUrl(url), { cache: 'no-store' });
+  if (!res.ok) throw new Error(`Failed to fetch staged image (${res.status})`);
+  const buf = await res.arrayBuffer();
+  const type = res.headers.get('content-type') || 'image/jpeg';
+  return new File([buf], filename, { type });
+}
+
+/**
+ * Free — uploads a front+back pair to S3 and inserts a staging row with only raw_* set
+ * (cropped image_url/back_image_url stay null until scanner or "use as-is").
+ * kind: `matrix` = batch sheet pair, `single_pair` = one card front/back.
+ */
+export async function stagePairedUploadAction(formData: FormData) {
+  await checkAuth();
+  const kind = (formData.get('kind') as string) || 'single_pair';
+  const front = formData.get('front') as File | null;
+  const back = formData.get('back') as File | null;
+  if (!front) throw new Error('No front image provided');
+  if (kind === 'matrix' && (!back || back.size === 0)) {
+    throw new Error('Batch matrix requires both front and back images');
+  }
+
+  const ts = Date.now();
   const rand = () => Math.random().toString(36).substring(2, 8);
+  const prefix = kind === 'matrix' ? 'matrix' : 'pair';
 
   const frontExt = (front.name || '').split('.').pop() || 'jpg';
-  const { url: frontUrl } = await put(`scans/single-${ts}-${rand()}.${frontExt}`, front);
+  const { url: rawFront } = await put(`scans/${prefix}-front-${ts}-${rand()}.${frontExt}`, front);
 
-  let backUrl: string | null = null;
+  let rawBack: string | null = null;
   if (back && back.size > 0) {
     const backExt = (back.name || '').split('.').pop() || 'jpg';
-    const { url } = await put(`scans/single-back-${ts}-${rand()}.${backExt}`, back);
-    backUrl = url;
+    const { url } = await put(`scans/${prefix}-back-${ts}-${rand()}.${backExt}`, back);
+    rawBack = url;
   }
 
   const { rows } = await pool.query(
-    `INSERT INTO scan_staging (image_url, back_image_url)
-     VALUES ($1, $2)
+    `INSERT INTO scan_staging (raw_front_url, raw_back_url, image_url, back_image_url)
+     VALUES ($1, $2, NULL, NULL)
      RETURNING id, player_name, card_set, card_number, insert_name,
-               parallel_name, print_run, image_url, back_image_url,
-               listed_price, market_price`,
-    [frontUrl, backUrl]
+               parallel_name, print_run, raw_front_url, raw_back_url,
+               image_url, back_image_url, listed_price, market_price`,
+    [rawFront, rawBack]
   );
 
   return rows[0];
+}
+
+/** Back-compat wrapper — same as stagePairedUploadAction with kind=single_pair */
+export async function stageSingleCardAction(formData: FormData) {
+  const fd = new FormData();
+  const front = formData.get('front');
+  const back = formData.get('back');
+  if (front) fd.append('front', front as File);
+  if (back) fd.append('back', back as File);
+  fd.append('kind', 'single_pair');
+  return stagePairedUploadAction(fd);
 }
 
 export async function createDraftCardsAction(cards: any[]) {
@@ -74,6 +115,68 @@ export async function createDraftCardsAction(cards: any[]) {
   }
 
   return results
+}
+
+export async function listScanStagingAction() {
+  await checkAuth();
+  const { rows } = await pool.query(`
+    SELECT id, player_name, card_set, card_number, insert_name, parallel_name, print_run,
+           raw_front_url, raw_back_url, image_url, back_image_url, listed_price, market_price
+    FROM scan_staging
+    ORDER BY id DESC
+  `);
+  return rows;
+}
+
+/** Submit one raw-pair staging row to the platform scanner (burns 1 credit on upload). */
+export async function submitStagingRowToScannerAction(rowId: string): Promise<{ job_id: string }> {
+  await checkAuth();
+  const { rows } = await pool.query(
+    `SELECT raw_front_url, raw_back_url, image_url FROM scan_staging WHERE id = $1`,
+    [rowId]
+  );
+  if (!rows.length) throw new Error('Staging row not found');
+  const row = rows[0];
+  if (!row.raw_front_url) throw new Error('Nothing to scan — missing raw front');
+  if (row.image_url) throw new Error('This row is already cropped');
+  if (!row.raw_back_url) throw new Error('Scanner requires a paired back image');
+
+  const frontFile = await fetchImageAsFile(row.raw_front_url, 'fronts.jpg');
+  const backFile = await fetchImageAsFile(row.raw_back_url, 'backs.jpg');
+  const fd = new FormData();
+  fd.append('fronts', frontFile);
+  fd.append('backs', backFile);
+  const job_id = await uploadImagesToScanner(fd);
+  return { job_id };
+}
+
+/** Replace one raw-pair row with N cropped card rows returned by the scanner. */
+export async function finalizeStagingScanAction(
+  parentId: string,
+  cards: { side_a_url: string | null; side_b_url: string | null }[]
+) {
+  await checkAuth();
+  if (!cards.length) throw new Error('Scanner returned no card pairs');
+  await pool.query(`DELETE FROM scan_staging WHERE id = $1`, [parentId]);
+  return createDraftCardsAction(cards);
+}
+
+/** Copy raw URLs into cropped columns without calling the scanner (free). */
+export async function promoteRawStagingToCroppedAction(ids: string[]) {
+  await checkAuth();
+  if (!ids.length) return { replaced: 0 };
+  const res = await pool.query(
+    `UPDATE scan_staging
+     SET image_url = raw_front_url,
+         back_image_url = raw_back_url,
+         raw_front_url = NULL,
+         raw_back_url = NULL
+     WHERE id = ANY($1::uuid[])
+       AND raw_front_url IS NOT NULL
+       AND image_url IS NULL`,
+    [ids]
+  );
+  return { replaced: res.rowCount ?? 0 };
 }
 
 export async function updateDraftCardAction(id: string, updates: any) {
@@ -124,6 +227,14 @@ export async function publishDraftCardsAction(ids: string[]) {
 
   if (!staged?.length) {
     throw new Error("Failed to read staged cards")
+  }
+
+  for (const s of staged) {
+    if (!s.image_url) {
+      throw new Error(
+        'Cannot publish rows without a front image. Run the scanner or use "Use as-is (no crop)" first.'
+      );
+    }
   }
 
   // 2. Insert into live inventory
