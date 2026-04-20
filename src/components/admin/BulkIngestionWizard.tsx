@@ -5,7 +5,7 @@ import {
   ChevronDown, ChevronUp, RefreshCw, Trash2, Send, Eye, EyeOff
 } from 'lucide-react'
 import { uploadImagesToScanner, pollScannerResult, requestPricingAction } from '@/app/actions/visionSync'
-import { createDraftCardsAction, updateDraftCardAction, publishDraftCardsAction } from '@/app/actions/drafts'
+import { stageSingleCardAction, createDraftCardsAction, updateDraftCardAction, publishDraftCardsAction } from '@/app/actions/drafts'
 import { deleteStagingCardsAction } from '@/app/actions/inventory'
 import { submitBatchIngestAction, checkBatchStatusAction } from '@/app/actions/oracleAPI'
 import { TaxonomySearch } from '@/components/admin/TaxonomySearch'
@@ -99,20 +99,42 @@ export function BulkIngestionWizard() {
   // ── Step 1 → 2: upload to scanner ────────────────────────────────────────
 
   const handleUpload = async () => {
-    const front = uploadMode === 'batch' ? batchFront : singleFront
-    const back  = uploadMode === 'batch' ? batchBack  : singleBack
-    if (!front || !back) return
-
     setIsUploading(true)
     try {
-      const fd = new FormData()
-      fd.append('fronts', front)
-      fd.append('backs', back)
-      const jobId = await uploadImagesToScanner(fd)
-      setScanJobId(jobId)
-      setScanProgress('Sending to scanner…')
-      setStep(2)
-      pollScanner(jobId)
+      if (uploadMode === 'single') {
+        // ── Free path: upload directly to S3, skip scanner entirely ──────────
+        if (!singleFront) return
+        const fd = new FormData()
+        fd.append('front', singleFront)
+        if (singleBack) fd.append('back', singleBack)
+        const row = await stageSingleCardAction(fd)
+        const card: StagingCard = {
+          id: row.id,
+          player_name:   row.player_name   || '',
+          card_set:      row.card_set      || '',
+          card_number:   row.card_number   || '',
+          insert_name:   row.insert_name   || '',
+          parallel_name: row.parallel_name || '',
+          print_run:     row.print_run     || '',
+          listed_price:  row.listed_price?.toString() || '',
+          image_url:     row.image_url     || null,
+          back_image_url:row.back_image_url|| null,
+        }
+        setStaging([card])
+        setSelectedIds(new Set([card.id]))
+        setStep(3)
+      } else {
+        // ── Paid path: send to scanner for auto-crop/rotate ───────────────────
+        if (!batchFront || !batchBack) return
+        const fd = new FormData()
+        fd.append('fronts', batchFront)
+        fd.append('backs', batchBack)
+        const jobId = await uploadImagesToScanner(fd)
+        setScanJobId(jobId)
+        setScanProgress('Sending to scanner…')
+        setStep(2)
+        pollScanner(jobId)
+      }
     } catch (e: any) {
       alert('Upload failed: ' + e.message)
     } finally {
@@ -483,19 +505,28 @@ export function BulkIngestionWizard() {
               <DropZone label="Back Matrix (same layout)" file={batchBack} id="batch-back" onFile={setBatchBack} />
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4">
-              <DropZone label="Front Side" file={singleFront} id="single-front" onFile={setSingleFront} />
-              <DropZone label="Back Side" file={singleBack} id="single-back" onFile={setSingleBack} />
-            </div>
+            <>
+              <p className="text-center text-xs text-muted font-medium -mt-2 mb-1">
+                Free — images go straight to staging, no cropping or credit used.
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <DropZone label="Front Side" file={singleFront} id="single-front" onFile={setSingleFront} />
+                <DropZone label="Back Side (optional)" file={singleBack} id="single-back" onFile={setSingleBack} />
+              </div>
+            </>
           )}
 
           <button
             onClick={handleUpload}
-            disabled={isUploading || (uploadMode === 'batch' ? (!batchFront || !batchBack) : (!singleFront || !singleBack))}
+            disabled={isUploading || (uploadMode === 'batch' ? (!batchFront || !batchBack) : !singleFront)}
             className="w-full bg-brand text-background font-black text-lg py-4 rounded-xl disabled:opacity-40 hover:bg-brand-hover transition flex items-center justify-center gap-3"
           >
             {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5" />}
-            {isUploading ? 'Uploading…' : 'Submit for Scanning'}
+            {isUploading
+              ? 'Uploading…'
+              : uploadMode === 'single'
+                ? 'Add to Staging (Free)'
+                : 'Submit for Scanning (1 Credit)'}
           </button>
         </div>
       )}

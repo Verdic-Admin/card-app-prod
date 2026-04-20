@@ -1,5 +1,6 @@
 "use server";
 import pool from '@/utils/db';
+import { put } from '@/utils/storage';
 
 
 const ALLOWED_COLUMNS = [
@@ -7,6 +8,41 @@ const ALLOWED_COLUMNS = [
   'parallel_name', 'print_run', 'listed_price', 'market_price',
   'image_url', 'back_image_url'
 ];
+
+/**
+ * Free path — no scanner, no credit burn.
+ * Uploads front + back directly to S3 and creates a single scan_staging row.
+ * Used by the "Single Pair" mode in BulkIngestionWizard.
+ */
+export async function stageSingleCardAction(formData: FormData) {
+  const front = formData.get('front') as File | null;
+  const back  = formData.get('back')  as File | null;
+  if (!front) throw new Error('No front image provided');
+
+  const ts   = Date.now();
+  const rand = () => Math.random().toString(36).substring(2, 8);
+
+  const frontExt = (front.name || '').split('.').pop() || 'jpg';
+  const { url: frontUrl } = await put(`scans/single-${ts}-${rand()}.${frontExt}`, front);
+
+  let backUrl: string | null = null;
+  if (back && back.size > 0) {
+    const backExt = (back.name || '').split('.').pop() || 'jpg';
+    const { url } = await put(`scans/single-back-${ts}-${rand()}.${backExt}`, back);
+    backUrl = url;
+  }
+
+  const { rows } = await pool.query(
+    `INSERT INTO scan_staging (image_url, back_image_url)
+     VALUES ($1, $2)
+     RETURNING id, player_name, card_set, card_number, insert_name,
+               parallel_name, print_run, image_url, back_image_url,
+               listed_price, market_price`,
+    [frontUrl, backUrl]
+  );
+
+  return rows[0];
+}
 
 export async function createDraftCardsAction(cards: any[]) {
   const payload = cards.map(c => ({
