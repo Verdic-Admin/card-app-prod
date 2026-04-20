@@ -71,12 +71,16 @@ async function init() {
   const apiBaseUrl = process.env.API_BASE_URL || 'https://api.playerindexdata.com';
   if (!playerIndexApiKey && provisioningToken) {
     console.log(`Found PROVISIONING_TOKEN. Exchanging with ${apiBaseUrl} for permanent API key...`);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
     try {
       const resp = await fetch(`${apiBaseUrl}/fintech/provisioning/exchange`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: provisioningToken })
+        body: JSON.stringify({ token: provisioningToken }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       const raw = await resp.text();
       let data = {};
       try { data = JSON.parse(raw); } catch { /* non-JSON response */ }
@@ -90,6 +94,7 @@ async function init() {
         console.error(`Failed to exchange Provisioning Token [${resp.status}]: ${msg}`);
       }
     } catch (e) {
+      clearTimeout(timeoutId);
       console.error("Error during Provisioning Token exchange:", e.message);
     }
   }
