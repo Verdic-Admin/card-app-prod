@@ -1,4 +1,4 @@
--- Run once on the shop Postgres DB (Railway / template).
+-- Optional manual migration (one-off). New deployments: `init_db.js` on start applies the same changes.
 -- Paired front/back land in raw_* first; cropped singles use image_url / back_image_url.
 
 ALTER TABLE scan_staging
