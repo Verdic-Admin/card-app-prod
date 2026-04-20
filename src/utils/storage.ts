@@ -1,21 +1,22 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 
-const region = process.env.AWS_REGION || 'us-east-1';
-const endpoint = process.env.S3_ENDPOINT;
-const bucket = process.env.S3_BUCKET_NAME || 'public-assets';
+// Each var checks the custom S3_* name first, then Railway's native AWS_* name.
+// This means Railway's "Add to Service" bucket injection works automatically
+// without any manual variable renaming in the template or the Railway dashboard.
+const region   = process.env.AWS_REGION    || process.env.AWS_DEFAULT_REGION  || 'auto';
+const endpoint = process.env.S3_ENDPOINT   || process.env.AWS_ENDPOINT_URL;
+const bucket   = process.env.S3_BUCKET_NAME || process.env.AWS_S3_BUCKET_NAME || 'public-assets';
+const accessKeyId     = process.env.S3_ACCESS_KEY_ID     || process.env.AWS_ACCESS_KEY_ID;
+const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY;
 
 // S3_FORCE_PATH_STYLE defaults to false (Railway/Tigris uses virtual-host style).
-// Set S3_FORCE_PATH_STYLE=true only if your endpoint requires path-style access.
 const forcePathStyle = process.env.S3_FORCE_PATH_STYLE === 'true';
 
 const s3Client = new S3Client({
   region,
   ...(endpoint && { endpoint }),
-  ...(process.env.S3_ACCESS_KEY_ID && process.env.S3_SECRET_ACCESS_KEY && {
-    credentials: {
-      accessKeyId: process.env.S3_ACCESS_KEY_ID,
-      secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
-    },
+  ...(accessKeyId && secretAccessKey && {
+    credentials: { accessKeyId, secretAccessKey },
   }),
   forcePathStyle,
 });
