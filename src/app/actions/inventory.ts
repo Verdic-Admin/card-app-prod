@@ -4,15 +4,17 @@ import { revalidatePath } from 'next/cache'
 import pool from '@/utils/db';
 import { put, del } from '@/utils/storage';
 
-// Authentication check
-function checkAuth() {
-  if (!process.env.PLAYERINDEX_API_KEY) {
-    throw new Error("Unauthorized: Missing PLAYERINDEX_API_KEY");
+// Authentication check — env var or DB fallback (provisioned key lives in shop_config)
+async function checkAuth() {
+  if (process.env.PLAYERINDEX_API_KEY) return;
+  const { rows } = await pool.query('SELECT playerindex_api_key FROM shop_config LIMIT 1');
+  if (!rows[0]?.playerindex_api_key) {
+    throw new Error("Unauthorized: No PLAYERINDEX_API_KEY available");
   }
 }
 
 export async function uploadAssetAction(formData: FormData) {
-  checkAuth();
+  await checkAuth();
   const file = formData.get('file') as File;
   if (!file) throw new Error("No file provided");
   
@@ -27,7 +29,7 @@ export async function uploadAssetAction(formData: FormData) {
 }
 
 export async function addCardAction(formData: FormData) {
-  checkAuth();
+  await checkAuth();
 
   const file = formData.get('image') as File
   const backFile = formData.get('back_image') as File | null
@@ -97,7 +99,7 @@ export async function addCardAction(formData: FormData) {
 }
 
 export async function batchCommitAction(items: any[]) {
-  checkAuth();
+  await checkAuth();
 
   for (const item of items) {
     const parallel_insert_type = [item.insert_name, item.parallel_name].filter(v => v && String(v).toLowerCase() !== 'base').join(' ') || 'Base';
@@ -206,7 +208,7 @@ export async function createLotAction(
   lotTitle: string,
   lotPrice: number
 ) {
-  checkAuth();
+  await checkAuth();
   
   // 1. Sum cost_basis of all child cards
   const { rows: children } = await pool.query(`SELECT image_url, cost_basis FROM inventory WHERE id = ANY($1::uuid[])`, [itemIds as any]);
@@ -275,7 +277,7 @@ export async function createLotAction(
 }
 
 export async function updateLotChildren(lotId: string, itemIds: string[]) {
-  checkAuth();
+  await checkAuth();
 
   // clear all linked
   await pool.query(`UPDATE inventory SET lot_id = null WHERE lot_id = $1`, [lotId]);
@@ -299,7 +301,7 @@ export async function updateLotChildren(lotId: string, itemIds: string[]) {
 }
 
 export async function breakLotAction(lotId: string) {
-  checkAuth();
+  await checkAuth();
 
   
   // 1. Unlink all child cards
@@ -314,7 +316,7 @@ export async function breakLotAction(lotId: string) {
 }
 
 export async function toggleCardStatus(id: string, currentStatus: string) {
-  checkAuth();
+  await checkAuth();
 
     const newStatus = currentStatus === 'available' ? 'sold' : 'available'
   const payload: any = { status: newStatus }
@@ -332,7 +334,7 @@ export async function toggleCardStatus(id: string, currentStatus: string) {
 }
 
 export async function editCardAction(id: string, payload: any) {
-  checkAuth();
+  await checkAuth();
 
     
   // Manual generic update for now (or loop over keys)
@@ -344,7 +346,7 @@ export async function editCardAction(id: string, payload: any) {
 }
 
 export async function deleteCardAction(id: string, imageUrl?: string | null) {
-  checkAuth();
+  await checkAuth();
 
   
   if (imageUrl) {
@@ -362,7 +364,7 @@ export async function deleteCardAction(id: string, imageUrl?: string | null) {
 }
 
 export async function bulkDeleteCardsAction(items: {id: string, image_url: string | null}[]) {
-  checkAuth();
+  await checkAuth();
 
   
   // 1. Delete all images from vercel blob
@@ -387,7 +389,7 @@ export async function rotateCardImageAction(
   side: 'front' | 'back',
   formData: FormData
 ): Promise<{ newUrl: string }> {
-  checkAuth();
+  await checkAuth();
 
     const newFile = formData.get('image') as File
   if (!newFile) throw new Error('Missing rotated image file')
@@ -425,7 +427,7 @@ export async function rotateCardImageAction(
 }
 
 export async function bulkUpdateMetricsAction(ids: string[], costBasis: number, acceptsOffers: boolean) {
-  checkAuth();
+  await checkAuth();
 
   
   if (ids.length > 0) {
@@ -438,21 +440,21 @@ export async function bulkUpdateMetricsAction(ids: string[], costBasis: number, 
 }
 
 export async function updateLiveStreamUrl(url: string | null) {
-  checkAuth();
+  await checkAuth();
     await pool.query(`UPDATE store_settings SET live_stream_url = $1 WHERE id = 1`, [url]);
   revalidatePath('/admin')
   revalidatePath('/auction')
 }
 
 export async function updateProjectionTimeframe(timeframe: string) {
-  checkAuth();
+  await checkAuth();
     await pool.query(`UPDATE store_settings SET projection_timeframe = $1 WHERE id = 1`, [timeframe]);
   revalidatePath('/admin')
   revalidatePath('/auction')
 }
 
 export async function sendToAuctionBlock(ids: string[], formData?: FormData) {
-  checkAuth();
+  await checkAuth();
   if (ids.length === 0) return;
 
   for (const id of ids) {
@@ -535,7 +537,7 @@ export async function placeBidAction(itemId: string, bidderEmail: string, bidAmo
 }
 
 export async function updateStagedAuction(itemId: string, formData: FormData) {
-  checkAuth();
+  await checkAuth();
     
   const reservePrice = formData.get('reservePrice') as string;
   const endTime = formData.get('endTime') as string;
@@ -557,7 +559,7 @@ export async function updateStagedAuction(itemId: string, formData: FormData) {
 }
 
 export async function goLiveWithAuctions(itemIds: string[]) {
-  checkAuth();
+  await checkAuth();
     if (itemIds.length > 0) {
     await pool.query(`UPDATE inventory SET auction_status = 'live' WHERE id = ANY($1::uuid[])`, [itemIds as any]);
   }
@@ -566,7 +568,7 @@ export async function goLiveWithAuctions(itemIds: string[]) {
 }
 
 export async function generateBatchCodes(ids: string[]) {
-  checkAuth();
+  await checkAuth();
     for (const id of ids) {
     const code = `PI-${Math.floor(1000 + Math.random() * 9000)}`
     await pool.query(`UPDATE inventory SET verification_code = $1 WHERE id = $2`, [code, id]);
@@ -575,7 +577,7 @@ export async function generateBatchCodes(ids: string[]) {
 }
 
 export async function uploadVerifiedFlipUI(id: string, formData: FormData) {
-  checkAuth();
+  await checkAuth();
     
   const file = formData.get('video') as File
   if (!file) throw new Error("Missing video file")
@@ -589,14 +591,14 @@ export async function uploadVerifiedFlipUI(id: string, formData: FormData) {
 }
 
 export async function removeFromAuctionBlock(id: string) {
-  checkAuth();
+  await checkAuth();
     await pool.query(`UPDATE inventory SET is_auction = false, auction_status = 'pending' WHERE id = $1`, [id]);
   revalidatePath('/admin')
   revalidatePath('/auction')
 }
 
 export async function setAuctionStatus(id: string, status: 'pending' | 'live' | 'ended') {
-  checkAuth();
+  await checkAuth();
     await pool.query(`UPDATE inventory SET auction_status = $1 WHERE id = $2`, [status, id]);
   revalidatePath('/admin')
   revalidatePath('/auction')

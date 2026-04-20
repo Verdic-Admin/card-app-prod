@@ -3,8 +3,12 @@ import pool from '@/utils/db';
 
 import { put } from '@/utils/storage';
 import { revalidatePath } from 'next/cache'
-function checkAuth() {
-  if (!process.env.PLAYERINDEX_API_KEY) throw new Error("Unauthorized to access Admin operations");
+async function checkAuth() {
+  if (process.env.PLAYERINDEX_API_KEY) return;
+  const { rows } = await pool.query('SELECT playerindex_api_key FROM shop_config LIMIT 1');
+  if (!rows[0]?.playerindex_api_key) {
+    throw new Error("Unauthorized to access Admin operations");
+  }
 }
 
 export async function submitCoinRequest(itemId: string, email: string) {
@@ -19,7 +23,7 @@ export async function submitCoinRequest(itemId: string, email: string) {
 }
 
 export async function fulfillCoinRequest(requestId: string, itemId: string, formData: FormData) {
-  checkAuth();
+  await checkAuth();
 
   const file = formData.get('image') as File
   if (!file) throw new Error("Missing image file")
@@ -47,7 +51,7 @@ export async function fulfillCoinRequest(requestId: string, itemId: string, form
 }
 
 export async function getPendingCoinRequests() {
-  checkAuth();
+  await checkAuth();
   
   const { rows } = await pool.query(`
      SELECT c.*, row_to_json(i.*) as inventory
