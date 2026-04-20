@@ -181,10 +181,10 @@ export function BulkIngestionWizard() {
         setStaging((prev) => [card, ...prev])
         setSelectedIds((prev) => new Set([...prev, card.id]))
       } else {
-        if (!singleFront) return
+        if (!singleFront || !singleBack) return
         const fd = new FormData()
         fd.append('front', singleFront)
-        if (singleBack) fd.append('back', singleBack)
+        fd.append('back', singleBack)
         fd.append('kind', 'single_pair')
         const row = await stagePairedUploadAction(fd)
         const card = rowToStagingCard(row as Record<string, unknown>)
@@ -214,7 +214,7 @@ export function BulkIngestionWizard() {
     }
     const missingBack = pending.filter((c) => !c.raw_back_url)
     if (missingBack.length) {
-      alert('Scanner requires a back image for each selected upload. Add backs or use "Use as-is (no crop)" for front-only items.')
+      alert('Scanner requires a back image for each selected upload. Re-stage with front + back, or use "Use as-is" only when both raw sides exist.')
       return
     }
     setIsSendingToScanner(true)
@@ -260,6 +260,11 @@ export function BulkIngestionWizard() {
     const pending = staging.filter((c) => selectedIds.has(c.id) && isPendingScan(c))
     if (!pending.length) {
       alert('Select uncropped uploads to promote.')
+      return
+    }
+    const missingBack = pending.filter((c) => !c.raw_back_url)
+    if (missingBack.length) {
+      alert('Use as-is requires a back image for each row. Upload paired front + back, then promote.')
       return
     }
     try {
@@ -610,18 +615,18 @@ export function BulkIngestionWizard() {
           ) : (
             <>
               <p className="text-center text-xs text-muted font-medium -mt-2 mb-1">
-                Free to stage — add front + optional back, then crop with scanner (1 credit) or use as-is.
+                One physical card: front + back photos (required). Same flow as the full matrix — one pair per job.
               </p>
               <div className="grid grid-cols-2 gap-4">
-                <DropZone label="Front Side" file={singleFront} id="single-front" onFile={setSingleFront} />
-                <DropZone label="Back Side (optional)" file={singleBack} id="single-back" onFile={setSingleBack} />
+                <DropZone label="Front Side (required)" file={singleFront} id="single-front" onFile={setSingleFront} />
+                <DropZone label="Back Side (required)" file={singleBack} id="single-back" onFile={setSingleBack} />
               </div>
             </>
           )}
 
           <button
             onClick={handleUpload}
-            disabled={isUploading || (uploadMode === 'batch' ? (!batchFront || !batchBack) : !singleFront)}
+            disabled={isUploading || (uploadMode === 'batch' ? (!batchFront || !batchBack) : (!singleFront || !singleBack))}
             className="w-full bg-brand text-background font-black text-lg py-4 rounded-xl disabled:opacity-40 hover:bg-brand-hover transition flex items-center justify-center gap-3"
           >
             {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5" />}
@@ -647,7 +652,7 @@ export function BulkIngestionWizard() {
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
               <p className="font-black text-foreground text-lg">{staging.length} item{staging.length !== 1 ? 's' : ''} in staging</p>
-              <p className="text-xs text-muted font-medium">Pair front+back, then crop (credit) or use as-is (free), then AI / publish</p>
+              <p className="text-xs text-muted font-medium">Every row is a front+back pair; crop with scanner (credit) or use as-is (free), then AI / publish</p>
             </div>
             <div className="flex gap-2 flex-wrap items-center">
               <button type="button" onClick={() => setStep(1)} className="text-xs font-black text-brand hover:underline">

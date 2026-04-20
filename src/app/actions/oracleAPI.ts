@@ -19,9 +19,16 @@ export async function submitOracleRequest(url: string, options: RequestInit = {}
     }
   }
 
-  if (apiKey) {
-    headers.set("X-API-KEY", apiKey);
+  if (!apiKey) {
+    return {
+      error: 'api_failed',
+      status: 401,
+      statusText: 'No Player Index API key configured (PLAYERINDEX_API_KEY or shop_config).',
+    };
   }
+
+  // Match fintech-api APIKeyHeader name (headers are case-insensitive; use canonical form).
+  headers.set('X-Api-Key', apiKey);
 
   if (!headers.has("Content-Type") && !(options.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");

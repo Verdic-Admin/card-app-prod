@@ -1,4 +1,5 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { getAppOrigin } from '@/utils/app-origin';
 
 // Each var checks the custom S3_* name first, then Railway's native AWS_* name.
 // This means Railway's "Add to Service" bucket injection works automatically
@@ -25,9 +26,11 @@ const s3Client = new S3Client({
 // Railway buckets are private, so all access goes through /api/assets/[...key].
 // NEXT_PUBLIC_SITE_URL must be set to the app's public origin (e.g. https://example.up.railway.app).
 function publicAssetUrl(key: string): string {
-  const base = (process.env.NEXT_PUBLIC_SITE_URL || '').replace(/\/$/, '');
+  const base = getAppOrigin();
   if (!base) {
-    console.warn('[storage] NEXT_PUBLIC_SITE_URL is not set — asset URLs will be relative and may break in OG images or external API calls.');
+    console.warn(
+      '[storage] No public origin (NEXT_PUBLIC_SITE_URL, RAILWAY_PUBLIC_DOMAIN, or VERCEL_URL) — asset URLs will be relative and may break external API calls.'
+    );
   }
   const encodedKey = key.split('/').map(encodeURIComponent).join('/');
   return `${base}/api/assets/${encodedKey}`;

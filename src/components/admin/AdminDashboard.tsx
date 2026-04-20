@@ -1,17 +1,18 @@
 'use client'
 
 import { useState } from 'react'
-import { Loader2, Upload, ScanLine, DollarSign, Save, Image as ImageIcon, RefreshCw, Wand2 } from 'lucide-react'
+import { Loader2, Upload, ScanLine, Save, Wand2 } from 'lucide-react'
 import { addCardAction } from '@/app/actions/inventory'
 import { getSingleOraclePrice } from '@/app/actions/oracleSync'
 
 export function AdminDashboard() {
   const [file, setFile] = useState<File | null>(null)
+  const [backFile, setBackFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<string>('')
+  const [backPreview, setBackPreview] = useState<string>('')
   const [isScanning, setIsScanning] = useState(false)
   const [isPricing, setIsPricing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const [isSyncing, setIsSyncing] = useState(false)
   const [error, setError] = useState('')
 
   const [formData, setFormData] = useState({
@@ -32,8 +33,17 @@ export function AdminDashboard() {
     }
   }
 
+  const handleBackFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files?.[0]
+    if (selected) {
+      setBackFile(selected)
+      setBackPreview(URL.createObjectURL(selected))
+      setError('')
+    }
+  }
+
   const handleScan = async () => {
-    if (!file) return setError('Please upload an image first.')
+    if (!file || !backFile) return setError('Upload front and back images before AI scan.')
     setIsScanning(true)
     setError('')
 
@@ -41,14 +51,18 @@ export function AdminDashboard() {
       const { uploadAssetAction } = await import('@/app/actions/inventory')
       const { identifyCardPair } = await import('@/app/actions/visionSync')
 
-      const fd = new FormData()
-      fd.append('file', file)
-      const { url: imageUrl } = await uploadAssetAction(fd)
+      const fdFront = new FormData()
+      fdFront.append('file', file)
+      const { url: frontUrl } = await uploadAssetAction(fdFront)
+
+      const fdBack = new FormData()
+      fdBack.append('file', backFile)
+      const { url: backUrl } = await uploadAssetAction(fdBack)
 
       const result = await identifyCardPair({
         queue_id: `dashboard-${Date.now()}`,
-        side_a_url: imageUrl,
-        side_b_url: imageUrl,
+        side_a_url: frontUrl,
+        side_b_url: backUrl,
       })
 
       setFormData(prev => ({
@@ -90,13 +104,14 @@ export function AdminDashboard() {
   }
 
   const handleSave = async () => {
-    if (!file) return setError('Missing image')
+    if (!file || !backFile) return setError('Upload front and back images before saving.')
     setIsSaving(true)
     setError('')
     
     try {
       const data = new FormData()
       data.append('image', file)
+      data.append('back_image', backFile)
       
       const price = parseFloat(formData.oracle_price) || 0
       const payload = {
@@ -112,7 +127,9 @@ export function AdminDashboard() {
       
       // Reset
       setFile(null)
+      setBackFile(null)
       setPreview('')
+      setBackPreview('')
       setFormData({
         player_name: '', card_set: '', insert_name: '', parallel_name: '', card_number: '',
         oracle_price: '',
@@ -140,36 +157,48 @@ export function AdminDashboard() {
 
       {/* Step 1: Upload & Scan */}
       <div className="mb-8">
-        <label className="block text-sm font-semibold text-slate-700 mb-2">1. Upload Image</label>
-        <div className="flex gap-4 items-start">
-          <div className="flex-grow">
-            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-300 border-dashed rounded-lg cursor-pointer bg-slate-50 hover:bg-slate-100 transition-colors">
-              <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                <Upload className="w-8 h-8 mb-2 text-slate-400" />
-                <p className="text-sm text-slate-500 font-medium">Click to upload card</p>
+        <label className="block text-sm font-semibold text-slate-700 mb-2">1. Upload front &amp; back</label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <p className="text-xs font-medium text-slate-500 mb-2">Front (required)</p>
+            <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-slate-300 border-dashed rounded-lg cursor-pointer bg-slate-50 hover:bg-slate-100 transition-colors">
+              <div className="flex flex-col items-center justify-center py-4">
+                <Upload className="w-6 h-6 mb-1 text-slate-400" />
+                <p className="text-xs text-slate-500 font-medium px-2 text-center">Front image</p>
               </div>
               <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
             </label>
-            {file && (
-              <button 
-                onClick={handleScan} disabled={isScanning}
-                className="mt-3 w-full bg-indigo-600 text-white font-medium py-2 rounded-lg hover:bg-indigo-700 transition flex justify-center items-center gap-2"
-              >
-                {isScanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanLine className="h-4 w-4" />}
-                Auto-Scan with AI
-              </button>
-            )}
+            {preview ? (
+              <div className="mt-2 w-full h-28 relative rounded-lg overflow-hidden border border-slate-200 bg-slate-100">
+                <img src={preview} alt="Front" className="w-full h-full object-contain" />
+              </div>
+            ) : null}
           </div>
-          {preview ? (
-            <div className="w-24 h-32 relative rounded-lg overflow-hidden border border-slate-200 shadow-sm flex-shrink-0 bg-slate-100">
-              <img src={preview} alt="Preview" className="w-full h-full object-contain" />
-            </div>
-          ) : (
-             <div className="w-24 h-32 relative rounded-lg border border-slate-200 border-dashed flex items-center justify-center flex-shrink-0 bg-slate-50">
-               <ImageIcon className="h-6 w-6 text-slate-300" />
-             </div>
-          )}
+          <div>
+            <p className="text-xs font-medium text-slate-500 mb-2">Back (required)</p>
+            <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-slate-300 border-dashed rounded-lg cursor-pointer bg-slate-50 hover:bg-slate-100 transition-colors">
+              <div className="flex flex-col items-center justify-center py-4">
+                <Upload className="w-6 h-6 mb-1 text-slate-400" />
+                <p className="text-xs text-slate-500 font-medium px-2 text-center">Back image</p>
+              </div>
+              <input type="file" className="hidden" accept="image/*" onChange={handleBackFileChange} />
+            </label>
+            {backPreview ? (
+              <div className="mt-2 w-full h-28 relative rounded-lg overflow-hidden border border-slate-200 bg-slate-100">
+                <img src={backPreview} alt="Back" className="w-full h-full object-contain" />
+              </div>
+            ) : null}
+          </div>
         </div>
+        {file && backFile && (
+          <button 
+            onClick={handleScan} disabled={isScanning}
+            className="mt-4 w-full bg-indigo-600 text-white font-medium py-2 rounded-lg hover:bg-indigo-700 transition flex justify-center items-center gap-2"
+          >
+            {isScanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanLine className="h-4 w-4" />}
+            Auto-Scan with AI
+          </button>
+        )}
       </div>
 
       {/* Step 2: Form */}
@@ -217,7 +246,7 @@ export function AdminDashboard() {
       {/* Step 4: Save */}
       <button 
         onClick={handleSave} 
-        disabled={isSaving || !file || !formData.player_name}
+        disabled={isSaving || !file || !backFile || !formData.player_name}
         className="mt-auto w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-emerald-600 disabled:opacity-50 transition-all flex justify-center items-center gap-2 shadow-sm"
       >
         {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}

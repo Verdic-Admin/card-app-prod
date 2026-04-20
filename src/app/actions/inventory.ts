@@ -77,6 +77,11 @@ export async function addCardAction(formData: FormData) {
   const payload = JSON.parse(formData.get('data') as string)
 
   if (!file) throw new Error("Missing primary image file")
+  if (!backFile || backFile.size === 0) {
+    throw new Error('Back image is required — upload front and back for every card.')
+  }
+  const name = payload?.player_name != null ? String(payload.player_name).trim() : ''
+  if (!name) throw new Error('Player name is required before saving to inventory')
 
   const fileExt = file.name.split('.').pop() || 'jpg'
   const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
@@ -84,16 +89,11 @@ export async function addCardAction(formData: FormData) {
   const blob = await put(`card-images/${fileName}`, file, {
     access: 'public',
   });
-  
-  let backImageUrl = null
-  if (backFile) {
-    const backExt = (backFile.name || '').split('.').pop() || 'jpg'
-    const backFileName = `back-${Date.now()}-${Math.random().toString(36).substring(7)}.${backExt}`
-    try {
-        const backBlob = await put(`card-images/${backFileName}`, backFile, { access: 'public' });
-        backImageUrl = backBlob.url;
-    } catch { }
-  }
+
+  const backExt = (backFile.name || '').split('.').pop() || 'jpg'
+  const backFileName = `back-${Date.now()}-${Math.random().toString(36).substring(7)}.${backExt}`
+  const backBlob = await put(`card-images/${backFileName}`, backFile, { access: 'public' })
+  const backImageUrl = backBlob.url
 
   const { rows } = await pool.query(`
     INSERT INTO inventory (
@@ -106,7 +106,7 @@ export async function addCardAction(formData: FormData) {
       $9, $10, $11, $12,
       $13, $14, 'available'
     ) RETURNING id
-  `, [payload.player_name, payload.team_name, payload.card_set, payload.insert_name, payload.parallel_name, payload.card_number, payload.high_price, payload.low_price, payload.avg_price, payload.listed_price || payload.avg_price, payload.cost_basis || 0, payload.accepts_offers || false, blob.url, backImageUrl]);
+  `, [name, payload.team_name, payload.card_set, payload.insert_name, payload.parallel_name, payload.card_number, payload.high_price, payload.low_price, payload.avg_price, payload.listed_price || payload.avg_price, payload.cost_basis || 0, payload.accepts_offers || false, blob.url, backImageUrl]);
   const insertedRow = rows[0];
 
 
@@ -121,7 +121,7 @@ export async function addCardAction(formData: FormData) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         shop_id: shopId,
-        player_name: payload.player_name,
+        player_name: name,
         card_set: payload.card_set,
         insert_name: payload.insert_name || payload.parallel_insert_type,
         parallel_name: payload.parallel_name || payload.parallel_insert_type,

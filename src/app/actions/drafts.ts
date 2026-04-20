@@ -1,6 +1,7 @@
 "use server";
 import pool from '@/utils/db';
 import { put } from '@/utils/storage';
+import { getAppOrigin } from '@/utils/app-origin';
 import { uploadImagesToScanner } from '@/app/actions/visionSync';
 
 async function checkAuth() {
@@ -20,7 +21,7 @@ const ALLOWED_COLUMNS = [
 function absAssetUrl(url: string): string {
   if (!url) return url;
   if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  const base = (process.env.NEXT_PUBLIC_SITE_URL || '').replace(/\/$/, '');
+  const base = getAppOrigin();
   if (!base) return url;
   return url.startsWith('/') ? `${base}${url}` : `${base}/${url}`;
 }
@@ -37,6 +38,7 @@ async function fetchImageAsFile(url: string, filename: string): Promise<File> {
  * Free — uploads a front+back pair to S3 and inserts a staging row with only raw_* set
  * (cropped image_url/back_image_url stay null until scanner or "use as-is").
  * kind: `matrix` = batch sheet pair, `single_pair` = one card front/back.
+ * Back image is always required — the scanner pairs sheet/card fronts with backs.
  */
 export async function stagePairedUploadAction(formData: FormData) {
   await checkAuth();
@@ -44,8 +46,8 @@ export async function stagePairedUploadAction(formData: FormData) {
   const front = formData.get('front') as File | null;
   const back = formData.get('back') as File | null;
   if (!front) throw new Error('No front image provided');
-  if (kind === 'matrix' && (!back || back.size === 0)) {
-    throw new Error('Batch matrix requires both front and back images');
+  if (!back || back.size === 0) {
+    throw new Error('Back image is required — upload a paired front and back (single card or full matrix).');
   }
 
   const ts = Date.now();
@@ -55,12 +57,8 @@ export async function stagePairedUploadAction(formData: FormData) {
   const frontExt = (front.name || '').split('.').pop() || 'jpg';
   const { url: rawFront } = await put(`scans/${prefix}-front-${ts}-${rand()}.${frontExt}`, front);
 
-  let rawBack: string | null = null;
-  if (back && back.size > 0) {
-    const backExt = (back.name || '').split('.').pop() || 'jpg';
-    const { url } = await put(`scans/${prefix}-back-${ts}-${rand()}.${backExt}`, back);
-    rawBack = url;
-  }
+  const backExt = (back.name || '').split('.').pop() || 'jpg';
+  const { url: rawBack } = await put(`scans/${prefix}-back-${ts}-${rand()}.${backExt}`, back);
 
   const { rows } = await pool.query(
     `INSERT INTO scan_staging (raw_front_url, raw_back_url, image_url, back_image_url)
@@ -173,6 +171,7 @@ export async function promoteRawStagingToCroppedAction(ids: string[]) {
          raw_back_url = NULL
      WHERE id = ANY($1::uuid[])
        AND raw_front_url IS NOT NULL
+       AND raw_back_url IS NOT NULL
        AND image_url IS NULL`,
     [ids]
   );
@@ -233,6 +232,11 @@ export async function publishDraftCardsAction(ids: string[]) {
     if (!s.image_url) {
       throw new Error(
         'Cannot publish rows without a front image. Run the scanner or use "Use as-is (no crop)" first.'
+      );
+    }
+    if (!s.back_image_url) {
+      throw new Error(
+        'Cannot publish without a back image for every card. Stage paired front+back, then scan or promote.'
       );
     }
   }

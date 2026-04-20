@@ -73,7 +73,7 @@ export async function syncInventoryWithOracle() {
 
   const res = await fetch(`${API_BASE_URL}/fintech/shop-api/batch-price`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-API-KEY': apiKey },
+    headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey },
     body: JSON.stringify({ cards, discount_rate: discountRate }),
   });
 

@@ -98,29 +98,26 @@ export default function AddInventoryPage() {
 
   const identifySingle = async (id: string) => {
     const single = stagedSingles.find(s => s.id === id);
-    if (!single?.frontFile) return;
+    if (!single?.frontFile || !single.backFile) {
+      alert('Upload both front and back images before running AI scan.');
+      return;
+    }
 
     setStagedSingles(prev => prev.map(s => s.id === id ? { ...s, processing: true } : s));
 
     try {
-      // Upload front image to get a public URL
       const frontFormData = new FormData();
       frontFormData.append('file', single.frontFile);
       const { url: frontUrl } = await uploadAssetAction(frontFormData);
 
-      let backUrl = '';
-      if (single.backFile) {
-        const backFormData = new FormData();
-        backFormData.append('file', single.backFile);
-        const { url } = await uploadAssetAction(backFormData);
-        backUrl = url;
-      }
+      const backFormData = new FormData();
+      backFormData.append('file', single.backFile);
+      const { url: backUrl } = await uploadAssetAction(backFormData);
 
-      // Call card-identifier via visionSync
       const result = await identifyCardPair({
         queue_id: `single-${id}`,
         side_a_url: frontUrl,
-        side_b_url: backUrl || frontUrl,
+        side_b_url: backUrl,
       });
 
       setStagedSingles(prev => prev.map(s =>
@@ -150,15 +147,15 @@ export default function AddInventoryPage() {
 
   const saveToDatabase = async (id: string) => {
     const single = stagedSingles.find(s => s.id === id);
-    if (!single?.frontFile) {
-      alert('Please upload at least the front image before saving.');
+    if (!single?.frontFile || !single.backFile) {
+      alert('Upload both front and back images before saving to inventory.');
       return;
     }
     setStagedSingles(prev => prev.map(s => s.id === id ? { ...s, saving: true } : s));
     try {
       const formData = new FormData();
       formData.append('image', single.frontFile);
-      if (single.backFile) formData.append('back_image', single.backFile);
+      formData.append('back_image', single.backFile);
       formData.append('data', JSON.stringify({
         player_name: single.data.player_name,
         team_name: '',
@@ -251,7 +248,7 @@ export default function AddInventoryPage() {
                   <div className="flex gap-4 w-full">
                     {/* Front Image */}
                     <div className="flex-1 flex flex-col gap-2">
-                      <label className="text-xs font-bold text-muted uppercase tracking-widest text-center">Front</label>
+                      <label className="text-xs font-bold text-muted uppercase tracking-widest text-center">Front (required)</label>
                       <div
                         onClick={() => !single.frontPreview && document.getElementById(`upload-front-${single.id}`)?.click()}
                         className={`aspect-[3/4] w-full rounded-xl border-2 overflow-hidden flex flex-col items-center justify-center relative group
@@ -276,7 +273,7 @@ export default function AddInventoryPage() {
 
                     {/* Back Image */}
                     <div className="flex-1 flex flex-col gap-2">
-                      <label className="text-xs font-bold text-muted uppercase tracking-widest text-center">Back</label>
+                      <label className="text-xs font-bold text-muted uppercase tracking-widest text-center">Back (required)</label>
                       <div
                         onClick={() => !single.backPreview && document.getElementById(`upload-back-${single.id}`)?.click()}
                         className={`aspect-[3/4] w-full rounded-xl border-2 overflow-hidden flex flex-col items-center justify-center relative group
@@ -304,7 +301,7 @@ export default function AddInventoryPage() {
                   <div className="w-full mt-2 text-center border-t border-border pt-6">
                     <button
                       onClick={() => identifySingle(single.id)}
-                      disabled={single.processing || !single.frontFile || single.identified}
+                      disabled={single.processing || !single.frontFile || !single.backFile || single.identified}
                       className="w-full py-4 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-black rounded-xl shadow-[0_0_20px_rgba(79,70,229,0.2)] hover:shadow-[0_0_30px_rgba(79,70,229,0.4)] transition-all disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2"
                     >
                       {single.processing ? (
@@ -316,7 +313,7 @@ export default function AddInventoryPage() {
                       )}
                     </button>
                     {!single.identified && (
-                      <p className="text-[10px] text-muted font-bold tracking-wide uppercase mt-3">Uploads + Calls Identifier API</p>
+                      <p className="text-[10px] text-muted font-bold tracking-wide uppercase mt-3">Requires front + back — then calls Identifier API</p>
                     )}
                   </div>
                 </div>
@@ -434,7 +431,7 @@ export default function AddInventoryPage() {
                     </button>
                     <button
                       onClick={() => saveToDatabase(single.id)}
-                      disabled={single.saving || single.saved || !single.frontFile}
+                      disabled={single.saving || single.saved || !single.frontFile || !single.backFile}
                       className="px-8 py-3 bg-foreground text-background font-black rounded-lg hover:bg-foreground/90 transition-colors shadow-md disabled:opacity-50 flex items-center gap-2"
                     >
                       {single.saving ? (

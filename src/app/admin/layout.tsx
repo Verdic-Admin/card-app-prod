@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import Link from "next/link";
+import { AdminApiCreditsStrip } from "@/components/admin/AdminApiCreditsStrip";
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   let isUpdateAvailable = false;
@@ -47,7 +47,9 @@ export default async function AdminLayout({ children }: { children: ReactNode })
               </a>
            </div>
         )}
-        
+
+        <AdminApiCreditsStrip />
+
         {/* Render the specific admin subpage */}
         <div className="flex-grow">
            {children}

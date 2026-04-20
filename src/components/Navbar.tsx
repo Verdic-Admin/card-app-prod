@@ -5,12 +5,20 @@ import { ShoppingCart } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import type { StoreSettings } from '@/lib/store-settings';
 
+/** “Get your own site” Railway CTA — only on deploys that opt in (set in Railway, not in the public template). */
+function showStoreDeployBanner(): boolean {
+  return (
+    process.env.NEXT_PUBLIC_SHOW_STORE_DEPLOY_BANNER === 'true' ||
+    process.env.NEXT_PUBLIC_IS_MASTER_ORCHESTRATOR === 'true'
+  );
+}
+
 export function Navbar({ settings }: { settings: StoreSettings }) {
   const { cartItems, setIsCartOpen } = useCart();
 
   return (
     <div className="flex flex-col w-full sticky top-0 z-50">
-      {process.env.NEXT_PUBLIC_IS_MASTER_ORCHESTRATOR === 'true' && (
+      {showStoreDeployBanner() && (
         <a
           href={process.env.NEXT_PUBLIC_DEPLOY_URL || 'https://railway.com/new/template/playerindex'}
           target="_blank"
