@@ -4,6 +4,47 @@ import { revalidatePath } from 'next/cache'
 import pool from '@/utils/db';
 import { put, del } from '@/utils/storage';
 
+interface BulkInventoryItem {
+  player_name: string;
+  card_set: string | null;
+  insert_name?: string | null;
+  parallel_name?: string | null;
+  price?: number;
+  side_a_url?: string | null;
+  side_b_url?: string | null;
+}
+
+interface VercelInventoryItem {
+  player_name: string;
+  card_set: string | null;
+  status: string;
+  pricing?: {
+    listed_price?: number;
+    trend_points?: number[];
+    player_index_url?: string;
+  };
+}
+
+interface EditCardPayload {
+  listed_price?: number;
+}
+
+interface SoldStatusPayload {
+  status: string;
+  sold_at: string | null;
+}
+
+interface SharpComposite {
+  input: Buffer;
+  left: number;
+  top: number;
+}
+
+interface LotChildRow {
+  image_url: string | null;
+  cost_basis: number | string | null;
+}
+
 // Authentication check — env var or DB fallback (provisioned key lives in shop_config)
 async function checkAuth() {
   if (process.env.PLAYERINDEX_API_KEY) return;
@@ -98,7 +139,7 @@ export async function addCardAction(formData: FormData) {
   return { success: true }
 }
 
-export async function batchCommitAction(items: any[]) {
+export async function batchCommitAction(items: BulkInventoryItem[]) {
   await checkAuth();
 
   for (const item of items) {
@@ -147,7 +188,7 @@ export async function batchCommitAction(items: any[]) {
   return { success: true }
 }
 
-export async function vercelBatchInsertInventory(items: any[]) {
+export async function vercelBatchInsertInventory(items: VercelInventoryItem[]) {
   // Directly insert finalized DB payload arrays
   for (const item of items) {
      const price = item.pricing?.listed_price || 0
@@ -191,7 +232,7 @@ export async function vercelBatchUpdatePrices(updates: { id: string, listed_pric
         $5::TEXT[]
       ) AS u(id, listed_price, market_price, trend_data, player_index_url)
       WHERE i.id = u.id;
-    `, [ids as any, listedPrices as any, marketPrices as any, trendData as any, playerIndexUrls as any]);
+    `, [ids, listedPrices, marketPrices, trendData, playerIndexUrls]);
     revalidatePath('/');
     revalidatePath('/admin');
     return { success: true };
@@ -211,10 +252,10 @@ export async function createLotAction(
   await checkAuth();
   
   // 1. Sum cost_basis of all child cards
-  const { rows: children } = await pool.query(`SELECT image_url, cost_basis FROM inventory WHERE id = ANY($1::uuid[])`, [itemIds as any]);
+  const { rows: children } = await pool.query(`SELECT image_url, cost_basis FROM inventory WHERE id = ANY($1::uuid[])`, [itemIds]);
 
   const totalCostBasis = children.reduce(
-    (sum: number, c: any) => sum + Number(c.cost_basis ?? 0),
+    (sum: number, c: LotChildRow) => sum + Number(c.cost_basis ?? 0),
     0
   )
 
@@ -233,7 +274,7 @@ export async function createLotAction(
         if (buffers.length > 0) {
            // We will create a 400x400 collage and resize each into a 200x200 tile.
            const tileW = 200, tileH = 200;
-           const composites: any[] = [];
+           const composites: SharpComposite[] = [];
            const resizePromises = buffers.map(async (buf, idx) => {
               const bgImg = await sharp(Buffer.from(buf)).resize(tileW, tileH, { fit: 'cover' }).toBuffer();
               const left = (idx % 2) * tileW;
@@ -255,8 +296,8 @@ export async function createLotAction(
            const blob = await put(`card-images/lot-${Date.now()}.jpg`, finalBuffer, { access: 'public', contentType: 'image/jpeg' });
            finalImageUrl = blob.url;
         }
-     } catch (e: any) {
-        console.warn("Soft fail composing lot image:", e.message);
+     } catch (e) {
+        console.warn("Soft fail composing lot image:", (e as Error).message);
      }
   }
 
@@ -269,7 +310,7 @@ export async function createLotAction(
   const lotId = rows[0].id;
 
   // 3. Link child cards to this lot
-  await pool.query(`UPDATE inventory SET lot_id = $1 WHERE id = ANY($2::uuid[])`, [lotId, itemIds as any]);
+  await pool.query(`UPDATE inventory SET lot_id = $1 WHERE id = ANY($2::uuid[])`, [lotId, itemIds]);
 
   revalidatePath('/')
   revalidatePath('/admin')
@@ -284,7 +325,7 @@ export async function updateLotChildren(lotId: string, itemIds: string[]) {
 
   if (itemIds.length > 0) {
      // link new
-     await pool.query(`UPDATE inventory SET lot_id = $1 WHERE id = ANY($2::uuid[])`, [lotId, itemIds as any]);
+     await pool.query(`UPDATE inventory SET lot_id = $1 WHERE id = ANY($2::uuid[])`, [lotId, itemIds]);
   
      // recalculate cost_basis
      const { rows: children } = await pool.query(`SELECT sum(cost_basis) as total_basis FROM inventory WHERE lot_id = $1`, [lotId]);
@@ -319,11 +360,9 @@ export async function toggleCardStatus(id: string, currentStatus: string) {
   await checkAuth();
 
     const newStatus = currentStatus === 'available' ? 'sold' : 'available'
-  const payload: any = { status: newStatus }
-  if (newStatus === 'sold') {
-    payload.sold_at = new Date().toISOString()
-  } else {
-    payload.sold_at = null
+  const payload: SoldStatusPayload = {
+    status: newStatus,
+    sold_at: newStatus === 'sold' ? new Date().toISOString() : null,
   }
 
   await pool.query(`UPDATE inventory SET status = $1, sold_at = $2 WHERE id = $3`, [newStatus, payload.sold_at, id]);
@@ -333,7 +372,7 @@ export async function toggleCardStatus(id: string, currentStatus: string) {
   revalidatePath('/sold')
 }
 
-export async function editCardAction(id: string, payload: any) {
+export async function editCardAction(id: string, payload: EditCardPayload) {
   await checkAuth();
 
     
@@ -370,13 +409,13 @@ export async function bulkDeleteCardsAction(items: {id: string, image_url: strin
   // 1. Delete all images from vercel blob
   const urls = items.filter(i => i.image_url).map(i => i.image_url!);
   if (urls.length > 0) {
-    try { await del(urls); } catch(e) {}
+    try { await del(urls); } catch {}
   }
 
   // 2. Delete all records from DB in a single ultra-fast operation
   if (items.length > 0) {
       const ids = items.map(i => i.id);
-      await pool.query(`DELETE FROM inventory WHERE id = ANY($1::uuid[])`, [ids as any]);
+      await pool.query(`DELETE FROM inventory WHERE id = ANY($1::uuid[])`, [ids]);
   }
 
   revalidatePath('/')
@@ -404,7 +443,7 @@ export async function rotateCardImageAction(
   if (oldUrl) {
     try {
       await del(oldUrl);
-    } catch (e: any) { console.error("Failed to cleanly delete rotated old image:", e.message) }
+    } catch (e) { console.error("Failed to cleanly delete rotated old image:", (e as Error).message) }
   }
 
   // Upload rotated file
@@ -431,7 +470,7 @@ export async function bulkUpdateMetricsAction(ids: string[], costBasis: number, 
 
   
   if (ids.length > 0) {
-    await pool.query(`UPDATE inventory SET cost_basis = $1, accepts_offers = $2 WHERE id = ANY($3::uuid[])`, [costBasis, acceptsOffers, ids as any]);
+    await pool.query(`UPDATE inventory SET cost_basis = $1, accepts_offers = $2 WHERE id = ANY($3::uuid[])`, [costBasis, acceptsOffers, ids]);
   }
 
   revalidatePath('/')
@@ -561,7 +600,7 @@ export async function updateStagedAuction(itemId: string, formData: FormData) {
 export async function goLiveWithAuctions(itemIds: string[]) {
   await checkAuth();
     if (itemIds.length > 0) {
-    await pool.query(`UPDATE inventory SET auction_status = 'live' WHERE id = ANY($1::uuid[])`, [itemIds as any]);
+    await pool.query(`UPDATE inventory SET auction_status = 'live' WHERE id = ANY($1::uuid[])`, [itemIds]);
   }
   revalidatePath('/admin')
   revalidatePath('/auction')
