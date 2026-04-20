@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
+import { Footer } from "@/components/Footer";
 import { CartProvider } from "@/context/CartContext";
 import { CartDrawer } from "@/components/CartDrawer";
 import { FloatingCart } from "@/components/FloatingCart";
@@ -58,6 +59,7 @@ export default async function RootLayout({
           <main className="flex-grow flex flex-col">
             {children}
           </main>
+          <Footer settings={settings} />
           <CartDrawer settings={settings} />
           <FloatingCart />
         </CartProvider>
