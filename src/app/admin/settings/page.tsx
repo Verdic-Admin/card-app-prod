@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getStoreSettings, updateStoreSettings, StoreSettings } from '@/app/actions/settings'
+import { getStoreSettings, updateStoreSettings, DEFAULT_STORE_SETTINGS, StoreSettings } from '@/app/actions/settings'
 import { Loader2, Save, CheckCircle2, AlertCircle } from 'lucide-react'
 import { InstructionTrigger } from '@/components/admin/DraggableGuide'
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState<StoreSettings | null>(null)
+  const [settings, setSettings] = useState<StoreSettings>(DEFAULT_STORE_SETTINGS)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [statusMsg, setStatusMsg] = useState<{type: 'success' | 'error', text: string} | null>(null)
@@ -16,8 +16,13 @@ export default function SettingsPage() {
       try {
         const data = await getStoreSettings()
         setSettings(data)
-      } catch (e: any) {
-         setStatusMsg({ type: 'error', text: "Failed to load settings! Make sure you ran the Supabase SQL script." })
+      } catch (e: unknown) {
+        setSettings({ ...DEFAULT_STORE_SETTINGS })
+        const msg = e instanceof Error ? e.message : 'Unknown error'
+        setStatusMsg({
+          type: 'error',
+          text: `Could not load settings from the server (${msg}). Showing defaults — try Save after checking your database connection, or redeploy so init_db.js runs.`,
+        })
       } finally {
         setIsLoading(false)
       }
@@ -27,8 +32,6 @@ export default function SettingsPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!settings) return
-    
     setIsSaving(true)
     setStatusMsg(null)
     
@@ -51,15 +54,6 @@ export default function SettingsPage() {
         <Loader2 className="w-8 h-8 animate-spin text-brand" />
       </div>
     )
-  }
-
-  if (!settings) {
-     return (
-        <div className="p-8 max-w-2xl mx-auto mt-12 bg-surface rounded-xl shadow-sm border border-red-200">
-           <h2 className="text-xl font-bold text-red-700 flex items-center gap-2 mb-2"><AlertCircle /> Database Table Missing</h2>
-           <p className="text-muted">The <code>store_settings</code> table does not exist in your Postgres database yet. Please copy the contents of <code>setup_settings.sql</code> and run it in your Vercel SQL Editor.</p>
-        </div>
-     )
   }
 
   return (
