@@ -1,142 +1,93 @@
 "use server";
 import pool from '@/utils/db';
 
-import { revalidatePath } from 'next/cache'
-
-export interface StoreSettings {
-    cart_minimum: number;
-    site_announcement: string;
-    paypal_email: string;
-    allow_offers: boolean;
-    store_description: string;
-    social_instagram: string;
-    social_twitter: string;
-    social_facebook: string;
-    social_discord: string;
-    social_threads: string;
-    oracle_discount_percentage: number;
-    projection_timeframe?: string;
-    live_stream_url?: string | null;
-    site_name: string;
-    site_author: string | null;
-    site_theme: string;
-    payment_link: string;
-    payment_instructions: string;
-    payment_venmo: string;
-    payment_paypal: string;
-    payment_cashapp: string;
-    payment_zelle: string;
-}
-
-/** Safe defaults + client fallback when the server action fails over the wire. */
-export const DEFAULT_STORE_SETTINGS: StoreSettings = {
-    cart_minimum: 20.00,
-    site_announcement: '',
-    paypal_email: '',
-    allow_offers: true,
-    store_description: 'Zero-Fee Sports Card Storefront. Prices reflect direct-to-buyer savings. No hidden buyer premiums, just high-quality cards shipped directly to you.',
-    social_instagram: '',
-    social_twitter: '',
-    social_facebook: '',
-    social_discord: '',
-    social_threads: '',
-    oracle_discount_percentage: 0.0,
-    site_name: 'My Card Store',
-    site_author: null,
-    site_theme: 'dark',
-    payment_link: '',
-    payment_instructions: 'Please select a payment method below and send the exact total. Your order will be shipped once payment is verified.',
-    payment_venmo: '',
-    payment_paypal: '',
-    payment_cashapp: '',
-    payment_zelle: ''
-};
+import { revalidatePath } from 'next/cache';
+import { DEFAULT_STORE_SETTINGS, type StoreSettings } from '@/lib/store-settings';
 
 function num(v: unknown, fallback: number): number {
-    if (v == null || v === '') return fallback;
-    const n = Number(v);
-    return Number.isFinite(n) ? n : fallback;
+  if (v == null || v === '') return fallback;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
 }
 
 function str(v: unknown, fallback = ''): string {
-    if (v == null) return fallback;
-    return String(v);
+  if (v == null) return fallback;
+  return String(v);
 }
 
 function bool(v: unknown, fallback: boolean): boolean {
-    if (v == null) return fallback;
-    if (typeof v === 'boolean') return v;
-    return Boolean(v);
+  if (v == null) return fallback;
+  if (typeof v === 'boolean') return v;
+  return Boolean(v);
 }
 
-/** Ensure JSON-safe primitives for Next.js server action serialization. */
 function normalizeStoreRow(row: Record<string, unknown>): StoreSettings {
-    return {
-        cart_minimum: num(row.cart_minimum, DEFAULT_STORE_SETTINGS.cart_minimum),
-        site_announcement: str(row.site_announcement),
-        paypal_email: str(row.paypal_email),
-        allow_offers: bool(row.allow_offers, DEFAULT_STORE_SETTINGS.allow_offers),
-        store_description: str(row.store_description, DEFAULT_STORE_SETTINGS.store_description),
-        social_instagram: str(row.social_instagram),
-        social_twitter: str(row.social_twitter),
-        social_facebook: str(row.social_facebook),
-        social_discord: str(row.social_discord),
-        social_threads: str(row.social_threads),
-        oracle_discount_percentage: num(row.oracle_discount_percentage, 0),
-        projection_timeframe: row.projection_timeframe != null ? str(row.projection_timeframe) : undefined,
-        live_stream_url: row.live_stream_url != null ? str(row.live_stream_url) : undefined,
-        site_name: str(row.site_name, DEFAULT_STORE_SETTINGS.site_name),
-        site_author: row.site_author != null && String(row.site_author).length ? str(row.site_author) : null,
-        site_theme: str(row.site_theme, 'dark'),
-        payment_link: str(row.payment_link),
-        payment_instructions: str(row.payment_instructions, DEFAULT_STORE_SETTINGS.payment_instructions),
-        payment_venmo: str(row.payment_venmo),
-        payment_paypal: str(row.payment_paypal),
-        payment_cashapp: str(row.payment_cashapp),
-        payment_zelle: str(row.payment_zelle),
-    };
+  return {
+    cart_minimum: num(row.cart_minimum, DEFAULT_STORE_SETTINGS.cart_minimum),
+    site_announcement: str(row.site_announcement),
+    paypal_email: str(row.paypal_email),
+    allow_offers: bool(row.allow_offers, DEFAULT_STORE_SETTINGS.allow_offers),
+    store_description: str(row.store_description, DEFAULT_STORE_SETTINGS.store_description),
+    social_instagram: str(row.social_instagram),
+    social_twitter: str(row.social_twitter),
+    social_facebook: str(row.social_facebook),
+    social_discord: str(row.social_discord),
+    social_threads: str(row.social_threads),
+    oracle_discount_percentage: num(row.oracle_discount_percentage, 0),
+    projection_timeframe: row.projection_timeframe != null ? str(row.projection_timeframe) : undefined,
+    live_stream_url: row.live_stream_url != null ? str(row.live_stream_url) : undefined,
+    site_name: str(row.site_name, DEFAULT_STORE_SETTINGS.site_name),
+    site_author: row.site_author != null && String(row.site_author).length ? str(row.site_author) : null,
+    site_theme: str(row.site_theme, 'dark'),
+    payment_link: str(row.payment_link),
+    payment_instructions: str(row.payment_instructions, DEFAULT_STORE_SETTINGS.payment_instructions),
+    payment_venmo: str(row.payment_venmo),
+    payment_paypal: str(row.payment_paypal),
+    payment_cashapp: str(row.payment_cashapp),
+    payment_zelle: str(row.payment_zelle),
+  };
 }
 
 export async function getStoreSettings(): Promise<StoreSettings> {
-    try {
-        const { rows } = await pool.query(`SELECT * FROM store_settings WHERE id = 1`);
-        const row = rows[0];
-        if (!row) {
-            return { ...DEFAULT_STORE_SETTINGS };
-        }
-        return normalizeStoreRow(row as Record<string, unknown>);
-    } catch (e) {
-        console.error('[getStoreSettings]', e);
-        return { ...DEFAULT_STORE_SETTINGS };
+  try {
+    const { rows } = await pool.query(`SELECT * FROM store_settings WHERE id = 1`);
+    const row = rows[0];
+    if (!row) {
+      return { ...DEFAULT_STORE_SETTINGS };
     }
+    return normalizeStoreRow(row as Record<string, unknown>);
+  } catch (e) {
+    console.error('[getStoreSettings]', e);
+    return { ...DEFAULT_STORE_SETTINGS };
+  }
 }
 
 export async function updateStoreSettings(settings: StoreSettings) {
-    const v = [
-        settings.cart_minimum,
-        settings.site_announcement,
-        settings.paypal_email,
-        settings.allow_offers,
-        settings.store_description,
-        settings.social_instagram,
-        settings.social_twitter,
-        settings.social_facebook,
-        settings.social_discord,
-        settings.social_threads,
-        settings.oracle_discount_percentage,
-        settings.site_name,
-        settings.site_author,
-        settings.site_theme,
-        settings.payment_link,
-        settings.payment_instructions,
-        settings.payment_venmo,
-        settings.payment_paypal,
-        settings.payment_cashapp,
-        settings.payment_zelle,
-    ];
-    try {
-        await pool.query(
-            `
+  const v = [
+    settings.cart_minimum,
+    settings.site_announcement,
+    settings.paypal_email,
+    settings.allow_offers,
+    settings.store_description,
+    settings.social_instagram,
+    settings.social_twitter,
+    settings.social_facebook,
+    settings.social_discord,
+    settings.social_threads,
+    settings.oracle_discount_percentage,
+    settings.site_name,
+    settings.site_author,
+    settings.site_theme,
+    settings.payment_link,
+    settings.payment_instructions,
+    settings.payment_venmo,
+    settings.payment_paypal,
+    settings.payment_cashapp,
+    settings.payment_zelle,
+  ];
+  try {
+    await pool.query(
+      `
             INSERT INTO store_settings (
               id, cart_minimum, site_announcement, paypal_email, allow_offers, store_description,
               social_instagram, social_twitter, social_facebook, social_discord, social_threads,
@@ -167,15 +118,15 @@ export async function updateStoreSettings(settings: StoreSettings) {
               payment_cashapp = EXCLUDED.payment_cashapp,
               payment_zelle = EXCLUDED.payment_zelle
             `,
-            v
-        );
-        revalidatePath('/', 'layout');
-        return { success: true };
-    } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        throw new Error(
-            'Could not save store_settings. Confirm Postgres is reachable and init_db.js has run (Railway redeploy). ' +
-                msg
-        );
-    }
+      v
+    );
+    revalidatePath('/', 'layout');
+    return { success: true };
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      'Could not save store_settings. Confirm Postgres is reachable and init_db.js has run (Railway redeploy). ' +
+        msg
+    );
+  }
 }

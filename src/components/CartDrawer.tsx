@@ -6,7 +6,7 @@ import { X, ShoppingCart, Trash2, Handshake, Loader2, CheckCircle2, ArrowRight }
 import { submitManualCheckout } from '@/app/actions/checkout'
 import { submitTradeOffer } from '@/app/actions/trades'
 import { TradeModal } from '@/components/TradeModal'
-import { StoreSettings } from '@/app/actions/settings'
+import type { StoreSettings } from '@/lib/store-settings'
 
 export function CartDrawer({ settings }: { settings: StoreSettings }) {
   const { cartItems, isCartOpen, setIsCartOpen, removeFromCart, clearCart, cartTotal, kickItems, validateCartCompleteness } = useCart()

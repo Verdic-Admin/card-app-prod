@@ -1,4 +1,4 @@
-import { StoreSettings } from "@/app/actions/settings";
+import type { StoreSettings } from "@/lib/store-settings";
 import { Instagram, Twitter, Facebook } from 'lucide-react';
 
 export function Hero({ settings }: { settings: StoreSettings }) {

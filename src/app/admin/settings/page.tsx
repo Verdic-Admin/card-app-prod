@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getStoreSettings, updateStoreSettings, DEFAULT_STORE_SETTINGS, StoreSettings } from '@/app/actions/settings'
+import { getStoreSettings, updateStoreSettings } from '@/app/actions/settings'
+import { DEFAULT_STORE_SETTINGS, type StoreSettings } from '@/lib/store-settings'
 import { Loader2, Save, CheckCircle2, AlertCircle } from 'lucide-react'
 import { InstructionTrigger } from '@/components/admin/DraggableGuide'
 

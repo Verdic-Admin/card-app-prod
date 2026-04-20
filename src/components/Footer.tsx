@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { StoreSettings } from "@/app/actions/settings";
+import type { StoreSettings } from "@/lib/store-settings";
 
 type FooterProps = {
   settings: StoreSettings;

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { ShoppingCart } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
-import { StoreSettings } from '@/app/actions/settings';
+import type { StoreSettings } from '@/lib/store-settings';
 
 export function Navbar({ settings }: { settings: StoreSettings }) {
   const { cartItems, setIsCartOpen } = useCart();
