@@ -106,6 +106,15 @@ export default function SettingsPage() {
              <div className="border-t border-border pt-5">
                  <h4 className="text-sm font-bold text-foreground mb-4">Payment Methods Config</h4>
                  <p className="text-xs text-muted mb-4 font-medium">Leave any field entirely blank to hide that payment option from your buyers during checkout.</p>
+                 <div className="mb-4 p-3 rounded-lg border border-border bg-surface-hover/50 text-[11px] text-muted leading-relaxed space-y-2">
+                   <p className="font-bold text-foreground">Permanent profile links (saved in your database)</p>
+                   <ul className="list-disc pl-4 space-y-1">
+                     <li><strong className="text-foreground">Venmo</strong> — your public profile, e.g. <code className="text-foreground">https://venmo.com/u/YourShop</code>. After checkout, buyers copy a short &quot;payment note&quot; we generate (order ref + items + total) into the Venmo memo.</li>
+                     <li><strong className="text-foreground">PayPal</strong> — PayPal.me link without the trailing amount, e.g. <code className="text-foreground">https://paypal.me/YourShop</code>. Checkout may append the order total for one-tap pay.</li>
+                     <li><strong className="text-foreground">Cash App</strong> — <code className="text-foreground">https://cash.app/$YourCashtag</code>; checkout can append the amount.</li>
+                     <li><strong className="text-foreground">Zelle</strong> — your phone or email only (no URL). Buyers use their bank app; they still copy the same payment note so you can match the transfer.</li>
+                   </ul>
+                 </div>
                  
                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                      <div>

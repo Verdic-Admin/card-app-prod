@@ -1,6 +1,50 @@
 "use server";
 import pool from '@/utils/db';
 
+export type CheckoutResult = {
+  success: true;
+  orderId: string;
+  subtotal: number;
+  shipping: number;
+  total: number;
+  paymentMemo: string;
+};
+
+function buildPaymentMemo(opts: {
+  orderId: string;
+  buyerName: string;
+  buyerEmail: string;
+  lines: { player_name: string; card_set: string | null; price: number }[];
+  subtotal: number;
+  shipping: number;
+  total: number;
+  tradeProposalCount: number;
+}): string {
+  const idShort = opts.orderId.replace(/-/g, "").slice(0, 8).toUpperCase();
+  const lineSummaries = opts.lines.map((l) => {
+    const name = (l.player_name || "Card").slice(0, 24);
+    const set = (l.card_set || "").slice(0, 16);
+    const bit = set ? `${name} / ${set}` : name;
+    return `${bit} $${l.price.toFixed(2)}`;
+  });
+  let memo = `PI ${idShort} | ${opts.buyerName} | $${opts.total.toFixed(2)} total`;
+  if (opts.shipping > 0) {
+    memo += ` (incl $${opts.shipping.toFixed(2)} ship)`;
+  }
+  memo += ` | ${opts.buyerEmail}`;
+  if (opts.tradeProposalCount > 0) {
+    memo += ` | +${opts.tradeProposalCount} trade proposal(s) in cart (submit via Trade button if not sent yet)`;
+  }
+  memo += " | ";
+  memo += lineSummaries.join(" · ");
+  const maxLen = 300;
+  if (memo.length > maxLen) {
+    memo =
+      memo.slice(0, maxLen - 3).trimEnd() +
+      `… (${opts.lines.length} items, $${opts.total.toFixed(2)})`;
+  }
+  return memo;
+}
 
 export async function validateCartItems(itemIds: string[]) {
   if (!itemIds || itemIds.length === 0) return [];
@@ -8,7 +52,14 @@ export async function validateCartItems(itemIds: string[]) {
   return rows;
 }
 
-export async function submitManualCheckout(itemIds: string[], buyerName: string, buyerEmail: string, shippingAddress: string) {
+export async function submitManualCheckout(
+  itemIds: string[],
+  buyerName: string,
+  buyerEmail: string,
+  shippingAddress: string,
+  opts?: { tradeProposalCount?: number }
+): Promise<CheckoutResult> {
+  const tradeProposalCount = Math.max(0, Math.floor(opts?.tradeProposalCount ?? 0));
 
   if (!itemIds || itemIds.length === 0) {
     throw new Error('No items provided for checkout.')
@@ -74,18 +125,42 @@ export async function submitManualCheckout(itemIds: string[], buyerName: string,
   const shipping = subtotal < SHIPPING_THRESHOLD ? SHIPPING_FEE : 0.00;
   const total = subtotal + shipping;
 
-  // Insert "Order" into trade_offers for CRM Management
-  // We use trade_offers since it acts as the centralized Inbox for the admin.
-  // offer_text = 'Checkout Order - Address: ...'
-  
-  const orderText = `CHECKOUT ORDER - Total: $${total.toFixed(2)} (Subtotal: $${subtotal.toFixed(2)}, Shipping: $${shipping.toFixed(2)})\nShipping Address:\n${shippingAddress}`;
-  
   const { rows: orderRows } = await pool.query(`
       INSERT INTO trade_offers (buyer_name, buyer_email, offer_text, attached_image_url, target_items, status)
       VALUES ($1, $2, $3, $4, $5, 'pending_payment')
       RETURNING id
-  `, [buyerName, buyerEmail, orderText, null, JSON.stringify(purchaseItems)]);
+  `, [
+    buyerName,
+    buyerEmail,
+    `CHECKOUT ORDER - Total: $${total.toFixed(2)} (Subtotal: $${subtotal.toFixed(2)}, Shipping: $${shipping.toFixed(2)})\nShipping Address:\n${shippingAddress}`,
+    null,
+    JSON.stringify(purchaseItems),
+  ]);
 
-  return { success: true, orderId: orderRows[0].id, total };
+  const orderId = orderRows[0].id as string;
+
+  const lines = purchaseItems.map((row: { player_name?: string; card_set?: string | null; listed_price?: unknown; avg_price?: unknown }) => ({
+    player_name: row.player_name || "Card",
+    card_set: row.card_set ?? null,
+    price: Number(row.listed_price ?? row.avg_price ?? 0),
+  }));
+
+  const paymentMemo = buildPaymentMemo({
+    orderId,
+    buyerName,
+    buyerEmail,
+    lines,
+    subtotal,
+    shipping,
+    total,
+    tradeProposalCount,
+  });
+
+  await pool.query(
+    `UPDATE trade_offers SET offer_text = offer_text || $2 WHERE id = $1`,
+    [orderId, `\n\n--- Payment memo (copy to Venmo / PayPal / Cash App note) ---\n${paymentMemo}`]
+  );
+
+  return { success: true, orderId, subtotal, shipping, total, paymentMemo };
 }
 

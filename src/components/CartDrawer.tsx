@@ -2,11 +2,20 @@
 
 import { useState, useEffect } from 'react'
 import { useCart } from '@/context/CartContext'
-import { X, ShoppingCart, Trash2, Handshake, Loader2, CheckCircle2, ArrowRight } from 'lucide-react'
+import { X, ShoppingCart, Trash2, Handshake, Loader2, CheckCircle2, ArrowRight, Copy } from 'lucide-react'
 import { submitManualCheckout } from '@/app/actions/checkout'
 import { submitTradeOffer } from '@/app/actions/trades'
 import { TradeModal } from '@/components/TradeModal'
 import type { StoreSettings } from '@/lib/store-settings'
+import { paymentUrlWithAmount } from '@/lib/payment-links'
+
+type CheckoutSuccessPayload = {
+  orderId: string
+  subtotal: number
+  shipping: number
+  total: number
+  paymentMemo: string
+}
 
 export function CartDrawer({ settings }: { settings: StoreSettings }) {
   const { cartItems, isCartOpen, setIsCartOpen, removeFromCart, clearCart, cartTotal, kickItems, validateCartCompleteness } = useCart()
@@ -16,6 +25,8 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
   const [cartError, setCartError] = useState<string | null>(null)
   const [checkoutStage, setCheckoutStage] = useState<'cart' | 'form' | 'success'>('cart')
   const [checkoutForm, setCheckoutForm] = useState({ name: '', email: '', address: '' })
+  const [checkoutResult, setCheckoutResult] = useState<CheckoutSuccessPayload | null>(null)
+  const [memoCopied, setMemoCopied] = useState(false)
 
   const cashItems = cartItems.filter(i => !i.isTradeProposal);
   const tradeItems = cartItems.filter(i => i.isTradeProposal);
@@ -66,6 +77,14 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
       runPreFlight()
     }
   }, [isCartOpen, cartItems])
+
+  useEffect(() => {
+    if (!isCartOpen) {
+      setCheckoutStage('cart')
+      setCheckoutResult(null)
+      setMemoCopied(false)
+    }
+  }, [isCartOpen])
 
   if (!isCartOpen) return null
 
@@ -164,10 +183,18 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
         cashItems.map(i => i.id),
         checkoutForm.name,
         checkoutForm.email,
-        checkoutForm.address
+        checkoutForm.address,
+        { tradeProposalCount: tradeItems.length }
       );
       
       if (res.success) {
+        setCheckoutResult({
+          orderId: res.orderId,
+          subtotal: res.subtotal,
+          shipping: res.shipping,
+          total: res.total,
+          paymentMemo: res.paymentMemo,
+        });
         setCheckoutStage('success');
       }
     } catch (err: any) {
@@ -290,34 +317,75 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
                       </form>
                     )}
 
-                    {checkoutStage === 'success' && (
+                    {checkoutStage === 'success' && checkoutResult && (
                       <div className="bg-emerald-950/30 p-5 rounded-xl border border-emerald-900/50 text-center space-y-4 animate-in fade-in zoom-in-95">
                          <div className="w-12 h-12 bg-emerald-900/50 rounded-full flex items-center justify-center mx-auto border border-emerald-500/30">
                             <CheckCircle2 className="w-6 h-6 text-emerald-400" />
                          </div>
                          <div>
-                            <h3 className="text-emerald-400 font-black text-lg">Order Reserved!</h3>
-                            <p className="text-emerald-200/80 text-xs mt-1 leading-relaxed">{settings.payment_instructions}</p>
+                            <h3 className="text-emerald-400 font-black text-lg">Order reserved</h3>
+                            <p className="text-emerald-200/70 text-[11px] mt-1 font-mono break-all">Ref: {checkoutResult.orderId}</p>
+                            <p className="text-emerald-200/80 text-xs mt-2 leading-relaxed text-left">{settings.payment_instructions}</p>
+                         </div>
+                         <div className="text-left space-y-2">
+                            <p className="text-[10px] font-black uppercase text-emerald-300/90 tracking-widest">Payment total</p>
+                            <div className="flex justify-between text-xs text-emerald-100/90 font-mono">
+                              <span>Subtotal</span><span>${checkoutResult.subtotal.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-xs text-emerald-100/90 font-mono">
+                              <span>Shipping</span><span>{checkoutResult.shipping > 0 ? `$${checkoutResult.shipping.toFixed(2)}` : "—"}</span>
+                            </div>
+                            <div className="flex justify-between text-sm font-black text-emerald-200 pt-1 border-t border-emerald-800/50">
+                              <span>Send exactly</span><span>${checkoutResult.total.toFixed(2)}</span>
+                            </div>
+                         </div>
+                         <div className="text-left space-y-2">
+                            <p className="text-[10px] font-black uppercase text-emerald-300/90 tracking-widest">Copy into Venmo / PayPal / Cash App note</p>
+                            <textarea
+                              readOnly
+                              rows={4}
+                              className="w-full text-[11px] font-mono bg-black/40 border border-emerald-900/60 rounded-lg p-2 text-emerald-100 resize-none"
+                              value={checkoutResult.paymentMemo}
+                            />
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  await navigator.clipboard.writeText(checkoutResult.paymentMemo);
+                                  setMemoCopied(true);
+                                  setTimeout(() => setMemoCopied(false), 2500);
+                                } catch {
+                                  setCartError("Could not copy — select the text above and copy manually.");
+                                }
+                              }}
+                              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-emerald-700/50 text-emerald-200 text-xs font-bold hover:bg-emerald-900/40 transition-colors"
+                            >
+                              <Copy className="w-4 h-4" />
+                              {memoCopied ? "Copied!" : "Copy payment note"}
+                            </button>
+                            <p className="text-[10px] text-emerald-200/60 leading-snug">
+                              Venmo and most apps do not read cart data automatically. Pasting this note lets the seller match your payment to this order. PayPal.me and Cash App links below may pre-fill the amount only.
+                            </p>
                          </div>
                          <div className="space-y-2">
                              {settings.payment_venmo && (
                                 <a href={settings.payment_venmo} target="_blank" rel="noopener noreferrer" className="block w-full bg-[#008CFF] hover:bg-[#0074D4] text-foreground font-black py-3 rounded-lg transition-colors text-sm shadow-md">
-                                   Pay ${cartTotal.toFixed(2)} via Venmo
+                                   Open Venmo — pay ${checkoutResult.total.toFixed(2)}
                                 </a>
                              )}
                              {settings.payment_paypal && (
-                                <a href={settings.payment_paypal} target="_blank" rel="noopener noreferrer" className="block w-full bg-[#003087] hover:bg-[#001C53] text-foreground font-black py-3 rounded-lg transition-colors text-sm shadow-md">
-                                   Pay ${cartTotal.toFixed(2)} via PayPal
+                                <a href={paymentUrlWithAmount(settings.payment_paypal, checkoutResult.total)} target="_blank" rel="noopener noreferrer" className="block w-full bg-[#003087] hover:bg-[#001C53] text-foreground font-black py-3 rounded-lg transition-colors text-sm shadow-md">
+                                   Open PayPal — ${checkoutResult.total.toFixed(2)}
                                 </a>
                              )}
                              {settings.payment_cashapp && (
-                                <a href={settings.payment_cashapp} target="_blank" rel="noopener noreferrer" className="block w-full bg-[#00D632] hover:bg-[#00A827] text-foreground font-black py-3 rounded-lg transition-colors text-sm shadow-md">
-                                   Pay ${cartTotal.toFixed(2)} via CashApp
+                                <a href={paymentUrlWithAmount(settings.payment_cashapp, checkoutResult.total)} target="_blank" rel="noopener noreferrer" className="block w-full bg-[#00D632] hover:bg-[#00A827] text-foreground font-black py-3 rounded-lg transition-colors text-sm shadow-md">
+                                   Open Cash App — ${checkoutResult.total.toFixed(2)}
                                 </a>
                              )}
                              {settings.payment_zelle && (
                                 <a href={(settings.payment_zelle.includes('@') ? `mailto:${settings.payment_zelle}` : `tel:${settings.payment_zelle}`)} target="_blank" rel="noopener noreferrer" className="block w-full bg-[#7411E2] hover:bg-[#5C0DB3] text-foreground font-black py-3 rounded-lg transition-colors text-sm shadow-md">
-                                   Pay ${cartTotal.toFixed(2)} via Zelle ({settings.payment_zelle})
+                                   Zelle: {settings.payment_zelle} — send ${checkoutResult.total.toFixed(2)}
                                 </a>
                              )}
                          </div>
