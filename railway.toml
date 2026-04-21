@@ -13,3 +13,12 @@ restartPolicyType = "on_failure"
 # Both names are supported in code; set the same value if you override the host.
 API_BASE_URL = "https://api.playerindexdata.com"
 FINTECH_API_URL = "https://api.playerindexdata.com"
+# S3 / Railway Bucket — same effect as Bucket → "Add to Service" in the dashboard.
+# Requires a Bucket resource in this project whose service name is exactly "Bucket"
+# (canvas name). If you rename it, change "Bucket" below to match (e.g. ${{MyBucket.BUCKET}}).
+# See https://docs.railway.com/guides/storage-buckets#variable-references
+AWS_ACCESS_KEY_ID = "${{Bucket.ACCESS_KEY_ID}}"
+AWS_SECRET_ACCESS_KEY = "${{Bucket.SECRET_ACCESS_KEY}}"
+AWS_S3_BUCKET_NAME = "${{Bucket.BUCKET}}"
+AWS_REGION = "${{Bucket.REGION}}"
+AWS_ENDPOINT_URL = "${{Bucket.ENDPOINT}}"
