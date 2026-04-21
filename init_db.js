@@ -108,7 +108,7 @@ async function init() {
     return;
   }
 
-  const client = new Client({ connectionString });
+  const client = new Client({ connectionString, connectionTimeoutMillis: 10_000 });
   await client.connect();
 
   console.log('Connected to Postgres. Initializing schema...');
