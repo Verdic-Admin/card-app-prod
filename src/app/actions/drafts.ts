@@ -11,6 +11,19 @@ async function checkAuth() {
   }
 }
 
+function safeNumeric(v: unknown, fallback = 0): number {
+  if (v == null || v === '') return fallback;
+  const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/,/g, ''));
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function parallelInsertType(insertName: string | null, parallelName: string | null): string {
+  const parts = [insertName, parallelName].filter(
+    (x) => x != null && String(x).trim() !== '' && String(x).toLowerCase() !== 'base',
+  );
+  return parts.length ? parts.join(' ') : 'Base';
+}
+
 const ALLOWED_COLUMNS = [
   'player_name', 'card_set', 'card_number', 'insert_name',
   'parallel_name', 'print_run', 'listed_price', 'market_price',
@@ -226,6 +239,8 @@ export async function updateDraftCardAction(id: string, updates: any) {
 }
 
 export async function publishDraftCardsAction(ids: string[]) {
+  await checkAuth();
+
   // 1. Read approved rows from staging
   let staged = [];
   try {
@@ -256,22 +271,57 @@ export async function publishDraftCardsAction(ids: string[]) {
   // 2. Insert into live inventory
   try {
       for (const s of staged) {
+          const listed = safeNumeric(s.listed_price, 0);
+          const market = safeNumeric(s.market_price, listed);
+          const printRun =
+            s.print_run == null || s.print_run === ''
+              ? null
+              : String(s.print_run);
+          const pit = parallelInsertType(s.insert_name, s.parallel_name);
           await pool.query(`
-             INSERT INTO inventory (player_name, card_set, card_number, insert_name, parallel_name, print_run, image_url, back_image_url, listed_price, market_price, is_rookie, is_auto, is_relic, grading_company, grade, status)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'available')
-          `, [s.player_name, s.card_set, s.card_number, s.insert_name, s.parallel_name, s.print_run, s.image_url, s.back_image_url, s.listed_price, s.market_price, s.is_rookie || false, s.is_auto || false, s.is_relic || false, s.grading_company || null, s.grade || null]);
+             INSERT INTO inventory (
+               player_name, card_set, card_number, insert_name, parallel_name, parallel_insert_type,
+               print_run, image_url, back_image_url, listed_price, market_price,
+               is_rookie, is_auto, is_relic, grading_company, grade, status
+             )
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'available')
+          `, [
+            s.player_name,
+            s.card_set,
+            s.card_number,
+            s.insert_name,
+            s.parallel_name,
+            pit,
+            printRun,
+            s.image_url,
+            s.back_image_url,
+            listed,
+            market,
+            Boolean(s.is_rookie),
+            Boolean(s.is_auto),
+            Boolean(s.is_relic),
+            s.grading_company || null,
+            s.grade || null,
+          ]);
       }
-  } catch (insertError) {
+  } catch (insertError: unknown) {
       console.error(insertError);
-      throw new Error("Failed to mint cards to inventory")
+      const msg =
+        insertError instanceof Error
+          ? insertError.message
+          : typeof insertError === 'object' && insertError != null && 'message' in insertError
+            ? String((insertError as { message: unknown }).message)
+            : String(insertError);
+      throw new Error(`Failed to mint cards to inventory: ${msg}`);
   }
 
   // 3. Remove from staging
   try {
       await pool.query(`DELETE FROM scan_staging WHERE id = ANY($1::uuid[])`, [ids as any]);
-  } catch (deleteError) {
+  } catch (deleteError: unknown) {
       console.error("Warning: cards minted but staging cleanup failed:", deleteError)
-      throw new Error("Failed to clean up staging area after publishing")
+      const msg = deleteError instanceof Error ? deleteError.message : String(deleteError);
+      throw new Error(`Failed to clean up staging area after publishing: ${msg}`);
   }
 
   return { success: true }

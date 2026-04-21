@@ -191,7 +191,8 @@ export async function vercelBatchUpdatePrices(updates: { id: string, listed_pric
     return { success: true };
   } catch (err) {
     console.error("Batch update error:", err);
-    return { success: false, error: err };
+    const message = err instanceof Error ? err.message : String(err);
+    return { success: false, error: message };
   }
 }
 

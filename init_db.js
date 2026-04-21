@@ -66,6 +66,21 @@ ALTER TABLE inventory ADD COLUMN IF NOT EXISTS is_auto BOOLEAN DEFAULT false;
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS is_relic BOOLEAN DEFAULT false;
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS grading_company TEXT;
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS grade TEXT;
+-- Older Railway templates created inventory before these columns existed on some installs
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS market_price NUMERIC(10, 2);
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS listed_price NUMERIC(10, 2);
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS back_image_url TEXT;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS card_number TEXT;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS insert_name TEXT;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS parallel_name TEXT;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS parallel_insert_type TEXT;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS trend_data JSONB;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS player_index_url TEXT;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS oracle_projection NUMERIC(10, 2);
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS oracle_trend_percentage NUMERIC(10, 4);
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS needs_correction BOOLEAN DEFAULT false;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS needs_price_approval BOOLEAN DEFAULT false;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS filename TEXT;
 `;
 
 async function runIdempotentAlters(client) {
