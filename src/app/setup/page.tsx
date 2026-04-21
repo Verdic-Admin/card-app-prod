@@ -11,14 +11,13 @@ export default function SetupPage() {
         </div>
         <h1 className="text-2xl font-black text-white mb-2">Finish linking your store</h1>
         <p className="text-muted mb-6 text-sm leading-relaxed">
-          This deployment has not completed the one-time Player Index handshake yet. You do{' '}
-          <strong className="text-foreground">not</strong> copy or see an API key — it is stored only on
-          the server after you deploy using the link from Player Index.
+          Set <span className="font-mono text-foreground">PLAYERINDEX_API_KEY</span> in Railway to the key you
+          copied from Player Index (<span className="font-mono">/claim</span> or{' '}
+          <span className="font-mono">/developers</span>), then redeploy.
         </p>
         <p className="text-muted mb-8 text-xs leading-relaxed">
-          If you already deployed from Player Index, wait for the first boot to finish, then refresh. If
-          this is a manual Railway deploy, add the single-use provisioning value you were given as the{' '}
-          <span className="font-mono text-foreground">PROVISIONING_TOKEN</span> variable and redeploy once.
+          Optional: <span className="font-mono text-foreground">FINTECH_API_URL</span> /{' '}
+          <span className="font-mono text-foreground">API_BASE_URL</span> default to the public gateway if unset.
         </p>
         <Link
           href="https://playerindexdata.com/claim"

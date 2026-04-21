@@ -1,13 +1,7 @@
 /**
  * Fintech API client for the Player Index master backend.
  *
- * Reads the per-shop `playerindex_api_key` provisioned during first boot
- * (see init_db.js → shop_config.playerindex_api_key) and attaches it as
- * X-API-Key on every request. The key is burned one token per request by
- * the backend's verify_client_api_key / burn_api_tokens RPC, so a 402
- * response means this shop needs a token refill.
- *
- * Base URL: getOracleGatewayBaseUrl() — shop_config from provisioning first, then env.
+ * Uses PLAYERINDEX_API_KEY (and optional FINTECH_API_URL / API_BASE_URL) from the host.
  */
 import { getOracleGatewayBaseUrl } from '@/lib/oracle-gateway-url';
 import { getShopOracleApiKey } from '@/lib/shop-oracle-credentials';
@@ -33,15 +27,12 @@ export class FintechAuthError extends Error {
   }
 }
 
-/**
- * Load the shop gateway API key (server-only). Ops may set PLAYERINDEX_API_KEY on the host;
- * otherwise the key from one-time provisioning lives in shop_config — never shown in the UI.
- */
+/** Load the shop gateway API key (server-only). Requires PLAYERINDEX_API_KEY in Railway. */
 export async function getFintechApiKey(): Promise<string> {
   const key = await getShopOracleApiKey();
   if (!key) {
     throw new FintechAuthError(
-      'Store is not provisioned yet. Deploy from Player Index with your provisioning link — you do not need to paste an API key.',
+      'Missing PLAYERINDEX_API_KEY. Add it in Railway from playerindexdata.com/claim or /developers.',
     );
   }
   return key;

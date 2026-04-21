@@ -3,12 +3,13 @@ builder = "nixpacks"
 buildCommand = "npm run build"
 
 [deploy]
-startCommand = "node init_db.js && npm run start"
+startCommand = "node init_db.js && sh -c 'set -a; [ -f /tmp/shop-oracle.env ] && . /tmp/shop-oracle.env; set +a; exec npm run start'"
 healthcheckPath = "/"
 healthcheckTimeout = 120
 restartPolicyType = "on_failure"
 
 [deploy.environmentVariables]
+# Railway template: add PLAYERINDEX_API_KEY as a required variable; shops paste the key from playerindexdata.com/claim.
 # Both names are supported in code; set the same value if you override the host.
 API_BASE_URL = "https://api.playerindexdata.com"
 FINTECH_API_URL = "https://api.playerindexdata.com"

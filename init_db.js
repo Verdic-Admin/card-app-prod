@@ -1,9 +1,12 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 /**
- * Railway / template entrypoint: `node init_db.js && npm run start`
- * Idempotent schema + seed row for store_settings (id=1) and shop_config.
+ * Railway / template entrypoint: see `railway.toml` startCommand — runs `init_db.js`,
+ * then sources `/tmp/shop-oracle.env` when present so `npm run start` sees mirrored env.
  */
+const fs = require('fs');
 const { Client } = require('pg');
+
+const SHOP_ORACLE_ENV_FILE = '/tmp/shop-oracle.env';
 
 /** Run after CREATE TABLE IF NOT EXISTS — safe on existing DBs (PG 9.1+). */
 const IDEMPOTENT_ALTER = `
@@ -43,7 +46,7 @@ ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS shipping_fee NUMERIC(10, 2) 
 ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS free_shipping_threshold NUMERIC(10, 2) DEFAULT 25.00;
 ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS site_announcement_url TEXT;
 
--- shop_config: API host from provisioning exchange (avoids relying on Railway API_BASE_URL)
+-- shop_config: optional legacy columns (Oracle URL was mirrored here in older templates)
 ALTER TABLE shop_config ADD COLUMN IF NOT EXISTS playerindex_api_base_url TEXT;
 
 -- scan_staging (bulk importer / wizard)
@@ -75,6 +78,25 @@ async function runIdempotentAlters(client) {
     } catch (e) {
       console.warn('[init_db] alter skipped:', e.message || e);
     }
+  }
+}
+
+/** POSIX single-quoted string for a line in a file sourced by `sh`. */
+function shSingleQuote(val) {
+  return `'${String(val).replace(/'/g, `'\"'\"'`)}'`;
+}
+
+function writeEphemeralOracleEnv(apiKey, apiBaseNorm) {
+  if (!apiKey || !apiBaseNorm) return;
+  const body =
+    `PLAYERINDEX_API_KEY=${shSingleQuote(apiKey)}\n` +
+    `FINTECH_API_URL=${shSingleQuote(apiBaseNorm)}\n` +
+    `API_BASE_URL=${shSingleQuote(apiBaseNorm)}\n`;
+  try {
+    fs.writeFileSync(SHOP_ORACLE_ENV_FILE, body, { encoding: 'utf8', mode: 0o600 });
+    console.log(`[init_db] Wrote ${SHOP_ORACLE_ENV_FILE} (sourced before npm run start).`);
+  } catch (e) {
+    console.warn('[init_db] Could not write ephemeral env file:', e.message || e);
   }
 }
 
@@ -164,61 +186,10 @@ async function init() {
   }
   const configRow = configRowResult.rows[0];
 
-  let playerIndexApiKey = process.env.PLAYERINDEX_API_KEY || configRow.playerindex_api_key;
-  const provisioningToken = process.env.PROVISIONING_TOKEN;
-
-  if (!playerIndexApiKey && provisioningToken) {
-    // Provisioning exchange is handled by the Vercel-hosted player-index-oracle app.
-    const provisioningUrl = 'https://playerindexdata.com/api/provisioning/exchange';
-    console.log(`Found PROVISIONING_TOKEN. Exchanging with ${provisioningUrl} for permanent API key...`);
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
-    try {
-      const resp = await fetch(provisioningUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: provisioningToken }),
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-      const raw = await resp.text();
-      let data = {};
-      try {
-        data = JSON.parse(raw);
-      } catch {
-        /* non-JSON */
-      }
-
-      if (resp.ok && data.api_key) {
-        playerIndexApiKey = data.api_key;
-        const apiBase =
-          (typeof data.api_gateway_url === 'string' && data.api_gateway_url.trim()) ||
-          process.env.API_BASE_URL ||
-          process.env.FINTECH_API_URL ||
-          'https://api.playerindexdata.com';
-        const apiBaseNorm = String(apiBase).replace(/\/+$/, '');
-        await client.query(
-          'UPDATE shop_config SET playerindex_api_key = $1, playerindex_api_base_url = $2 WHERE id = $3',
-          [playerIndexApiKey, apiBaseNorm, configRow.id]
-        );
-        console.log(
-          'Successfully exchanged Provisioning Token; saved API key + gateway URL to shop_config.'
-        );
-        console.log(
-          'Tip: remove PROVISIONING_TOKEN from Railway after a successful boot — it is one-time only.'
-        );
-      } else {
-        const msg = data.detail || data.error || raw.slice(0, 200) || `HTTP ${resp.status}`;
-        console.error(`Failed to exchange Provisioning Token [${resp.status}]: ${msg}`);
-      }
-    } catch (e) {
-      clearTimeout(timeoutId);
-      console.error('Error during Provisioning Token exchange:', e.message);
-    }
-  }
+  let playerIndexApiKey = process.env.PLAYERINDEX_API_KEY;
 
   if (playerIndexApiKey) {
-    console.log('API key available (env or shop_config).');
+    console.log('API key available (PLAYERINDEX_API_KEY on host).');
     const envGateway = (process.env.FINTECH_API_URL || process.env.API_BASE_URL || '')
       .trim()
       .replace(/\/+$/, '');
@@ -227,6 +198,7 @@ async function init() {
         await client.query(
           `UPDATE shop_config SET playerindex_api_base_url = $1
            WHERE id = $2
+             AND playerindex_api_key IS NOT NULL
              AND (playerindex_api_base_url IS NULL OR TRIM(playerindex_api_base_url) = '')`,
           [envGateway, configRow.id]
         );
@@ -341,6 +313,34 @@ async function init() {
 
   await runIdempotentAlters(client);
   console.log('- Column upgrades applied (IF NOT EXISTS)');
+
+  const { rows: liveCfgRows } = await client.query(
+    'SELECT playerindex_api_key, playerindex_api_base_url FROM shop_config WHERE id = $1',
+    [configRow.id]
+  );
+  const liveCfg = liveCfgRows[0] || {};
+
+  if (!process.env.PLAYERINDEX_API_KEY && liveCfg.playerindex_api_key) {
+    const base =
+      String(liveCfg.playerindex_api_base_url || '')
+        .trim()
+        .replace(/\/+$/, '') ||
+      String(process.env.FINTECH_API_URL || process.env.API_BASE_URL || '')
+        .trim()
+        .replace(/\/+$/, '') ||
+      'https://api.playerindexdata.com';
+    writeEphemeralOracleEnv(liveCfg.playerindex_api_key, base);
+  }
+
+  if (process.env.PLAYERINDEX_API_KEY && liveCfg.playerindex_api_key) {
+    await client.query(
+      'UPDATE shop_config SET playerindex_api_key = NULL WHERE id = $1',
+      [configRow.id]
+    );
+    console.log(
+      '[init_db] Removed duplicate playerindex_api_key from shop_config (using PLAYERINDEX_API_KEY from the host).'
+    );
+  }
 
   await client.end();
   console.log('Database schema initialized successfully.');
