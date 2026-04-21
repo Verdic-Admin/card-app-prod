@@ -121,6 +121,9 @@ export function BulkIngestionWizard() {
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1)
   const [isSendingToScanner, setIsSendingToScanner] = useState(false)
 
+  // Image zoom lightbox
+  const [zoomedImg, setZoomedImg] = useState<string | null>(null)
+
   const creditsExhausted = useCallback(() => {
     window.dispatchEvent(new CustomEvent('api-credits-exhausted'))
     window.location.href = '/admin/billing'
@@ -649,16 +652,16 @@ export function BulkIngestionWizard() {
             </div>
           </div>
 
-          <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+          <div className="space-y-3 max-h-[72vh] overflow-y-auto pr-1">
             {staging.map(card => {
               const pending = isPendingScan(card)
               const displayFront = pending ? (card.raw_front_url ?? null) : (card.image_url ?? null)
               const displayBack = pending ? (card.raw_back_url ?? null) : (card.back_image_url ?? null)
               return (
               <div key={card.id}
-                className={`border rounded-xl p-4 bg-surface transition ${selectedIds.has(card.id) ? 'border-brand/50' : 'border-border opacity-60'}`}>
-                <div className="flex gap-4">
-                  {/* Images — front + back side by side */}
+                className={`border rounded-xl p-3 bg-surface transition ${selectedIds.has(card.id) ? 'border-brand/50' : 'border-border opacity-60'}`}>
+                <div className="flex gap-3">
+                  {/* Images — front + back side by side, click to zoom */}
                   <div className="flex-shrink-0 flex flex-col gap-1">
                     {pending && (
                       <span className="block text-[9px] font-black uppercase tracking-wide text-orange-600 bg-orange-500/15 rounded px-1 py-0.5 text-center">
@@ -669,10 +672,10 @@ export function BulkIngestionWizard() {
                       <div className="flex flex-col items-center gap-0.5">
                         <span className="text-[9px] font-bold text-muted uppercase tracking-wide">Front</span>
                         {displayFront ? (
-                          <img src={displayFront} alt="front"
-                            className="w-24 h-32 object-contain rounded-lg border border-border bg-surface" />
+                          <img src={displayFront} alt="front" onClick={() => setZoomedImg(displayFront)}
+                            className="w-28 h-40 object-contain rounded-lg border border-border bg-surface cursor-zoom-in hover:border-brand/50 transition" />
                         ) : (
-                          <div className="w-24 h-32 rounded-lg border border-border bg-surface-hover flex items-center justify-center text-muted text-[10px] text-center p-1">
+                          <div className="w-28 h-40 rounded-lg border border-border bg-surface-hover flex items-center justify-center text-muted text-[10px] text-center p-1">
                             No image
                           </div>
                         )}
@@ -680,10 +683,10 @@ export function BulkIngestionWizard() {
                       <div className="flex flex-col items-center gap-0.5">
                         <span className="text-[9px] font-bold text-muted uppercase tracking-wide">Back</span>
                         {displayBack ? (
-                          <img src={displayBack} alt="back"
-                            className="w-24 h-32 object-contain rounded-lg border border-border bg-surface" />
+                          <img src={displayBack} alt="back" onClick={() => setZoomedImg(displayBack)}
+                            className="w-28 h-40 object-contain rounded-lg border border-border bg-surface cursor-zoom-in hover:border-brand/50 transition" />
                         ) : (
-                          <div className="w-24 h-32 rounded-lg border border-border bg-surface-hover flex items-center justify-center text-muted text-[10px] text-center p-1">
+                          <div className="w-28 h-40 rounded-lg border border-border bg-surface-hover flex items-center justify-center text-muted text-[10px] text-center p-1">
                             No image
                           </div>
                         )}
@@ -692,52 +695,50 @@ export function BulkIngestionWizard() {
                   </div>
 
                   {/* Fields */}
-                  <div className="flex-1 space-y-2">
-                    {/* Catalog search */}
+                  <div className="flex-1 space-y-1.5">
                     <TaxonomySearch onSelect={data => applyTaxonomy(card.id, data)} />
-
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-1.5">
                       <input
                         value={card.player_name}
                         onChange={e => updateField(card.id, 'player_name', e.target.value)}
                         onBlur={e => saveField(card.id, 'player_name', e.target.value)}
                         placeholder="Player Name"
-                        className="border border-border rounded-lg p-2 text-sm bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
+                        className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
                       />
                       <input
                         value={card.card_set}
                         onChange={e => updateField(card.id, 'card_set', e.target.value)}
                         onBlur={e => saveField(card.id, 'card_set', e.target.value)}
                         placeholder="Card Set"
-                        className="border border-border rounded-lg p-2 text-sm bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
+                        className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
                       />
                       <input
                         value={card.card_number}
                         onChange={e => updateField(card.id, 'card_number', e.target.value)}
                         onBlur={e => saveField(card.id, 'card_number', e.target.value)}
                         placeholder="Card #"
-                        className="border border-border rounded-lg p-2 text-sm bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
+                        className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
                       />
                       <input
                         value={card.insert_name}
                         onChange={e => updateField(card.id, 'insert_name', e.target.value)}
                         onBlur={e => saveField(card.id, 'insert_name', e.target.value)}
                         placeholder="Insert"
-                        className="border border-border rounded-lg p-2 text-sm bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
+                        className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
                       />
                       <input
                         value={card.parallel_name}
                         onChange={e => updateField(card.id, 'parallel_name', e.target.value)}
                         onBlur={e => saveField(card.id, 'parallel_name', e.target.value)}
                         placeholder="Parallel"
-                        className="border border-border rounded-lg p-2 text-sm bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
+                        className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
                       />
                       <input
                         value={card.print_run}
                         onChange={e => updateField(card.id, 'print_run', e.target.value)}
                         onBlur={e => saveField(card.id, 'print_run', e.target.value)}
                         placeholder="Print Run"
-                        className="border border-border rounded-lg p-2 text-sm bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
+                        className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
                       />
                       <input
                         value={card.listed_price}
@@ -745,7 +746,7 @@ export function BulkIngestionWizard() {
                         onBlur={e => saveField(card.id, 'price', e.target.value)}
                         placeholder="Price $"
                         type="number"
-                        className="border border-border rounded-lg p-2 text-sm bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
+                        className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
                       />
                     </div>
                   </div>
@@ -845,22 +846,22 @@ export function BulkIngestionWizard() {
             <span className="ml-auto text-xs text-muted font-medium">{reviewSelected.size} selected</span>
           </div>
 
-          <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
+          <div className="space-y-3 max-h-[72vh] overflow-y-auto pr-1">
             {reviewCards
               .filter(c => activeTab === 'ready' ? (c.confidence ?? 0) > 0.85 : (c.confidence ?? 1) <= 0.85)
               .map(card => (
                 <div key={card.id}
-                  className={`border rounded-xl p-4 bg-surface transition ${reviewSelected.has(card.id) ? 'border-brand/50' : 'border-border opacity-60'}`}>
-                  <div className="flex gap-4">
-                    {/* Images — front + back side by side */}
+                  className={`border rounded-xl p-3 bg-surface transition ${reviewSelected.has(card.id) ? 'border-brand/50' : 'border-border opacity-60'}`}>
+                  <div className="flex gap-3">
+                    {/* Images — front + back side by side, click to zoom */}
                     <div className="flex-shrink-0 flex gap-2">
                       <div className="flex flex-col items-center gap-0.5">
                         <span className="text-[9px] font-bold text-muted uppercase tracking-wide">Front</span>
                         {card.image_url ? (
-                          <img src={card.image_url} alt="front"
-                            className="w-24 h-32 object-contain rounded-lg border border-border bg-surface" />
+                          <img src={card.image_url} alt="front" onClick={() => setZoomedImg(card.image_url!)}
+                            className="w-28 h-40 object-contain rounded-lg border border-border bg-surface cursor-zoom-in hover:border-brand/50 transition" />
                         ) : (
-                          <div className="w-24 h-32 rounded-lg border border-border bg-surface-hover flex items-center justify-center text-muted text-[10px] text-center p-1">
+                          <div className="w-28 h-40 rounded-lg border border-border bg-surface-hover flex items-center justify-center text-muted text-[10px] text-center p-1">
                             No image
                           </div>
                         )}
@@ -868,10 +869,10 @@ export function BulkIngestionWizard() {
                       <div className="flex flex-col items-center gap-0.5">
                         <span className="text-[9px] font-bold text-muted uppercase tracking-wide">Back</span>
                         {card.back_image_url ? (
-                          <img src={card.back_image_url} alt="back"
-                            className="w-24 h-32 object-contain rounded-lg border border-border bg-surface" />
+                          <img src={card.back_image_url} alt="back" onClick={() => setZoomedImg(card.back_image_url!)}
+                            className="w-28 h-40 object-contain rounded-lg border border-border bg-surface cursor-zoom-in hover:border-brand/50 transition" />
                         ) : (
-                          <div className="w-24 h-32 rounded-lg border border-border bg-surface-hover flex items-center justify-center text-muted text-[10px] text-center p-1">
+                          <div className="w-28 h-40 rounded-lg border border-border bg-surface-hover flex items-center justify-center text-muted text-[10px] text-center p-1">
                             No image
                           </div>
                         )}
@@ -879,7 +880,7 @@ export function BulkIngestionWizard() {
                     </div>
 
                     {/* Fields */}
-                    <div className="flex-1 space-y-2">
+                    <div className="flex-1 space-y-1.5">
                       {/* Confidence badge */}
                       {card.confidence !== undefined && (
                         <div className="flex items-center gap-2">
@@ -901,7 +902,7 @@ export function BulkIngestionWizard() {
                         <TaxonomySearch onSelect={data => applyReviewTaxonomy(card.id, data)} />
                       )}
 
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-2 gap-1.5">
                         {[
                           { field: 'player_name', placeholder: 'Player Name' },
                           { field: 'card_set', placeholder: 'Card Set' },
@@ -915,21 +916,21 @@ export function BulkIngestionWizard() {
                             onChange={e => updateReviewField(card.id, field as keyof StagingCard, e.target.value)}
                             onBlur={e => saveReviewField(card.id, field, e.target.value)}
                             placeholder={placeholder}
-                            className="border border-border rounded-lg p-2 text-sm bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
+                            className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
                           />
                         ))}
                       </div>
 
                       {/* Price + reprice + send to fintech */}
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-bold text-muted">$</span>
+                        <span className="text-xs font-bold text-muted">$</span>
                         <input
                           type="number"
                           value={card.listed_price || ''}
                           onChange={e => updateReviewField(card.id, 'listed_price', e.target.value)}
                           onBlur={e => saveReviewField(card.id, 'price', e.target.value)}
                           placeholder="0.00"
-                          className="border border-border rounded-lg p-2 text-sm bg-surface text-foreground w-28 focus:ring-1 focus:ring-brand outline-none"
+                          className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground w-24 focus:ring-1 focus:ring-brand outline-none"
                         />
                         <button
                           onClick={() => card.image_url && handleReprice(card.id, card.image_url)}
@@ -973,6 +974,28 @@ export function BulkIngestionWizard() {
           >
             {isPublishing ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
             Publish {reviewSelected.size > 0 ? `${reviewSelected.size} Cards` : 'Selected'} to Inventory
+          </button>
+        </div>
+      )}
+
+      {/* ── Image zoom lightbox ─────────────────────────────────────────────── */}
+      {zoomedImg && (
+        <div
+          className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4 cursor-zoom-out"
+          onClick={() => setZoomedImg(null)}
+        >
+          <img
+            src={zoomedImg}
+            alt="zoomed card"
+            className="max-w-[90vw] max-h-[90vh] object-contain rounded-2xl shadow-2xl ring-1 ring-white/10"
+            onClick={e => e.stopPropagation()}
+          />
+          <button
+            className="absolute top-4 right-5 text-white/70 hover:text-white text-3xl font-bold leading-none"
+            onClick={() => setZoomedImg(null)}
+            aria-label="Close"
+          >
+            ×
           </button>
         </div>
       )}
