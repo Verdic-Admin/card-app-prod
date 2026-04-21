@@ -1,13 +1,12 @@
 import Link from 'next/link';
 import { submitOracleRequest } from '@/app/actions/oracleAPI';
 import { PLAYER_INDEX_BILLING_URL } from '@/lib/player-index-urls';
+import { getOracleGatewayBaseUrl } from '@/lib/oracle-gateway-url';
 import { Coins, TrendingUp, Star, Mail, ExternalLink } from 'lucide-react';
-
-const API_BASE_URL = process.env.API_BASE_URL || 'https://api.playerindexdata.com';
 
 async function getAccountBalance() {
   try {
-    const resp = await submitOracleRequest(`${API_BASE_URL}/account/balance`);
+    const resp = await submitOracleRequest(`${getOracleGatewayBaseUrl()}/account/balance`);
     if (!resp.success) return null;
     return resp.data;
   } catch {

@@ -7,14 +7,10 @@
  * the backend's verify_client_api_key / burn_api_tokens RPC, so a 402
  * response means this shop needs a token refill.
  *
- * Base URL defaults to https://playerindexdata.com/fintech (root_path
- * configured in backend/main.py). Override with FINTECH_API_URL if the
- * storefront is pointed at a different deployment.
+ * Base URL: see getOracleGatewayBaseUrl() (FINTECH_API_URL or API_BASE_URL).
  */
 import pool from '@/utils/db';
-
-const FINTECH_BASE_URL =
-  process.env.FINTECH_API_URL ?? 'https://api.playerindexdata.com';
+import { getOracleGatewayBaseUrl } from '@/lib/oracle-gateway-url';
 
 /**
  * Thrown when the shop is out of API tokens. The caller should surface
@@ -74,7 +70,7 @@ async function fintechFetch<T>(
   init: Omit<RequestInit, 'headers'> & { headers?: Record<string, string> } = {},
 ): Promise<T> {
   const apiKey = await getFintechApiKey();
-  const url = `${FINTECH_BASE_URL}${path}`;
+  const url = `${getOracleGatewayBaseUrl()}${path.startsWith('/') ? path : `/${path}`}`;
   const res = await fetch(url, {
     ...init,
     headers: {
@@ -115,9 +111,22 @@ export interface BatchPriceItem {
 }
 
 export interface BatchPriceResponse {
-  shop_id: string;
   discount_applied: number;
   items: BatchPriceItem[];
+}
+
+/** One row for POST /shop-api/batch-price (matches fintech-api CardBatchItem). */
+export interface BatchPriceCardInput {
+  card_id: string;
+  player_name: string;
+  card_set?: string;
+  card_number?: string;
+  insert_name?: string;
+  parallel_name?: string;
+  is_auto?: boolean;
+  is_relic?: boolean;
+  is_rookie?: boolean;
+  print_run?: number | null;
 }
 
 /**
@@ -125,12 +134,12 @@ export interface BatchPriceResponse {
  * configured discount rate. Replaces client-side pricing math.
  */
 export async function batchPrice(
-  cardIds: string[],
+  cards: BatchPriceCardInput[],
   discountRate: number,
 ): Promise<BatchPriceResponse> {
   return fintechFetch<BatchPriceResponse>('/shop-api/batch-price', {
     method: 'POST',
-    body: JSON.stringify({ card_ids: cardIds, discount_rate: discountRate }),
+    body: JSON.stringify({ cards, discount_rate: discountRate }),
   });
 }
 

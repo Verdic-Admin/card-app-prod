@@ -1,8 +1,7 @@
 "use server";
 
 import pool from '@/utils/db';
-
-const API_BASE_URL = process.env.API_BASE_URL || 'https://api.playerindexdata.com';
+import { getOracleGatewayBaseUrl } from '@/lib/oracle-gateway-url';
 
 async function getApiKey(): Promise<string> {
   if (process.env.PLAYERINDEX_API_KEY) return process.env.PLAYERINDEX_API_KEY;
@@ -57,6 +56,13 @@ export async function syncInventoryWithOracle() {
   console.log(`-> Batching ${inventory.length} items to shop-api...`);
 
   const apiKey = await getApiKey();
+  if (!apiKey) {
+    return {
+      success: false,
+      message: 'No Player Index API key (PLAYERINDEX_API_KEY or shop_config).',
+      count: 0,
+    };
+  }
 
   const cards = inventory.map((i: any) => ({
     card_id: i.id,
@@ -71,9 +77,10 @@ export async function syncInventoryWithOracle() {
     print_run: i.print_run ? Number(i.print_run) : null,
   }));
 
-  const res = await fetch(`${API_BASE_URL}/shop-api/batch-price`, {
+  const base = getOracleGatewayBaseUrl();
+  const res = await fetch(`${base}/shop-api/batch-price`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey },
+    headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
     body: JSON.stringify({ cards, discount_rate: discountRate }),
   });
 
@@ -159,7 +166,7 @@ export async function syncSingleItemWithOracle(id: string) {
       skip_fuzzy: true
     }
 
-    const res = await fetch(`${API_BASE_URL}/v1/calculate`, {
+    const res = await fetch(`${getOracleGatewayBaseUrl()}/v1/calculate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -220,9 +227,10 @@ export async function evaluateItemWithOracle(payload: any) {
       skip_fuzzy: true
     }
     
-    console.log(`-> Evaluate payload going to ${API_BASE_URL}/v1/calculate:`, formattedPayload);
+    const base = getOracleGatewayBaseUrl();
+    console.log(`-> Evaluate payload going to ${base}/v1/calculate:`, formattedPayload);
 
-    const res = await fetch(`${API_BASE_URL}/v1/calculate`, {
+    const res = await fetch(`${base}/v1/calculate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -275,7 +283,7 @@ export async function getSingleOraclePrice(payload: {
     };
 
     const apiKey = await getApiKey();
-    const response = await fetch(`${API_BASE_URL}/v1/calculate`, {
+    const response = await fetch(`${getOracleGatewayBaseUrl()}/v1/calculate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -321,7 +329,7 @@ export async function getBatchOraclePrices(cards: any[]) {
       };
     });
 
-    const response = await fetch(`${API_BASE_URL}/v1/b2b/calculate-batch`, {
+    const response = await fetch(`${getOracleGatewayBaseUrl()}/v1/b2b/calculate-batch`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
       // Backend expects "items" payload

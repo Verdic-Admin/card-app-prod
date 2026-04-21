@@ -9,4 +9,6 @@ healthcheckTimeout = 120
 restartPolicyType = "on_failure"
 
 [deploy.environmentVariables]
+# Both names are supported in code; set the same value if you override the host.
 API_BASE_URL = "https://api.playerindexdata.com"
+FINTECH_API_URL = "https://api.playerindexdata.com"

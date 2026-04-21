@@ -1,6 +1,6 @@
 'use server'
 
-const API_BASE_URL = process.env.API_BASE_URL || 'https://api.playerindexdata.com';
+import { getOracleGatewayBaseUrl } from '@/lib/oracle-gateway-url';
 
 export async function submitOracleRequest(url: string, options: RequestInit = {}) {
   const headers = new Headers(options.headers || {});
@@ -27,8 +27,7 @@ export async function submitOracleRequest(url: string, options: RequestInit = {}
     };
   }
 
-  // Match fintech-api APIKeyHeader name (headers are case-insensitive; use canonical form).
-  headers.set('X-Api-Key', apiKey);
+  headers.set('X-API-Key', apiKey);
 
   if (!headers.has("Content-Type") && !(options.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
@@ -58,7 +57,8 @@ export async function submitOracleRequest(url: string, options: RequestInit = {}
 }
 
 export async function searchTaxonomyAction(query: string) {
-  return await submitOracleRequest(`${API_BASE_URL}/v1/taxonomy/search?q=${encodeURIComponent(query)}`);
+  const base = getOracleGatewayBaseUrl();
+  return await submitOracleRequest(`${base}/v1/taxonomy/search?q=${encodeURIComponent(query)}`);
 }
 
 export async function calculatePricingAction(fields: {
@@ -73,7 +73,7 @@ export async function calculatePricingAction(fields: {
   is_relic?: boolean;
   grade?: string | null;
 }) {
-  return await submitOracleRequest(`${API_BASE_URL}/v1/calculate`, {
+  return await submitOracleRequest(`${getOracleGatewayBaseUrl()}/v1/calculate`, {
     method: 'POST',
     body: JSON.stringify({
       player_name: fields.player_name,

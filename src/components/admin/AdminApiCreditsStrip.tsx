@@ -2,11 +2,10 @@ import { Suspense } from 'react';
 import { Coins, ExternalLink } from 'lucide-react';
 import { submitOracleRequest } from '@/app/actions/oracleAPI';
 import { PLAYER_INDEX_BILLING_URL } from '@/lib/player-index-urls';
-
-const API_BASE_URL = process.env.API_BASE_URL || 'https://api.playerindexdata.com';
+import { getOracleGatewayBaseUrl } from '@/lib/oracle-gateway-url';
 
 async function CreditsInner() {
-  const res = await submitOracleRequest(`${API_BASE_URL}/account/balance`);
+  const res = await submitOracleRequest(`${getOracleGatewayBaseUrl()}/account/balance`);
   const data = res.success && res.data ? (res.data as Record<string, unknown>) : null;
   const exempt = data?.billing_exempt === true;
   const balance =
