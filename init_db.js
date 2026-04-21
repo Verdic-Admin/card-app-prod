@@ -47,6 +47,18 @@ ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS raw_front_url TEXT;
 ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS raw_back_url TEXT;
 ALTER TABLE scan_staging ALTER COLUMN image_url DROP NOT NULL;
 ALTER TABLE scan_staging ALTER COLUMN back_image_url DROP NOT NULL;
+
+-- rookie / auto / relic / grading attributes (migration 002)
+ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS is_rookie BOOLEAN DEFAULT false;
+ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS is_auto BOOLEAN DEFAULT false;
+ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS is_relic BOOLEAN DEFAULT false;
+ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS grading_company TEXT;
+ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS grade TEXT;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS is_rookie BOOLEAN DEFAULT false;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS is_auto BOOLEAN DEFAULT false;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS is_relic BOOLEAN DEFAULT false;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS grading_company TEXT;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS grade TEXT;
 `;
 
 async function runIdempotentAlters(client) {

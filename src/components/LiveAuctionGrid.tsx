@@ -78,7 +78,23 @@ export function LiveAuctionGrid({ initialItems }: { initialItems: Item[] }) {
             
             <div className="p-4">
               <h3 className="font-bold text-lg text-white leading-tight">{item.player_name}</h3>
-              <p className="text-zinc-400 text-sm mb-3">{item.card_set}</p>
+              <p className="text-zinc-400 text-sm">{item.card_set}</p>
+              {(item.is_rookie || item.is_auto || item.is_relic || (item.grading_company && item.grade)) && (
+                <div className="flex flex-wrap gap-1.5 mt-1 mb-2">
+                  {item.is_rookie && (
+                    <span className="text-[9px] font-black bg-yellow-400/20 text-yellow-400 border border-yellow-400/40 px-2 py-0.5 rounded-full uppercase tracking-wider">RC</span>
+                  )}
+                  {item.is_auto && (
+                    <span className="text-[9px] font-black bg-blue-400/20 text-blue-400 border border-blue-400/40 px-2 py-0.5 rounded-full uppercase tracking-wider">Auto</span>
+                  )}
+                  {item.is_relic && (
+                    <span className="text-[9px] font-black bg-purple-400/20 text-purple-400 border border-purple-400/40 px-2 py-0.5 rounded-full uppercase tracking-wider">Relic</span>
+                  )}
+                  {item.grading_company && item.grade && (
+                    <span className="text-[9px] font-black bg-emerald-400/20 text-emerald-400 border border-emerald-400/40 px-2 py-0.5 rounded-full uppercase tracking-wider">{item.grading_company} {item.grade}</span>
+                  )}
+                </div>
+              )}
               
               <div className="text-center font-mono font-black text-3xl text-cyan-400 bg-zinc-950 py-3 rounded-lg mb-2 shadow-inner border border-zinc-800 relative">
                 ${item.current_bid || item.listed_price || '0.00'}

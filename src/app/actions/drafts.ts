@@ -16,6 +16,7 @@ const ALLOWED_COLUMNS = [
   'player_name', 'card_set', 'card_number', 'insert_name',
   'parallel_name', 'print_run', 'listed_price', 'market_price',
   'image_url', 'back_image_url',
+  'is_rookie', 'is_auto', 'is_relic', 'grading_company', 'grade',
 ];
 
 function absAssetUrl(url: string): string {
@@ -65,7 +66,8 @@ export async function stagePairedUploadAction(formData: FormData) {
      VALUES ($1, $2, NULL, NULL)
      RETURNING id, player_name, card_set, card_number, insert_name,
                parallel_name, print_run, raw_front_url, raw_back_url,
-               image_url, back_image_url, listed_price, market_price`,
+               image_url, back_image_url, listed_price, market_price,
+               is_rookie, is_auto, is_relic, grading_company, grade`,
     [rawFront, rawBack]
   );
 
@@ -95,16 +97,21 @@ export async function createDraftCardsAction(cards: any[]) {
     back_image_url: c.side_b_url,
     listed_price: c.price || 0,
     market_price: c.market_price || c.price || 0,
+    is_rookie: c.is_rookie || false,
+    is_auto: c.is_auto || false,
+    is_relic: c.is_relic || false,
+    grading_company: c.grading_company || null,
+    grade: c.grade || null,
   }));
   
   const results = [];
   try {
      for (const item of payload) {
         const { rows } = await pool.query(`
-           INSERT INTO scan_staging (player_name, card_set, card_number, insert_name, parallel_name, print_run, image_url, back_image_url, listed_price, market_price)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-           RETURNING id, player_name, card_set, card_number, insert_name, parallel_name, print_run, image_url, back_image_url, listed_price, market_price
-        `, [item.player_name, item.card_set, item.card_number, item.insert_name, item.parallel_name, item.print_run, item.image_url, item.back_image_url, item.listed_price, item.market_price]);
+           INSERT INTO scan_staging (player_name, card_set, card_number, insert_name, parallel_name, print_run, image_url, back_image_url, listed_price, market_price, is_rookie, is_auto, is_relic, grading_company, grade)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+           RETURNING id, player_name, card_set, card_number, insert_name, parallel_name, print_run, image_url, back_image_url, listed_price, market_price, is_rookie, is_auto, is_relic, grading_company, grade
+        `, [item.player_name, item.card_set, item.card_number, item.insert_name, item.parallel_name, item.print_run, item.image_url, item.back_image_url, item.listed_price, item.market_price, item.is_rookie, item.is_auto, item.is_relic, item.grading_company, item.grade]);
         if (rows.length > 0) results.push(rows[0]);
      }
   } catch (error) {
@@ -119,7 +126,8 @@ export async function listScanStagingAction() {
   await checkAuth();
   const { rows } = await pool.query(`
     SELECT id, player_name, card_set, card_number, insert_name, parallel_name, print_run,
-           raw_front_url, raw_back_url, image_url, back_image_url, listed_price, market_price
+           raw_front_url, raw_back_url, image_url, back_image_url, listed_price, market_price,
+           is_rookie, is_auto, is_relic, grading_company, grade
     FROM scan_staging
     ORDER BY id DESC
   `);
@@ -186,6 +194,11 @@ export async function updateDraftCardAction(id: string, updates: any) {
   if (updates.insert_name !== undefined) payload.insert_name = updates.insert_name
   if (updates.parallel_name !== undefined) payload.parallel_name = updates.parallel_name
   if (updates.print_run !== undefined) payload.print_run = updates.print_run
+  if (updates.is_rookie !== undefined) payload.is_rookie = updates.is_rookie
+  if (updates.is_auto !== undefined) payload.is_auto = updates.is_auto
+  if (updates.is_relic !== undefined) payload.is_relic = updates.is_relic
+  if (updates.grading_company !== undefined) payload.grading_company = updates.grading_company
+  if (updates.grade !== undefined) payload.grade = updates.grade
   if (updates.price !== undefined) {
     payload.listed_price = parseFloat(updates.price) || 0
   }
@@ -217,7 +230,7 @@ export async function publishDraftCardsAction(ids: string[]) {
   // 1. Read approved rows from staging
   let staged = [];
   try {
-     const { rows } = await pool.query(`SELECT player_name, card_set, card_number, insert_name, parallel_name, print_run, image_url, back_image_url, listed_price, market_price FROM scan_staging WHERE id = ANY($1::uuid[])`, [ids as any]);
+     const { rows } = await pool.query(`SELECT player_name, card_set, card_number, insert_name, parallel_name, print_run, image_url, back_image_url, listed_price, market_price, is_rookie, is_auto, is_relic, grading_company, grade FROM scan_staging WHERE id = ANY($1::uuid[])`, [ids as any]);
      staged = rows;
   } catch (error) {
      console.error(error);
@@ -245,9 +258,9 @@ export async function publishDraftCardsAction(ids: string[]) {
   try {
       for (const s of staged) {
           await pool.query(`
-             INSERT INTO inventory (player_name, card_set, card_number, insert_name, parallel_name, print_run, image_url, back_image_url, listed_price, market_price, status)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'available')
-          `, [s.player_name, s.card_set, s.card_number, s.insert_name, s.parallel_name, s.print_run, s.image_url, s.back_image_url, s.listed_price, s.market_price]);
+             INSERT INTO inventory (player_name, card_set, card_number, insert_name, parallel_name, print_run, image_url, back_image_url, listed_price, market_price, is_rookie, is_auto, is_relic, grading_company, grade, status)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'available')
+          `, [s.player_name, s.card_set, s.card_number, s.insert_name, s.parallel_name, s.print_run, s.image_url, s.back_image_url, s.listed_price, s.market_price, s.is_rookie || false, s.is_auto || false, s.is_relic || false, s.grading_company || null, s.grade || null]);
       }
   } catch (insertError) {
       console.error(insertError);

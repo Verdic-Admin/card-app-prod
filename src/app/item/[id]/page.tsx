@@ -235,6 +235,26 @@ export default async function ItemPage({ params }: PageProps) {
             )}
           </div>
 
+          {/* Attribute badges */}
+          {((item as any).is_rookie || (item as any).is_auto || (item as any).is_relic || ((item as any).grading_company && (item as any).grade)) && (
+            <div className="flex flex-wrap gap-2 pt-1">
+              {(item as any).is_rookie && (
+                <span className="text-xs font-black bg-yellow-400/15 text-yellow-400 border border-yellow-400/40 px-2.5 py-1 rounded-full uppercase tracking-wider">RC</span>
+              )}
+              {(item as any).is_auto && (
+                <span className="text-xs font-black bg-blue-400/15 text-blue-400 border border-blue-400/40 px-2.5 py-1 rounded-full uppercase tracking-wider">Auto</span>
+              )}
+              {(item as any).is_relic && (
+                <span className="text-xs font-black bg-purple-400/15 text-purple-400 border border-purple-400/40 px-2.5 py-1 rounded-full uppercase tracking-wider">Relic</span>
+              )}
+              {(item as any).grading_company && (item as any).grade && (
+                <span className="text-xs font-black bg-emerald-400/15 text-emerald-400 border border-emerald-400/40 px-2.5 py-1 rounded-full uppercase tracking-wider">
+                  {(item as any).grading_company} {(item as any).grade}
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Pricing */}
           <div className="border-t border-border pt-4">
             {(item as any).oracle_projection && (item as any).oracle_projection > 0 ? (

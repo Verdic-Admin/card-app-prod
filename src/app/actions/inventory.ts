@@ -99,14 +99,18 @@ export async function addCardAction(formData: FormData) {
     INSERT INTO inventory (
       player_name, team_name, card_set, insert_name, parallel_name, card_number, 
       high_price, low_price, avg_price, listed_price, cost_basis, accepts_offers, 
-      image_url, back_image_url, status
+      image_url, back_image_url,
+      is_rookie, is_auto, is_relic, grading_company, grade,
+      status
     ) VALUES (
       $1, $2, $3, $4,
       $5, $6, $7, $8,
       $9, $10, $11, $12,
-      $13, $14, 'available'
+      $13, $14,
+      $15, $16, $17, $18, $19,
+      'available'
     ) RETURNING id
-  `, [name, payload.team_name, payload.card_set, payload.insert_name, payload.parallel_name, payload.card_number, payload.high_price, payload.low_price, payload.avg_price, payload.listed_price || payload.avg_price, payload.cost_basis || 0, payload.accepts_offers || false, blob.url, backImageUrl]);
+  `, [name, payload.team_name, payload.card_set, payload.insert_name, payload.parallel_name, payload.card_number, payload.high_price, payload.low_price, payload.avg_price, payload.listed_price || payload.avg_price, payload.cost_basis || 0, payload.accepts_offers || false, blob.url, backImageUrl, payload.is_rookie || false, payload.is_auto || false, payload.is_relic || false, payload.grading_company || null, payload.grade || null]);
   const insertedRow = rows[0];
 
 

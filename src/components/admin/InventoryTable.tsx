@@ -1162,6 +1162,56 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                     <input type="checkbox" checked={editForm.accepts_offers || false} onChange={e => setEditForm({...editForm, accepts_offers: e.target.checked})} className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 outline-none" />
                     <span className="text-xs font-bold text-slate-600">Accepts Offers</span>
                   </label>
+                  {/* Attribute flags */}
+                  <div className="flex items-center gap-3 flex-wrap">
+                    {([
+                      { key: 'is_rookie' as const, label: 'RC' },
+                      { key: 'is_auto'   as const, label: 'Auto' },
+                      { key: 'is_relic'  as const, label: 'Relic' },
+                    ]).map(({ key, label }) => (
+                      <label key={key} className="flex items-center gap-1 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={!!(editForm as any)[key]}
+                          onChange={e => setEditForm({...editForm, [key]: e.target.checked})}
+                          className="w-3.5 h-3.5 text-indigo-600 rounded"
+                        />
+                        <span className="text-[10px] font-bold text-slate-600">{label}</span>
+                      </label>
+                    ))}
+                    <label className="flex items-center gap-1 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!!((editForm as any).grading_company)}
+                        onChange={e => {
+                          if (!e.target.checked) {
+                            setEditForm({...editForm, grading_company: null, grade: null})
+                          } else {
+                            setEditForm({...editForm, grading_company: 'PSA'})
+                          }
+                        }}
+                        className="w-3.5 h-3.5 text-indigo-600 rounded"
+                      />
+                      <span className="text-[10px] font-bold text-slate-600">Graded</span>
+                    </label>
+                    {!!((editForm as any).grading_company) && (
+                      <>
+                        <select
+                          value={(editForm as any).grading_company || 'PSA'}
+                          onChange={e => setEditForm({...editForm, grading_company: e.target.value} as any)}
+                          className="border border-indigo-100 rounded px-1.5 py-0.5 text-[10px] bg-white text-slate-900 outline-none"
+                        >
+                          {['PSA', 'BGS', 'SGC', 'CGC', 'CSG'].map(g => <option key={g}>{g}</option>)}
+                        </select>
+                        <input
+                          value={(editForm as any).grade || ''}
+                          onChange={e => setEditForm({...editForm, grade: e.target.value} as any)}
+                          placeholder="10"
+                          className="border border-indigo-100 rounded px-1.5 py-0.5 text-[10px] w-12 bg-white text-slate-900 outline-none"
+                        />
+                      </>
+                    )}
+                  </div>
                   {/* Save / Cancel */}
                   <div className="flex gap-2 pt-1">
                     <button onClick={() => handleSaveEdit(item.id)} disabled={isSaving} className="flex-1 text-white hover:bg-emerald-600 font-bold text-xs bg-emerald-500 py-1.5 rounded flex items-center justify-center gap-1 disabled:opacity-50 transition-colors shadow-sm">
@@ -1199,6 +1249,18 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                       )}
                       {!item.insert_name && !item.parallel_name && item.parallel_insert_type && item.parallel_insert_type.toLowerCase() !== 'base' && (
                         <div className="text-[10px] text-zinc-500 font-black uppercase">{item.parallel_insert_type}</div>
+                      )}
+                      {item.is_rookie && (
+                        <span className="text-[9px] font-black bg-yellow-400/20 text-yellow-700 border border-yellow-400/40 px-1.5 py-0.5 rounded uppercase tracking-widest">RC</span>
+                      )}
+                      {item.is_auto && (
+                        <span className="text-[9px] font-black bg-blue-400/20 text-blue-700 border border-blue-400/40 px-1.5 py-0.5 rounded uppercase tracking-widest">Auto</span>
+                      )}
+                      {item.is_relic && (
+                        <span className="text-[9px] font-black bg-purple-400/20 text-purple-700 border border-purple-400/40 px-1.5 py-0.5 rounded uppercase tracking-widest">Relic</span>
+                      )}
+                      {item.grading_company && item.grade && (
+                        <span className="text-[9px] font-black bg-emerald-400/20 text-emerald-700 border border-emerald-400/40 px-1.5 py-0.5 rounded uppercase tracking-widest">{item.grading_company} {item.grade}</span>
                       )}
                     </div>
                     {(item as any).is_lot && (

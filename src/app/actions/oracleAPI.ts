@@ -67,6 +67,11 @@ export async function calculatePricingAction(fields: {
   insert_name?: string;
   parallel_name?: string;
   card_number?: string;
+  print_run?: number | null;
+  is_rookie?: boolean;
+  is_auto?: boolean;
+  is_relic?: boolean;
+  grade?: string | null;
 }) {
   return await submitOracleRequest(`${API_BASE_URL}/fintech/api/v1/calculate`, {
     method: 'POST',
@@ -76,6 +81,11 @@ export async function calculatePricingAction(fields: {
       insert_name: fields.insert_name || 'Base',
       parallel_name: fields.parallel_name || 'Base',
       card_number: fields.card_number || '',
+      print_run: fields.print_run ?? null,
+      is_rookie: fields.is_rookie ?? false,
+      is_auto: fields.is_auto ?? false,
+      is_relic: fields.is_relic ?? false,
+      grade: fields.grade || null,
       skip_fuzzy: false,
     }),
   });

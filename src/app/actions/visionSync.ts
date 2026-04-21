@@ -107,7 +107,7 @@ function normalizeIdentifyResponse(raw: any): IdentifyCardResult {
     card_number:  cd.card_number     ?? null,
     insert_name:  cd.insert_name     ?? null,
     parallel_name: cd.parallel_type  ?? null,
-    print_run:    cd.print_run       ?? null,
+    print_run:    null, // always user-input; AI value intentionally ignored
   };
 }
 

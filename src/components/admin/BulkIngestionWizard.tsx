@@ -34,6 +34,11 @@ interface StagingCard {
   back_image_url: string | null
   raw_front_url?: string | null
   raw_back_url?: string | null
+  is_rookie: boolean
+  is_auto: boolean
+  is_relic: boolean
+  grading_company: string
+  grade: string
   confidence?: number
   ai_status?: string
   repricing?: boolean
@@ -46,17 +51,22 @@ function isPendingScan(c: StagingCard): boolean {
 function rowToStagingCard(row: Record<string, unknown>): StagingCard {
   return {
     id: String(row.id),
-    player_name:   String(row.player_name ?? ''),
-    card_set:      String(row.card_set ?? ''),
-    card_number:   String(row.card_number ?? ''),
-    insert_name:   String(row.insert_name ?? ''),
-    parallel_name: String(row.parallel_name ?? ''),
-    print_run:     row.print_run != null ? String(row.print_run) : '',
-    listed_price:  row.listed_price != null ? String(row.listed_price) : '',
-    image_url:     (row.image_url as string) ?? null,
-    back_image_url:(row.back_image_url as string) ?? null,
-    raw_front_url: (row.raw_front_url as string) ?? null,
-    raw_back_url:  (row.raw_back_url as string) ?? null,
+    player_name:      String(row.player_name ?? ''),
+    card_set:         String(row.card_set ?? ''),
+    card_number:      String(row.card_number ?? ''),
+    insert_name:      String(row.insert_name ?? ''),
+    parallel_name:    String(row.parallel_name ?? ''),
+    print_run:        row.print_run != null ? String(row.print_run) : '',
+    listed_price:     row.listed_price != null ? String(row.listed_price) : '',
+    image_url:        (row.image_url as string) ?? null,
+    back_image_url:   (row.back_image_url as string) ?? null,
+    raw_front_url:    (row.raw_front_url as string) ?? null,
+    raw_back_url:     (row.raw_back_url as string) ?? null,
+    is_rookie:        Boolean(row.is_rookie ?? false),
+    is_auto:          Boolean(row.is_auto ?? false),
+    is_relic:         Boolean(row.is_relic ?? false),
+    grading_company:  String(row.grading_company ?? ''),
+    grade:            String(row.grade ?? ''),
   }
 }
 
@@ -293,7 +303,7 @@ export function BulkIngestionWizard() {
 
   // ── Step 3: staging field updates (auto-save on blur) ─────────────────────
 
-  const updateField = (id: string, field: keyof StagingCard, value: string) => {
+  const updateField = (id: string, field: keyof StagingCard, value: string | boolean) => {
     setStaging(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c))
   }
 
@@ -387,7 +397,7 @@ export function BulkIngestionWizard() {
               card_number:   res.card_number    || updates[idx].card_number,
               insert_name:   res.insert_name    || updates[idx].insert_name,
               parallel_name: res.parallel_name  || updates[idx].parallel_name,
-              print_run:     res.print_run != null ? String(res.print_run) : updates[idx].print_run,
+              // print_run is intentionally not applied from AI — user input only
               confidence,
               ai_status: aiStatus,
             }
@@ -456,12 +466,20 @@ export function BulkIngestionWizard() {
     }
     setReviewCards(prev => prev.map(c => c.id === id ? { ...c, repricing: true } : c))
     try {
+      const gradeStr = card.grading_company && card.grade
+        ? `${card.grading_company} ${card.grade}`
+        : undefined
       const res = await calculatePricingAction({
-        player_name: card.player_name,
-        card_set: card.card_set,
-        insert_name: card.insert_name,
+        player_name:  card.player_name,
+        card_set:     card.card_set,
+        insert_name:  card.insert_name,
         parallel_name: card.parallel_name,
-        card_number: card.card_number,
+        card_number:  card.card_number,
+        print_run:    card.print_run ? Number(card.print_run) : null,
+        is_rookie:    card.is_rookie,
+        is_auto:      card.is_auto,
+        is_relic:     card.is_relic,
+        grade:        gradeStr,
       })
       if (res.error === 'credits_exhausted') { creditsExhausted(); return }
       if (!res.success) {
@@ -477,7 +495,51 @@ export function BulkIngestionWizard() {
     }
   }
 
-  const updateReviewField = async (id: string, field: keyof StagingCard, value: string) => {
+  const [isPricingAll, setIsPricingAll] = useState(false)
+
+  const handlePriceAll = async () => {
+    const visibleCards = reviewCards.filter(c =>
+      activeTab === 'ready' ? (c.confidence ?? 0) > 0.85 : (c.confidence ?? 1) <= 0.85
+    ).filter(c => c.player_name)
+    if (!visibleCards.length) {
+      alert('No cards with a Player Name on this tab to price.')
+      return
+    }
+    setIsPricingAll(true)
+    for (const card of visibleCards) {
+      setReviewCards(prev => prev.map(c => c.id === card.id ? { ...c, repricing: true } : c))
+      try {
+        const gradeStr = card.grading_company && card.grade
+          ? `${card.grading_company} ${card.grade}`
+          : undefined
+        const res = await calculatePricingAction({
+          player_name:  card.player_name,
+          card_set:     card.card_set,
+          insert_name:  card.insert_name,
+          parallel_name: card.parallel_name,
+          card_number:  card.card_number,
+          print_run:    card.print_run ? Number(card.print_run) : null,
+          is_rookie:    card.is_rookie,
+          is_auto:      card.is_auto,
+          is_relic:     card.is_relic,
+          grade:        gradeStr,
+        })
+        if (res.error === 'credits_exhausted') { creditsExhausted(); setIsPricingAll(false); return }
+        if (res.success) {
+          const newPrice = String(res.data.projected_target ?? '')
+          setReviewCards(prev => prev.map(c => c.id === card.id ? { ...c, repricing: false, listed_price: newPrice } : c))
+          updateDraftCardAction(card.id, { price: newPrice }).catch(() => {})
+        } else {
+          setReviewCards(prev => prev.map(c => c.id === card.id ? { ...c, repricing: false } : c))
+        }
+      } catch {
+        setReviewCards(prev => prev.map(c => c.id === card.id ? { ...c, repricing: false } : c))
+      }
+    }
+    setIsPricingAll(false)
+  }
+
+  const updateReviewField = async (id: string, field: keyof StagingCard, value: string | boolean) => {
     setReviewCards(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c))
   }
 
@@ -749,6 +811,66 @@ export function BulkIngestionWizard() {
                         className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
                       />
                     </div>
+
+                    {/* Attribute flags */}
+                    <div className="flex items-center gap-3 flex-wrap pt-0.5">
+                      {([
+                        { key: 'is_rookie', label: 'RC' },
+                        { key: 'is_auto',   label: 'Auto' },
+                        { key: 'is_relic',  label: 'Relic' },
+                      ] as const).map(({ key, label }) => (
+                        <label key={key} className="flex items-center gap-1 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={card[key]}
+                            onChange={e => {
+                              updateField(card.id, key, e.target.checked as any)
+                              updateDraftCardAction(card.id, { [key]: e.target.checked }).catch(() => {})
+                            }}
+                            className="w-3.5 h-3.5 accent-brand"
+                          />
+                          <span className="text-[10px] font-bold text-muted">{label}</span>
+                        </label>
+                      ))}
+                      <label className="flex items-center gap-1 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={!!card.grading_company}
+                          onChange={e => {
+                            if (!e.target.checked) {
+                              updateField(card.id, 'grading_company', '' as any)
+                              updateField(card.id, 'grade', '' as any)
+                              updateDraftCardAction(card.id, { grading_company: '', grade: '' }).catch(() => {})
+                            } else {
+                              updateField(card.id, 'grading_company', 'PSA' as any)
+                            }
+                          }}
+                          className="w-3.5 h-3.5 accent-brand"
+                        />
+                        <span className="text-[10px] font-bold text-muted">Graded</span>
+                      </label>
+                      {!!card.grading_company && (
+                        <>
+                          <select
+                            value={card.grading_company}
+                            onChange={e => {
+                              updateField(card.id, 'grading_company', e.target.value as any)
+                              updateDraftCardAction(card.id, { grading_company: e.target.value }).catch(() => {})
+                            }}
+                            className="border border-border rounded px-1.5 py-0.5 text-[10px] bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
+                          >
+                            {['PSA', 'BGS', 'SGC', 'CGC', 'CSG'].map(g => <option key={g}>{g}</option>)}
+                          </select>
+                          <input
+                            value={card.grade}
+                            onChange={e => updateField(card.id, 'grade', e.target.value as any)}
+                            onBlur={e => updateDraftCardAction(card.id, { grade: e.target.value }).catch(() => {})}
+                            placeholder="10"
+                            className="border border-border rounded px-1.5 py-0.5 text-[10px] w-12 bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
+                          />
+                        </>
+                      )}
+                    </div>
                   </div>
 
                   {/* Checkbox */}
@@ -921,6 +1043,66 @@ export function BulkIngestionWizard() {
                         ))}
                       </div>
 
+                      {/* Attribute flags */}
+                      <div className="flex items-center gap-3 flex-wrap pt-0.5">
+                        {([
+                          { key: 'is_rookie', label: 'RC' },
+                          { key: 'is_auto',   label: 'Auto' },
+                          { key: 'is_relic',  label: 'Relic' },
+                        ] as const).map(({ key, label }) => (
+                          <label key={key} className="flex items-center gap-1 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={card[key]}
+                              onChange={e => {
+                                updateReviewField(card.id, key, e.target.checked as any)
+                                updateDraftCardAction(card.id, { [key]: e.target.checked }).catch(() => {})
+                              }}
+                              className="w-3.5 h-3.5 accent-brand"
+                            />
+                            <span className="text-[10px] font-bold text-muted">{label}</span>
+                          </label>
+                        ))}
+                        <label className="flex items-center gap-1 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={!!card.grading_company}
+                            onChange={e => {
+                              if (!e.target.checked) {
+                                updateReviewField(card.id, 'grading_company', '')
+                                updateReviewField(card.id, 'grade', '')
+                                updateDraftCardAction(card.id, { grading_company: '', grade: '' }).catch(() => {})
+                              } else {
+                                updateReviewField(card.id, 'grading_company', 'PSA')
+                              }
+                            }}
+                            className="w-3.5 h-3.5 accent-brand"
+                          />
+                          <span className="text-[10px] font-bold text-muted">Graded</span>
+                        </label>
+                        {!!card.grading_company && (
+                          <>
+                            <select
+                              value={card.grading_company}
+                              onChange={e => {
+                                updateReviewField(card.id, 'grading_company', e.target.value)
+                                updateDraftCardAction(card.id, { grading_company: e.target.value }).catch(() => {})
+                              }}
+                              className="border border-border rounded px-1.5 py-0.5 text-[10px] bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
+                            >
+                              {['PSA', 'BGS', 'SGC', 'CGC', 'CSG'].map(g => <option key={g}>{g}</option>)}
+                            </select>
+                            <input
+                              value={card.grade}
+                              onChange={e => updateReviewField(card.id, 'grade', e.target.value)}
+                              onBlur={e => updateDraftCardAction(card.id, { grade: e.target.value }).catch(() => {})}
+                              placeholder="10"
+                              className="border border-border rounded px-1.5 py-0.5 text-[10px] w-12 bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
+                            />
+                          </>
+                        )}
+                      </div>
+
                       {/* Price + reprice + send to fintech */}
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs font-bold text-muted">$</span>
@@ -967,14 +1149,24 @@ export function BulkIngestionWizard() {
               ))}
           </div>
 
-          <button
-            onClick={handlePublish}
-            disabled={reviewSelected.size === 0 || isPublishing}
-            className="w-full bg-slate-900 text-white font-black text-lg py-4 rounded-xl disabled:opacity-40 hover:bg-emerald-600 transition flex items-center justify-center gap-3 drop-shadow-md"
-          >
-            {isPublishing ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
-            Publish {reviewSelected.size > 0 ? `${reviewSelected.size} Cards` : 'Selected'} to Inventory
-          </button>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={handlePriceAll}
+              disabled={isPricingAll || isPublishing}
+              className="flex-1 bg-emerald-700 text-white font-black py-3 rounded-xl disabled:opacity-40 hover:bg-emerald-600 transition flex items-center justify-center gap-2"
+            >
+              {isPricingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <DollarSign className="w-4 h-4" />}
+              Price All on Tab
+            </button>
+            <button
+              onClick={handlePublish}
+              disabled={reviewSelected.size === 0 || isPublishing}
+              className="flex-[2] bg-slate-900 text-white font-black text-lg py-4 rounded-xl disabled:opacity-40 hover:bg-brand transition flex items-center justify-center gap-3 drop-shadow-md"
+            >
+              {isPublishing ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+              Publish {reviewSelected.size > 0 ? `${reviewSelected.size} Cards` : 'Selected'} to Inventory
+            </button>
+          </div>
         </div>
       )}
 

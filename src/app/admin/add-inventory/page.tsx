@@ -28,6 +28,9 @@ type StagedSingle = {
     condition: string;
     listed_price: number;
     avg_price: number;
+    is_rookie: boolean;
+    is_auto: boolean;
+    is_relic: boolean;
   };
   processing: boolean;
   saving: boolean;
@@ -57,6 +60,9 @@ function blankSingle(): StagedSingle {
       condition: 'NM',
       listed_price: 0,
       avg_price: 0,
+      is_rookie: false,
+      is_auto: false,
+      is_relic: false,
     },
     processing: false,
     saving: false,
@@ -169,6 +175,11 @@ export default function AddInventoryPage() {
         listed_price: single.data.listed_price,
         cost_basis: 0,
         accepts_offers: false,
+        is_rookie: single.data.is_rookie,
+        is_auto: single.data.is_auto,
+        is_relic: single.data.is_relic,
+        grading_company: single.data.grading_company || null,
+        grade: single.data.grade || null,
       }));
       await addCardAction(formData);
       setStagedSingles(prev => prev.map(s => s.id === id ? { ...s, saving: false, saved: true } : s));
@@ -408,6 +419,52 @@ export default function AddInventoryPage() {
                         </select>
                       </div>
                     </div>
+
+                    {/* Card attribute flags */}
+                    <div className="flex items-center gap-4 flex-wrap py-1">
+                      {([
+                        { key: 'is_rookie' as const, label: 'RC (Rookie)' },
+                        { key: 'is_auto'   as const, label: 'Auto' },
+                        { key: 'is_relic'  as const, label: 'Relic' },
+                      ]).map(({ key, label }) => (
+                        <label key={key} className="flex items-center gap-1.5 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={single.data[key]}
+                            onChange={e => updateSingleField(single.id, key, e.target.checked)}
+                            className="w-4 h-4 accent-brand"
+                          />
+                          <span className="text-sm font-bold text-muted">{label}</span>
+                        </label>
+                      ))}
+                    </div>
+
+                    {/* Grading details (shown when condition = Graded) */}
+                    {single.data.condition === 'Graded' && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs font-bold text-muted uppercase tracking-widest mb-1 block">Grading Company</label>
+                          <select
+                            value={single.data.grading_company}
+                            onChange={e => updateSingleField(single.id, 'grading_company', e.target.value)}
+                            className="w-full bg-background border border-border rounded-lg p-3 text-sm font-medium text-foreground"
+                          >
+                            <option value="">Select...</option>
+                            {['PSA', 'BGS', 'SGC', 'CGC', 'CSG'].map(g => <option key={g}>{g}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-muted uppercase tracking-widest mb-1 block">Grade</label>
+                          <input
+                            type="text"
+                            value={single.data.grade}
+                            onChange={e => updateSingleField(single.id, 'grade', e.target.value)}
+                            placeholder="e.g. 10, 9.5"
+                            className="w-full bg-background border border-border rounded-lg p-3 text-sm font-medium text-foreground"
+                          />
+                        </div>
+                      </div>
+                    )}
 
                     <div>
                       <label className="text-xs font-bold text-muted uppercase tracking-widest mb-1 block">Listed Price ($)</label>

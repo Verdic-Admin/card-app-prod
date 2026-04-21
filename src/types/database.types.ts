@@ -79,6 +79,11 @@ export type Database = {
           parallel_name: string | null
           player_name: string | null
           print_run: number | null
+          is_rookie: boolean | null
+          is_auto: boolean | null
+          is_relic: boolean | null
+          grading_company: string | null
+          grade: string | null
           sold_at: string | null
           status: string | null
           team_name: string | null
@@ -116,6 +121,11 @@ export type Database = {
           parallel_name?: string | null
           player_name?: string | null
           print_run?: number | null
+          is_rookie?: boolean | null
+          is_auto?: boolean | null
+          is_relic?: boolean | null
+          grading_company?: string | null
+          grade?: string | null
           sold_at?: string | null
           status?: string | null
           team_name?: string | null
@@ -153,6 +163,11 @@ export type Database = {
           parallel_name?: string | null
           player_name?: string | null
           print_run?: number | null
+          is_rookie?: boolean | null
+          is_auto?: boolean | null
+          is_relic?: boolean | null
+          grading_company?: string | null
+          grade?: string | null
           sold_at?: string | null
           status?: string | null
           team_name?: string | null
