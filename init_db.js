@@ -43,6 +43,9 @@ ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS shipping_fee NUMERIC(10, 2) 
 ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS free_shipping_threshold NUMERIC(10, 2) DEFAULT 25.00;
 ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS site_announcement_url TEXT;
 
+-- shop_config: API host from provisioning exchange (avoids relying on Railway API_BASE_URL)
+ALTER TABLE shop_config ADD COLUMN IF NOT EXISTS playerindex_api_base_url TEXT;
+
 -- scan_staging (bulk importer / wizard)
 ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS raw_front_url TEXT;
 ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS raw_back_url TEXT;
@@ -139,11 +142,20 @@ async function init() {
     CREATE TABLE IF NOT EXISTS shop_config (
       id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
       playerindex_api_key TEXT,
+      playerindex_api_base_url TEXT,
       discount_rate NUMERIC(5, 2) DEFAULT 0.0,
       updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
   `);
   console.log('- shop_config table OK');
+
+  try {
+    await client.query(
+      'ALTER TABLE shop_config ADD COLUMN IF NOT EXISTS playerindex_api_base_url TEXT'
+    );
+  } catch (e) {
+    console.warn('[init_db] shop_config playerindex_api_base_url alter:', e.message || e);
+  }
 
   let configRowResult = await client.query('SELECT * FROM shop_config LIMIT 1');
   if (configRowResult.rows.length === 0) {
@@ -179,11 +191,19 @@ async function init() {
 
       if (resp.ok && data.api_key) {
         playerIndexApiKey = data.api_key;
-        await client.query('UPDATE shop_config SET playerindex_api_key = $1 WHERE id = $2', [
-          playerIndexApiKey,
-          configRow.id,
-        ]);
-        console.log('Successfully exchanged Provisioning Token and saved API key to shop_config.');
+        const apiBase =
+          (typeof data.api_gateway_url === 'string' && data.api_gateway_url.trim()) ||
+          process.env.API_BASE_URL ||
+          process.env.FINTECH_API_URL ||
+          'https://api.playerindexdata.com';
+        const apiBaseNorm = String(apiBase).replace(/\/+$/, '');
+        await client.query(
+          'UPDATE shop_config SET playerindex_api_key = $1, playerindex_api_base_url = $2 WHERE id = $3',
+          [playerIndexApiKey, apiBaseNorm, configRow.id]
+        );
+        console.log(
+          'Successfully exchanged Provisioning Token; saved API key + gateway URL to shop_config.'
+        );
       } else {
         const msg = data.detail || data.error || raw.slice(0, 200) || `HTTP ${resp.status}`;
         console.error(`Failed to exchange Provisioning Token [${resp.status}]: ${msg}`);
@@ -196,6 +216,21 @@ async function init() {
 
   if (playerIndexApiKey) {
     console.log('API key available (env or shop_config).');
+    const envGateway = (process.env.FINTECH_API_URL || process.env.API_BASE_URL || '')
+      .trim()
+      .replace(/\/+$/, '');
+    if (envGateway) {
+      try {
+        await client.query(
+          `UPDATE shop_config SET playerindex_api_base_url = $1
+           WHERE id = $2
+             AND (playerindex_api_base_url IS NULL OR TRIM(playerindex_api_base_url) = '')`,
+          [envGateway, configRow.id]
+        );
+      } catch (e) {
+        console.warn('[init_db] backfill playerindex_api_base_url:', e.message || e);
+      }
+    }
   }
 
   await client.query(`

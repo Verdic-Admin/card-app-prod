@@ -57,7 +57,7 @@ export async function submitOracleRequest(url: string, options: RequestInit = {}
 }
 
 export async function searchTaxonomyAction(query: string) {
-  const base = getOracleGatewayBaseUrl();
+  const base = await getOracleGatewayBaseUrl();
   return await submitOracleRequest(`${base}/v1/taxonomy/search?q=${encodeURIComponent(query)}`);
 }
 
@@ -73,7 +73,8 @@ export async function calculatePricingAction(fields: {
   is_relic?: boolean;
   grade?: string | null;
 }) {
-  return await submitOracleRequest(`${getOracleGatewayBaseUrl()}/v1/calculate`, {
+  const base = await getOracleGatewayBaseUrl();
+  return await submitOracleRequest(`${base}/v1/calculate`, {
     method: 'POST',
     body: JSON.stringify({
       player_name: fields.player_name,

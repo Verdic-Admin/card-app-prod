@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getOracleGatewayBaseUrl } from '@/lib/oracle-gateway-url'
+import { getOracleGatewayBaseUrlFromEnv } from '@/lib/oracle-gateway-url'
 
 export const runtime = 'edge'
 
@@ -11,7 +11,7 @@ export async function GET(
   const apiKey = process.env.PLAYERINDEX_API_KEY || ''
 
   const upstream = await fetch(
-    `${getOracleGatewayBaseUrl()}/scan/stream/${jobId}`,
+    `${getOracleGatewayBaseUrlFromEnv()}/scan/stream/${jobId}`,
     {
       headers: {
         'X-API-Key': apiKey,

@@ -6,7 +6,8 @@ import { Coins, TrendingUp, Star, Mail, ExternalLink } from 'lucide-react';
 
 async function getAccountBalance() {
   try {
-    const resp = await submitOracleRequest(`${getOracleGatewayBaseUrl()}/account/balance`);
+    const base = await getOracleGatewayBaseUrl();
+    const resp = await submitOracleRequest(`${base}/account/balance`);
     if (!resp.success) return null;
     return resp.data;
   } catch {

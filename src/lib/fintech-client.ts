@@ -7,7 +7,7 @@
  * the backend's verify_client_api_key / burn_api_tokens RPC, so a 402
  * response means this shop needs a token refill.
  *
- * Base URL: see getOracleGatewayBaseUrl() (FINTECH_API_URL or API_BASE_URL).
+ * Base URL: getOracleGatewayBaseUrl() — shop_config from provisioning first, then env.
  */
 import pool from '@/utils/db';
 import { getOracleGatewayBaseUrl } from '@/lib/oracle-gateway-url';
@@ -70,7 +70,8 @@ async function fintechFetch<T>(
   init: Omit<RequestInit, 'headers'> & { headers?: Record<string, string> } = {},
 ): Promise<T> {
   const apiKey = await getFintechApiKey();
-  const url = `${getOracleGatewayBaseUrl()}${path.startsWith('/') ? path : `/${path}`}`;
+  const base = await getOracleGatewayBaseUrl();
+  const url = `${base}${path.startsWith('/') ? path : `/${path}`}`;
   const res = await fetch(url, {
     ...init,
     headers: {

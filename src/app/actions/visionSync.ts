@@ -17,7 +17,8 @@ async function getApiKey(): Promise<string> {
 
 export async function uploadImagesToScanner(formData: FormData) {
   const apiKey = await getApiKey();
-  const response = await fetch(`${getOracleGatewayBaseUrl()}/scan/upload`, {
+  const base = await getOracleGatewayBaseUrl();
+  const response = await fetch(`${base}/scan/upload`, {
     method: 'POST',
     headers: { 'X-API-Key': apiKey },
     body: formData,
@@ -41,7 +42,8 @@ export async function pollScannerResult(jobId: string): Promise<{
   error?: string;
 }> {
   const apiKey = await getApiKey();
-  const response = await fetch(`${getOracleGatewayBaseUrl()}/scan/result/${jobId}`, {
+  const base = await getOracleGatewayBaseUrl();
+  const response = await fetch(`${base}/scan/result/${jobId}`, {
     headers: { 'X-API-Key': apiKey },
   });
 
@@ -68,7 +70,8 @@ export async function requestPricingAction(imageUrl: string): Promise<{
   };
 }> {
   const apiKey = await getApiKey();
-  const response = await fetch(`${getOracleGatewayBaseUrl()}/orchestrator/process-asset`, {
+  const base = await getOracleGatewayBaseUrl();
+  const response = await fetch(`${base}/orchestrator/process-asset`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
     body: JSON.stringify({ image_url: imageUrl, shop_id: 'local_shop' }),
@@ -117,7 +120,8 @@ export async function identifyCardPair(payload: {
   side_b_url: string;
 }): Promise<IdentifyCardResult> {
   const apiKey = await getApiKey();
-  const response = await fetch(`${getOracleGatewayBaseUrl()}/identify/card`, {
+  const base = await getOracleGatewayBaseUrl();
+  const response = await fetch(`${base}/identify/card`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
     body: JSON.stringify(payload),
@@ -135,7 +139,8 @@ export async function identifyCardDirectAction(
   side_b_url?: string | null,
 ): Promise<IdentifyCardResult> {
   const apiKey = await getApiKey();
-  const response = await fetch(`${getOracleGatewayBaseUrl()}/identify/card`, {
+  const base = await getOracleGatewayBaseUrl();
+  const response = await fetch(`${base}/identify/card`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
     body: JSON.stringify({ queue_id, side_a_url, side_b_url: side_b_url || null }),

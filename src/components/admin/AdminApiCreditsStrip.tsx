@@ -5,7 +5,8 @@ import { PLAYER_INDEX_BILLING_URL } from '@/lib/player-index-urls';
 import { getOracleGatewayBaseUrl } from '@/lib/oracle-gateway-url';
 
 async function CreditsInner() {
-  const res = await submitOracleRequest(`${getOracleGatewayBaseUrl()}/account/balance`);
+  const base = await getOracleGatewayBaseUrl();
+  const res = await submitOracleRequest(`${base}/account/balance`);
   const data = res.success && res.data ? (res.data as Record<string, unknown>) : null;
   const exempt = data?.billing_exempt === true;
   const balance =
