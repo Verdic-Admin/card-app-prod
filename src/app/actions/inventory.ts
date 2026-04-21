@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import pool from '@/utils/db';
 import { put, del } from '@/utils/storage';
+import { hasShopOracleApiKey } from '@/lib/shop-oracle-credentials';
 
 interface BulkInventoryItem {
   player_name: string;
@@ -45,12 +46,9 @@ interface LotChildRow {
   cost_basis: number | string | null;
 }
 
-// Authentication check — env var or DB fallback (provisioned key lives in shop_config)
 async function checkAuth() {
-  if (process.env.PLAYERINDEX_API_KEY) return;
-  const { rows } = await pool.query('SELECT playerindex_api_key FROM shop_config LIMIT 1');
-  if (!rows[0]?.playerindex_api_key) {
-    throw new Error("Unauthorized: No PLAYERINDEX_API_KEY available");
+  if (!(await hasShopOracleApiKey())) {
+    throw new Error('Unauthorized: complete Player Index provisioning for this store first.');
   }
 }
 

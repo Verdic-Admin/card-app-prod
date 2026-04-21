@@ -1,17 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getOracleGatewayBaseUrlFromEnv } from '@/lib/oracle-gateway-url'
-
-export const runtime = 'edge'
+import { getOracleGatewayBaseUrl } from '@/lib/oracle-gateway-url'
+import { getShopOracleApiKey } from '@/lib/shop-oracle-credentials'
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ jobId: string }> }
 ) {
   const { jobId } = await params
-  const apiKey = process.env.PLAYERINDEX_API_KEY || ''
+  const apiKey = await getShopOracleApiKey()
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: 'Store is not provisioned for scanner access yet.' },
+      { status: 503 }
+    )
+  }
 
   const upstream = await fetch(
-    `${getOracleGatewayBaseUrlFromEnv()}/scan/stream/${jobId}`,
+    `${await getOracleGatewayBaseUrl()}/scan/stream/${jobId}`,
     {
       headers: {
         'X-API-Key': apiKey,

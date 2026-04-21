@@ -2,12 +2,12 @@
 import pool from '@/utils/db';
 
 import { put } from '@/utils/storage';
-import { revalidatePath } from 'next/cache'
+import { revalidatePath } from 'next/cache';
+import { hasShopOracleApiKey } from '@/lib/shop-oracle-credentials';
+
 async function checkAuth() {
-  if (process.env.PLAYERINDEX_API_KEY) return;
-  const { rows } = await pool.query('SELECT playerindex_api_key FROM shop_config LIMIT 1');
-  if (!rows[0]?.playerindex_api_key) {
-    throw new Error("Unauthorized to access Admin operations");
+  if (!(await hasShopOracleApiKey())) {
+    throw new Error('Unauthorized: complete Player Index provisioning for this store first.');
   }
 }
 

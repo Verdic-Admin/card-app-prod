@@ -2,17 +2,7 @@
 
 import pool from '@/utils/db';
 import { getOracleGatewayBaseUrl } from '@/lib/oracle-gateway-url';
-
-async function getApiKey(): Promise<string> {
-  if (process.env.PLAYERINDEX_API_KEY) return process.env.PLAYERINDEX_API_KEY;
-  try {
-    const { rows } = await pool.query('SELECT playerindex_api_key FROM shop_config LIMIT 1');
-    if (rows.length > 0 && rows[0].playerindex_api_key) return rows[0].playerindex_api_key;
-  } catch (e) {
-    console.warn('Failed to retrieve API key from database:', e);
-  }
-  return '';
-}
+import { getShopOracleApiKey } from '@/lib/shop-oracle-credentials';
 import { vercelBatchUpdatePrices } from '@/app/actions/inventory'
 
 const ALLOWED_COLUMNS = [
@@ -55,11 +45,11 @@ export async function syncInventoryWithOracle() {
 
   console.log(`-> Batching ${inventory.length} items to shop-api...`);
 
-  const apiKey = await getApiKey();
+  const apiKey = await getShopOracleApiKey();
   if (!apiKey) {
     return {
       success: false,
-      message: 'No Player Index API key (PLAYERINDEX_API_KEY or shop_config).',
+      message: 'Store is not provisioned yet. Redeploy from Player Index with your one-time setup link.',
       count: 0,
     };
   }
@@ -128,7 +118,7 @@ export async function syncInventoryWithOracle() {
 export async function syncSingleItemWithOracle(id: string) {
 
 
-  const oracle_api_key = await getApiKey();
+  const oracle_api_key = await getShopOracleApiKey();
 
   if (!oracle_api_key) {
     throw new Error('API key not configured. Please complete store provisioning.');
@@ -203,7 +193,7 @@ export async function syncSingleItemWithOracle(id: string) {
 
 export async function evaluateItemWithOracle(payload: any) {
 
-  const oracle_api_key = await getApiKey();
+  const oracle_api_key = await getShopOracleApiKey();
 
   if (!oracle_api_key) {
     throw new Error('API key not configured. Please complete store provisioning.');
@@ -283,7 +273,7 @@ export async function getSingleOraclePrice(payload: {
       skip_fuzzy: true
     };
 
-    const apiKey = await getApiKey();
+    const apiKey = await getShopOracleApiKey();
     const baseSingle = await getOracleGatewayBaseUrl();
     const response = await fetch(`${baseSingle}/v1/calculate`, {
       method: 'POST',
@@ -309,7 +299,7 @@ export async function getSingleOraclePrice(payload: {
 
 export async function getBatchOraclePrices(cards: any[]) {
   try {
-    const apiKey = await getApiKey();
+    const apiKey = await getShopOracleApiKey();
 
     // Map intuitive card props to Oracle B2B API payload shape
     const formattedItems = cards.map(c => {

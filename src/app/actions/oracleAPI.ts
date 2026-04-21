@@ -1,29 +1,18 @@
 'use server'
 
 import { getOracleGatewayBaseUrl } from '@/lib/oracle-gateway-url';
+import { getShopOracleApiKey } from '@/lib/shop-oracle-credentials';
 
 export async function submitOracleRequest(url: string, options: RequestInit = {}) {
   const headers = new Headers(options.headers || {});
-  
-  let apiKey = process.env.PLAYERINDEX_API_KEY;
-  
-  if (!apiKey) {
-    try {
-      const pool = (await import('@/utils/db')).default;
-      const { rows } = await pool.query('SELECT playerindex_api_key FROM shop_config LIMIT 1');
-      if (rows.length > 0) {
-        apiKey = rows[0].playerindex_api_key;
-      }
-    } catch (e) {
-      console.warn("Failed to retrieve fallback API key from database", e);
-    }
-  }
+
+  const apiKey = await getShopOracleApiKey();
 
   if (!apiKey) {
     return {
       error: 'api_failed',
       status: 401,
-      statusText: 'No Player Index API key configured (PLAYERINDEX_API_KEY or shop_config).',
+      statusText: 'Store is not provisioned yet. Use your Player Index one-time setup link to deploy.',
     };
   }
 

@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 export default function SetupPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-6">
@@ -7,18 +9,25 @@ export default function SetupPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
         </div>
-        <h1 className="text-2xl font-black text-white mb-2">Infrastructure Setup Required</h1>
-        <p className="text-muted mb-8">
-          Your storefront is missing the <code className="bg-surface md:bg-surface-hover px-2 py-0.5 rounded text-brand">PLAYERINDEX_API_KEY</code>. You must configure this environment variable to access the Admin dashboard and unlock backend orchestration.
+        <h1 className="text-2xl font-black text-white mb-2">Finish linking your store</h1>
+        <p className="text-muted mb-6 text-sm leading-relaxed">
+          This deployment has not completed the one-time Player Index handshake yet. You do{' '}
+          <strong className="text-foreground">not</strong> copy or see an API key — it is stored only on
+          the server after you deploy using the link from Player Index.
         </p>
-        <a 
-          href="https://playerindexdata.com/developer"
+        <p className="text-muted mb-8 text-xs leading-relaxed">
+          If you already deployed from Player Index, wait for the first boot to finish, then refresh. If
+          this is a manual Railway deploy, add the single-use provisioning value you were given as the{' '}
+          <span className="font-mono text-foreground">PROVISIONING_TOKEN</span> variable and redeploy once.
+        </p>
+        <Link
+          href="https://playerindexdata.com/claim"
           target="_blank"
           rel="noopener noreferrer"
-          className="block w-full bg-surface text-foreground hover:bg-zinc-200 transition-colors py-3 rounded-lg font-bold tracking-wide uppercase text-sm"
+          className="block w-full bg-brand text-background hover:opacity-90 transition-opacity py-3 rounded-lg font-bold tracking-wide uppercase text-sm"
         >
-          Get Your API Key
-        </a>
+          Open Player Index setup
+        </Link>
       </div>
     </div>
   );

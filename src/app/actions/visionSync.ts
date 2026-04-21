@@ -1,22 +1,10 @@
 "use server";
 
-import pool from '@/utils/db';
-
 import { getOracleGatewayBaseUrl } from '@/lib/oracle-gateway-url';
-
-async function getApiKey(): Promise<string> {
-  if (process.env.PLAYERINDEX_API_KEY) return process.env.PLAYERINDEX_API_KEY;
-  try {
-    const { rows } = await pool.query('SELECT playerindex_api_key FROM shop_config LIMIT 1');
-    if (rows.length > 0 && rows[0].playerindex_api_key) return rows[0].playerindex_api_key;
-  } catch (e) {
-    console.warn('Failed to retrieve API key from database:', e);
-  }
-  return '';
-}
+import { getShopOracleApiKey } from '@/lib/shop-oracle-credentials';
 
 export async function uploadImagesToScanner(formData: FormData) {
-  const apiKey = await getApiKey();
+  const apiKey = await getShopOracleApiKey();
   const base = await getOracleGatewayBaseUrl();
   const response = await fetch(`${base}/scan/upload`, {
     method: 'POST',
@@ -41,7 +29,7 @@ export async function pollScannerResult(jobId: string): Promise<{
   cards: { card_index: number; side_a_url: string | null; side_b_url: string | null }[];
   error?: string;
 }> {
-  const apiKey = await getApiKey();
+  const apiKey = await getShopOracleApiKey();
   const base = await getOracleGatewayBaseUrl();
   const response = await fetch(`${base}/scan/result/${jobId}`, {
     headers: { 'X-API-Key': apiKey },
@@ -69,7 +57,7 @@ export async function requestPricingAction(imageUrl: string): Promise<{
     ebay_comp_urls: string[];
   };
 }> {
-  const apiKey = await getApiKey();
+  const apiKey = await getShopOracleApiKey();
   const base = await getOracleGatewayBaseUrl();
   const response = await fetch(`${base}/orchestrator/process-asset`, {
     method: 'POST',
@@ -119,7 +107,7 @@ export async function identifyCardPair(payload: {
   side_a_url: string;
   side_b_url: string;
 }): Promise<IdentifyCardResult> {
-  const apiKey = await getApiKey();
+  const apiKey = await getShopOracleApiKey();
   const base = await getOracleGatewayBaseUrl();
   const response = await fetch(`${base}/identify/card`, {
     method: 'POST',
@@ -138,7 +126,7 @@ export async function identifyCardDirectAction(
   side_a_url: string,
   side_b_url?: string | null,
 ): Promise<IdentifyCardResult> {
-  const apiKey = await getApiKey();
+  const apiKey = await getShopOracleApiKey();
   const base = await getOracleGatewayBaseUrl();
   const response = await fetch(`${base}/identify/card`, {
     method: 'POST',

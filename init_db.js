@@ -204,6 +204,9 @@ async function init() {
         console.log(
           'Successfully exchanged Provisioning Token; saved API key + gateway URL to shop_config.'
         );
+        console.log(
+          'Tip: remove PROVISIONING_TOKEN from Railway after a successful boot — it is one-time only.'
+        );
       } else {
         const msg = data.detail || data.error || raw.slice(0, 200) || `HTTP ${resp.status}`;
         console.error(`Failed to exchange Provisioning Token [${resp.status}]: ${msg}`);

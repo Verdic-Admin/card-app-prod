@@ -9,8 +9,8 @@
  *
  * Base URL: getOracleGatewayBaseUrl() — shop_config from provisioning first, then env.
  */
-import pool from '@/utils/db';
 import { getOracleGatewayBaseUrl } from '@/lib/oracle-gateway-url';
+import { getShopOracleApiKey } from '@/lib/shop-oracle-credentials';
 
 /**
  * Thrown when the shop is out of API tokens. The caller should surface
@@ -33,34 +33,17 @@ export class FintechAuthError extends Error {
   }
 }
 
-let cachedApiKey: string | null = null;
-let cachedAt = 0;
-const CACHE_TTL_MS = 60_000;
-
 /**
- * Load the shop's fintech API key from shop_config. Prefers the env override
- * (PLAYERINDEX_API_KEY) so local/test deployments can skip provisioning.
+ * Load the shop gateway API key (server-only). Ops may set PLAYERINDEX_API_KEY on the host;
+ * otherwise the key from one-time provisioning lives in shop_config — never shown in the UI.
  */
 export async function getFintechApiKey(): Promise<string> {
-  const envKey = process.env.PLAYERINDEX_API_KEY;
-  if (envKey) return envKey;
-
-  const now = Date.now();
-  if (cachedApiKey && now - cachedAt < CACHE_TTL_MS) {
-    return cachedApiKey;
-  }
-
-  const { rows } = await pool.query<{ playerindex_api_key: string | null }>(
-    'SELECT playerindex_api_key FROM shop_config LIMIT 1',
-  );
-  const key = rows[0]?.playerindex_api_key ?? null;
+  const key = await getShopOracleApiKey();
   if (!key) {
     throw new FintechAuthError(
-      'No PLAYERINDEX_API_KEY provisioned. Complete Railway setup first.',
+      'Store is not provisioned yet. Deploy from Player Index with your provisioning link — you do not need to paste an API key.',
     );
   }
-  cachedApiKey = key;
-  cachedAt = now;
   return key;
 }
 
