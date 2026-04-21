@@ -14,7 +14,7 @@
 import pool from '@/utils/db';
 
 const FINTECH_BASE_URL =
-  process.env.FINTECH_API_URL ?? 'https://playerindexdata.com/fintech';
+  process.env.FINTECH_API_URL ?? 'https://api.playerindexdata.com';
 
 /**
  * Thrown when the shop is out of API tokens. The caller should surface

@@ -71,7 +71,7 @@ export async function syncInventoryWithOracle() {
     print_run: i.print_run ? Number(i.print_run) : null,
   }));
 
-  const res = await fetch(`${API_BASE_URL}/fintech/shop-api/batch-price`, {
+  const res = await fetch(`${API_BASE_URL}/shop-api/batch-price`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey },
     body: JSON.stringify({ cards, discount_rate: discountRate }),
@@ -121,7 +121,6 @@ export async function syncInventoryWithOracle() {
 export async function syncSingleItemWithOracle(id: string) {
 
 
-  const oracle_api_url = `${API_BASE_URL}/fintech`;
   const oracle_api_key = await getApiKey();
 
   if (!oracle_api_key) {
@@ -160,7 +159,7 @@ export async function syncSingleItemWithOracle(id: string) {
       skip_fuzzy: true
     }
 
-    const res = await fetch(`${oracle_api_url}/api/v1/calculate`, {
+    const res = await fetch(`${API_BASE_URL}/v1/calculate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -196,7 +195,6 @@ export async function syncSingleItemWithOracle(id: string) {
 
 export async function evaluateItemWithOracle(payload: any) {
 
-  const oracle_api_url = `${API_BASE_URL}/fintech`;
   const oracle_api_key = await getApiKey();
 
   if (!oracle_api_key) {
@@ -222,9 +220,9 @@ export async function evaluateItemWithOracle(payload: any) {
       skip_fuzzy: true
     }
     
-    console.log(`-> Evaluate payload going to ${oracle_api_url}/api/v1/calculate:`, formattedPayload);
+    console.log(`-> Evaluate payload going to ${API_BASE_URL}/v1/calculate:`, formattedPayload);
 
-    const res = await fetch(`${oracle_api_url}/api/v1/calculate`, {
+    const res = await fetch(`${API_BASE_URL}/v1/calculate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -277,7 +275,7 @@ export async function getSingleOraclePrice(payload: {
     };
 
     const apiKey = await getApiKey();
-    const response = await fetch(`${API_BASE_URL}/fintech/api/v1/calculate`, {
+    const response = await fetch(`${API_BASE_URL}/v1/calculate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -323,7 +321,7 @@ export async function getBatchOraclePrices(cards: any[]) {
       };
     });
 
-    const response = await fetch(`${API_BASE_URL}/fintech/api/v1/b2b/calculate-batch`, {
+    const response = await fetch(`${API_BASE_URL}/v1/b2b/calculate-batch`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
       // Backend expects "items" payload

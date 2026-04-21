@@ -153,14 +153,15 @@ async function init() {
 
   let playerIndexApiKey = process.env.PLAYERINDEX_API_KEY || configRow.playerindex_api_key;
   const provisioningToken = process.env.PROVISIONING_TOKEN;
-  const apiBaseUrl = process.env.API_BASE_URL || 'https://api.playerindexdata.com';
 
   if (!playerIndexApiKey && provisioningToken) {
-    console.log(`Found PROVISIONING_TOKEN. Exchanging with ${apiBaseUrl} for permanent API key...`);
+    // Provisioning exchange is handled by the Vercel-hosted player-index-oracle app.
+    const provisioningUrl = 'https://playerindexdata.com/api/provisioning/exchange';
+    console.log(`Found PROVISIONING_TOKEN. Exchanging with ${provisioningUrl} for permanent API key...`);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
     try {
-      const resp = await fetch(`${apiBaseUrl}/fintech/provisioning/exchange`, {
+      const resp = await fetch(provisioningUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: provisioningToken }),

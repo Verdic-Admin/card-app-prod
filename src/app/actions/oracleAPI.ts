@@ -58,7 +58,7 @@ export async function submitOracleRequest(url: string, options: RequestInit = {}
 }
 
 export async function searchTaxonomyAction(query: string) {
-  return await submitOracleRequest(`${API_BASE_URL}/fintech/v1/taxonomy/search?q=${encodeURIComponent(query)}`);
+  return await submitOracleRequest(`${API_BASE_URL}/v1/taxonomy/search?q=${encodeURIComponent(query)}`);
 }
 
 export async function calculatePricingAction(fields: {
@@ -73,7 +73,7 @@ export async function calculatePricingAction(fields: {
   is_relic?: boolean;
   grade?: string | null;
 }) {
-  return await submitOracleRequest(`${API_BASE_URL}/fintech/api/v1/calculate`, {
+  return await submitOracleRequest(`${API_BASE_URL}/v1/calculate`, {
     method: 'POST',
     body: JSON.stringify({
       player_name: fields.player_name,

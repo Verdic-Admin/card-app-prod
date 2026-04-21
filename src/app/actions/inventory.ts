@@ -95,7 +95,7 @@ export async function addCardAction(formData: FormData) {
   const backBlob = await put(`card-images/${backFileName}`, backFile, { access: 'public' })
   const backImageUrl = backBlob.url
 
-  const { rows } = await pool.query(`
+  await pool.query(`
     INSERT INTO inventory (
       player_name, team_name, card_set, insert_name, parallel_name, card_number, 
       high_price, low_price, avg_price, listed_price, cost_basis, accepts_offers, 
@@ -109,34 +109,8 @@ export async function addCardAction(formData: FormData) {
       $13, $14,
       $15, $16, $17, $18, $19,
       'available'
-    ) RETURNING id
+    )
   `, [name, payload.team_name, payload.card_set, payload.insert_name, payload.parallel_name, payload.card_number, payload.high_price, payload.low_price, payload.avg_price, payload.listed_price || payload.avg_price, payload.cost_basis || 0, payload.accepts_offers || false, blob.url, backImageUrl, payload.is_rookie || false, payload.is_auto || false, payload.is_relic || false, payload.grading_company || null, payload.grade || null]);
-  const insertedRow = rows[0];
-
-
-  try {
-    const shopId = process.env.NEXT_PUBLIC_SHOP_ID
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
-    if (!shopId || !siteUrl) throw new Error("Syndication configuration missing")
-    const fullUrl = `${siteUrl}/item/${insertedRow?.id || 'new'}`
-
-    await fetch('https://api.playerindexdata.com/fintech/syndication/webhook', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        shop_id: shopId,
-        player_name: name,
-        card_set: payload.card_set,
-        insert_name: payload.insert_name || payload.parallel_insert_type,
-        parallel_name: payload.parallel_name || payload.parallel_insert_type,
-        price: payload.listed_price || payload.avg_price,
-        image_url: blob.url,
-        buy_url: fullUrl
-      })
-    })
-  } catch (e) {
-    console.warn("Syndication webhook failed:", e)
-  }
 
   revalidatePath('/')
   revalidatePath('/admin')
@@ -149,39 +123,16 @@ export async function batchCommitAction(items: BulkInventoryItem[]) {
   for (const item of items) {
     const parallel_insert_type = [item.insert_name, item.parallel_name].filter(v => v && String(v).toLowerCase() !== 'base').join(' ') || 'Base';
     try {
-      const { rows } = await pool.query(`
+      await pool.query(`
         INSERT INTO inventory (
           player_name, card_set, insert_name, parallel_name, parallel_insert_type,
           listed_price, avg_price, cost_basis, accepts_offers, image_url, back_image_url, status
         ) VALUES (
           $1, $2, $3, $4, $5,
           $6, $7, 0, true, $8, $9, 'available'
-        ) RETURNING id
+        )
       `, [item.player_name, item.card_set, item.insert_name, item.parallel_name, parallel_insert_type, item.price || 0, item.price || 0, item.side_a_url, item.side_b_url]);
-      const insertedRow = rows[0];
 
-    // Fire webhook
-    try {
-      const shopId = process.env.NEXT_PUBLIC_SHOP_ID
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
-      if (!shopId || !siteUrl) throw new Error("Syndication configuration missing")
-      const fullUrl = `${siteUrl}/item/${insertedRow.id}`
-      await fetch('https://api.playerindexdata.com/fintech/syndication/webhook', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          shop_id: shopId,
-          player_name: item.player_name,
-          card_set: item.card_set,
-          insert_name: item.insert_name,
-          parallel_name: item.parallel_name,
-          image_url: item.side_a_url,
-          buy_url: fullUrl
-        })
-      })
-    } catch (e) {
-      console.warn("Syndication webhook failed:", e)
-    }
     } catch (err) {
        console.error("Insertion failed:", err)
     }

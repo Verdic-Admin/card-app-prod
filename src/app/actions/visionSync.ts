@@ -68,7 +68,7 @@ export async function requestPricingAction(imageUrl: string): Promise<{
   };
 }> {
   const apiKey = await getApiKey();
-  const response = await fetch(`${API_BASE_URL}/fintech/orchestrator/process-asset`, {
+  const response = await fetch(`${API_BASE_URL}/orchestrator/process-asset`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
     body: JSON.stringify({ image_url: imageUrl, shop_id: 'local_shop' }),

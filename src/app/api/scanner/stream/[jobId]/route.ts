@@ -10,7 +10,7 @@ export async function GET(
   const apiKey = process.env.PLAYERINDEX_API_KEY || ''
 
   const upstream = await fetch(
-    `https://api.playerindexdata.com/scan/scanner/stream/${jobId}`,
+    `https://api.playerindexdata.com/scan/stream/${jobId}`,
     {
       headers: {
         'X-API-Key': apiKey,

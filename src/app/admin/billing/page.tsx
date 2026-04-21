@@ -7,7 +7,7 @@ const API_BASE_URL = process.env.API_BASE_URL || 'https://api.playerindexdata.co
 
 async function getAccountBalance() {
   try {
-    const resp = await submitOracleRequest(`${API_BASE_URL}/fintech/account/balance`);
+    const resp = await submitOracleRequest(`${API_BASE_URL}/account/balance`);
     if (!resp.success) return null;
     return resp.data;
   } catch {

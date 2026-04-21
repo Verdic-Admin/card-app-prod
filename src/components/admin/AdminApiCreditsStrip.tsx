@@ -6,7 +6,7 @@ import { PLAYER_INDEX_BILLING_URL } from '@/lib/player-index-urls';
 const API_BASE_URL = process.env.API_BASE_URL || 'https://api.playerindexdata.com';
 
 async function CreditsInner() {
-  const res = await submitOracleRequest(`${API_BASE_URL}/fintech/account/balance`);
+  const res = await submitOracleRequest(`${API_BASE_URL}/account/balance`);
   const data = res.success && res.data ? (res.data as Record<string, unknown>) : null;
   const exempt = data?.billing_exempt === true;
   const balance =
