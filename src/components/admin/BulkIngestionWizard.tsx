@@ -138,6 +138,7 @@ export function BulkIngestionWizard() {
           }
           return Array.from(merged.values()).sort((a, b) => (a.id < b.id ? 1 : -1))
         })
+        setStep(2)
       })
       .catch(() => {})
   }, [])
