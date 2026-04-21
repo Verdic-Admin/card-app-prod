@@ -33,6 +33,18 @@ function pickStagingUrl(row: Record<string, unknown>, ...keys: string[]): string
   return null;
 }
 
+/** DB row cell → string | null for typed helpers (Record<string, unknown> rows). */
+function sqlNullableText(v: unknown): string | null {
+  if (v == null) return null;
+  const t = String(v).trim();
+  return t === '' ? null : t;
+}
+
+function sqlText(v: unknown, fallback = ''): string {
+  if (v == null) return fallback;
+  return String(v);
+}
+
 const ALLOWED_COLUMNS = [
   'player_name', 'card_set', 'card_number', 'insert_name',
   'parallel_name', 'print_run', 'listed_price', 'market_price',
@@ -322,7 +334,10 @@ export async function publishDraftCardsAction(ids: string[]): Promise<PublishDra
       const market = safeNumeric(s.market_price, listed);
       const printRun =
         s.print_run == null || s.print_run === '' ? null : String(s.print_run);
-      const pit = parallelInsertType(s.insert_name, s.parallel_name);
+      const pit = parallelInsertType(
+        sqlNullableText(s.insert_name),
+        sqlNullableText(s.parallel_name),
+      );
       await client.query(
         `
              INSERT INTO inventory (
@@ -333,11 +348,11 @@ export async function publishDraftCardsAction(ids: string[]): Promise<PublishDra
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'available')
           `,
         [
-          s.player_name,
-          s.card_set,
-          s.card_number,
-          s.insert_name,
-          s.parallel_name,
+          sqlText(s.player_name),
+          sqlText(s.card_set),
+          sqlText(s.card_number),
+          sqlNullableText(s.insert_name),
+          sqlNullableText(s.parallel_name),
           pit,
           printRun,
           frontUrl,
@@ -347,8 +362,8 @@ export async function publishDraftCardsAction(ids: string[]): Promise<PublishDra
           Boolean(s.is_rookie),
           Boolean(s.is_auto),
           Boolean(s.is_relic),
-          s.grading_company || null,
-          s.grade || null,
+          sqlNullableText(s.grading_company),
+          sqlNullableText(s.grade),
         ],
       );
     }
