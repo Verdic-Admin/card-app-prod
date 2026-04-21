@@ -1,6 +1,8 @@
 import { ReactNode } from "react";
 import { AdminApiCreditsStrip } from "@/components/admin/AdminApiCreditsStrip";
 
+export const dynamic = 'force-dynamic';
+
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   let isUpdateAvailable = false;
   
