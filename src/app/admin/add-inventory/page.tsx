@@ -133,8 +133,8 @@ export default function AddInventoryPage() {
               card_number: result.card_number || s.data.card_number,
               insert_name: result.insert_name || s.data.insert_name,
               parallel_name: result.parallel_name || s.data.parallel_name,
-              avg_price: result.pricing?.afv ?? s.data.avg_price,
-              listed_price: result.pricing?.afv ?? s.data.listed_price,
+              avg_price: s.data.avg_price,
+              listed_price: s.data.listed_price,
             },
           }
           : s
