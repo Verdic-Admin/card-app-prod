@@ -63,7 +63,7 @@ export async function calculatePricingAction(fields: {
   grade?: string | null;
 }) {
   const base = await getOracleGatewayBaseUrl();
-  return await submitOracleRequest(`${base}/v1/calculate`, {
+  const raw = await submitOracleRequest(`${base}/v1/calculate`, {
     method: 'POST',
     body: JSON.stringify({
       player_name: fields.player_name,
@@ -79,4 +79,16 @@ export async function calculatePricingAction(fields: {
       skip_fuzzy: false,
     }),
   });
+
+  if (!raw || typeof raw !== 'object' || !('success' in raw) || !raw.success) {
+    return raw;
+  }
+
+  const d = raw.data as Record<string, unknown>;
+  // Engine returns DerivativeResponse { target_price }; B2B uses projected_target.
+  const target = Number(d.target_price ?? d.projected_target ?? 0);
+  return {
+    success: true,
+    data: { ...d, projected_target: target, target_price: d.target_price ?? target },
+  };
 }
