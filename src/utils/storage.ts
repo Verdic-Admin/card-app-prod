@@ -22,6 +22,15 @@ const s3Client = new S3Client({
   forcePathStyle,
 });
 
+/** Fail fast with a clear message instead of AWS SDK credential-chain noise (`tryNextLink`, etc.). */
+function assertS3CredentialsForUpload(): void {
+  if (accessKeyId && secretAccessKey) return;
+  throw new Error(
+    '[storage] S3 credentials missing. In Railway: Bucket → Add to Service → select this app so Railway injects ' +
+      'AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_ENDPOINT_URL, AWS_S3_BUCKET_NAME, and AWS_REGION.',
+  );
+}
+
 // Build the public URL for a given storage key via the app's asset proxy.
 // Railway buckets are private, so all access goes through /api/assets/[...key].
 // NEXT_PUBLIC_SITE_URL must be set to the app's public origin (e.g. https://example.up.railway.app).
@@ -37,6 +46,8 @@ function publicAssetUrl(key: string): string {
 }
 
 export async function put(path: string, file: File | Blob | Buffer, options?: any) {
+  assertS3CredentialsForUpload();
+
   let body: Buffer | Uint8Array | Blob | string;
 
   if (file instanceof File || file instanceof Blob) {
@@ -88,6 +99,8 @@ function keyFromUrl(url: string): string {
 }
 
 export async function del(urlOrUrls: string | string[]) {
+  assertS3CredentialsForUpload();
+
   const urls = Array.isArray(urlOrUrls) ? urlOrUrls : [urlOrUrls];
 
   for (const url of urls) {
