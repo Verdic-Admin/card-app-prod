@@ -85,7 +85,37 @@ export async function requestPricingAction(imageUrl: string): Promise<{
   return response.json();
 }
 
-export async function identifyCardPair(payload: { queue_id: string; side_a_url: string; side_b_url: string }) {
+// Normalised flat shape returned by both identify helpers
+export interface IdentifyCardResult {
+  status: string;
+  confidence: number;
+  player_name: string | null;
+  card_set: string | null;
+  card_number: string | null;
+  insert_name: string | null;
+  parallel_name: string | null; // mapped from card_details.parallel_type
+  print_run: number | null;
+}
+
+function normalizeIdentifyResponse(raw: any): IdentifyCardResult {
+  const cd = raw?.card_details ?? {};
+  return {
+    status:       raw?.status        ?? 'unknown',
+    confidence:   raw?.confidence    ?? 0,
+    player_name:  cd.player_name     ?? null,
+    card_set:     cd.card_set        ?? null,
+    card_number:  cd.card_number     ?? null,
+    insert_name:  cd.insert_name     ?? null,
+    parallel_name: cd.parallel_type  ?? null,
+    print_run:    cd.print_run       ?? null,
+  };
+}
+
+export async function identifyCardPair(payload: {
+  queue_id: string;
+  side_a_url: string;
+  side_b_url: string;
+}): Promise<IdentifyCardResult> {
   const apiKey = await getApiKey();
   const response = await fetch(`${API_BASE_URL}/identify/identify/card`, {
     method: 'POST',
@@ -93,9 +123,26 @@ export async function identifyCardPair(payload: { queue_id: string; side_a_url: 
     body: JSON.stringify(payload),
   });
 
-  if (!response.ok) {
-    throw new Error(`Identity API failed: ${response.statusText}`);
-  }
+  if (response.status === 402) throw new Error('credits_exhausted');
+  if (!response.ok) throw new Error(`Identity API failed: ${response.statusText}`);
 
-  return await response.json();
+  return normalizeIdentifyResponse(await response.json());
+}
+
+export async function identifyCardDirectAction(
+  queue_id: string,
+  side_a_url: string,
+  side_b_url?: string | null,
+): Promise<IdentifyCardResult> {
+  const apiKey = await getApiKey();
+  const response = await fetch(`${API_BASE_URL}/identify/identify/card`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
+    body: JSON.stringify({ queue_id, side_a_url, side_b_url: side_b_url || null }),
+  });
+
+  if (response.status === 402) throw new Error('credits_exhausted');
+  if (!response.ok) throw new Error(`Card identification failed: ${response.statusText}`);
+
+  return normalizeIdentifyResponse(await response.json());
 }

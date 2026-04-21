@@ -44,7 +44,13 @@ export async function submitOracleRequest(url: string, options: RequestInit = {}
   }
 
   if (!response.ok) {
-    return { error: 'api_failed', status: response.status, statusText: response.statusText };
+    const detail = await response.text().catch(() => '');
+    return {
+      error: 'api_failed',
+      status: response.status,
+      statusText: response.statusText,
+      detail: detail.slice(0, 500),
+    };
   }
 
   const data = await response.json();
@@ -55,13 +61,22 @@ export async function searchTaxonomyAction(query: string) {
   return await submitOracleRequest(`${API_BASE_URL}/fintech/v1/taxonomy/search?q=${encodeURIComponent(query)}`);
 }
 
-export async function submitBatchIngestAction(shopId: string, images: string[]) {
-  return await submitOracleRequest(`${API_BASE_URL}/fintech/orchestrator/ingest/batch`, {
+export async function calculatePricingAction(fields: {
+  player_name: string;
+  card_set: string;
+  insert_name?: string;
+  parallel_name?: string;
+  card_number?: string;
+}) {
+  return await submitOracleRequest(`${API_BASE_URL}/fintech/api/v1/calculate`, {
     method: 'POST',
-    body: JSON.stringify({ shop_id: shopId, images })
+    body: JSON.stringify({
+      player_name: fields.player_name,
+      card_set: fields.card_set,
+      insert_name: fields.insert_name || 'Base',
+      parallel_name: fields.parallel_name || 'Base',
+      card_number: fields.card_number || '',
+      skip_fuzzy: false,
+    }),
   });
-}
-
-export async function checkBatchStatusAction(jobId: string) {
-  return await submitOracleRequest(`${API_BASE_URL}/fintech/orchestrator/ingest/status/${jobId}`);
 }

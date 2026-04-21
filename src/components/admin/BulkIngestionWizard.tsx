@@ -2,9 +2,9 @@
 import { useState, useCallback, useEffect } from 'react'
 import {
   Upload, Loader2, Play, CheckCircle2, Wand2,
-  RefreshCw, Trash2, Send, Eye, EyeOff, Scissors
+  RefreshCw, Trash2, Send, Scissors, DollarSign
 } from 'lucide-react'
-import { pollScannerResult, requestPricingAction } from '@/app/actions/visionSync'
+import { pollScannerResult, requestPricingAction, identifyCardDirectAction } from '@/app/actions/visionSync'
 import {
   stagePairedUploadAction,
   listScanStagingAction,
@@ -15,7 +15,7 @@ import {
   publishDraftCardsAction,
 } from '@/app/actions/drafts'
 import { deleteStagingCardsAction } from '@/app/actions/inventory'
-import { submitBatchIngestAction, checkBatchStatusAction } from '@/app/actions/oracleAPI'
+import { calculatePricingAction } from '@/app/actions/oracleAPI'
 import { TaxonomySearch } from '@/components/admin/TaxonomySearch'
 import { InstructionTrigger } from '@/components/admin/DraggableGuide'
 
@@ -105,12 +105,10 @@ export function BulkIngestionWizard() {
   // Step 3 — staging grid
   const [staging, setStaging] = useState<StagingCard[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [showBack, setShowBack] = useState<Set<string>>(new Set())
   const [isPublishingAsIs, setIsPublishingAsIs] = useState(false)
   const [isDiscarding, setIsDiscarding] = useState(false)
 
   // Step 4 — AI identification spinner
-  const [identJobId, setIdentJobId] = useState<string | null>(null)
   const [identProgress, setIdentProgress] = useState('')
 
   // Step 5 — review
@@ -316,14 +314,6 @@ export function BulkIngestionWizard() {
     })
   }
 
-  const toggleBack = (id: string) => {
-    setShowBack(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
-  }
-
   const selectAll = () => setSelectedIds(new Set(staging.map(c => c.id)))
   const deselectAll = () => setSelectedIds(new Set())
 
@@ -366,7 +356,7 @@ export function BulkIngestionWizard() {
     }
   }
 
-  // ── Step 3 → 4: send selected for AI identification ───────────────────────
+  // ── Step 3 → 4: send selected for AI identification (card-identifier direct) ─
 
   const handleIdentify = async () => {
     const selected = staging.filter((c) => selectedIds.has(c.id) && c.image_url)
@@ -374,88 +364,52 @@ export function BulkIngestionWizard() {
       alert('Select cropped cards with a front image (finish scanner or use as-is first).')
       return
     }
-    const urls = selected.map((c) => c.image_url).filter(Boolean) as string[]
-    if (!urls.length) {
-      alert('No image URLs available for selected cards.')
-      return
-    }
     setStep(4)
-    setIdentProgress(`Sending ${selected.length} cards for identification…`)
+    const updates: StagingCard[] = [...staging]
     try {
-      const res = await submitBatchIngestAction('local_shop', urls)
-      if (res.error === 'credits_exhausted') { creditsExhausted(); return }
-      if (!res.success) throw new Error('Batch ingest rejected')
-      const jobId = res.data.job_id
-      setIdentJobId(jobId)
-      pollIdent(jobId, selected)
-    } catch (e: any) {
-      alert('Identification failed: ' + e.message)
-      setStep(2)
-    }
-  }
-
-  // ── Step 4: poll orchestrator and write results back to staging ───────────
-
-  const pollIdent = (jobId: string, selectedCards: StagingCard[]) => {
-    const interval = setInterval(async () => {
-      try {
-        const res = await checkBatchStatusAction(jobId)
-        if (res.error === 'credits_exhausted') { clearInterval(interval); creditsExhausted(); return }
-        if (!res.success) { clearInterval(interval); setStep(2); return }
-        const data = res.data
-        if (data.status === 'processing') {
-          setIdentProgress(`AI identifying… (${data.progress || ''})`)
-          return
-        }
-        clearInterval(interval)
-        if (data.status !== 'completed') { setStep(2); return }
-
-        const allResults: any[] = [
-          ...(data.summary?.ready_to_publish || []),
-          ...(data.summary?.manual_correction_required || []),
-        ]
-
-        // Write AI results back to staging (match by position — orchestrator preserves order)
-        const updates: StagingCard[] = [...staging]
-        for (let i = 0; i < selectedCards.length; i++) {
-          const result = allResults[i]
-          if (!result) continue
-          const stagingIdx = updates.findIndex(c => c.id === selectedCards[i].id)
-          if (stagingIdx === -1) continue
-          const updated: StagingCard = {
-            ...updates[stagingIdx],
-            player_name:   result.player_name   || updates[stagingIdx].player_name,
-            card_set:      result.card_set       || updates[stagingIdx].card_set,
-            card_number:   result.card_number    || updates[stagingIdx].card_number,
-            insert_name:   result.insert_name    || updates[stagingIdx].insert_name,
-            parallel_name: result.parallel_name  || updates[stagingIdx].parallel_name,
-            listed_price:  String(result.pricing?.afv || updates[stagingIdx].listed_price || ''),
-            confidence:    result.confidence,
-            ai_status:     result.status,
+      for (let i = 0; i < selected.length; i++) {
+        const card = selected[i]
+        setIdentProgress(`Identifying card ${i + 1} of ${selected.length}…`)
+        try {
+          const res = await identifyCardDirectAction(card.id, card.image_url!, card.back_image_url)
+          const confidence = res.confidence ?? 0
+          const aiStatus = confidence >= 0.85 ? 'High Confidence' : 'Manual Correction'
+          const idx = updates.findIndex(c => c.id === card.id)
+          if (idx !== -1) {
+            updates[idx] = {
+              ...updates[idx],
+              player_name:   res.player_name   || updates[idx].player_name,
+              card_set:      res.card_set       || updates[idx].card_set,
+              card_number:   res.card_number    || updates[idx].card_number,
+              insert_name:   res.insert_name    || updates[idx].insert_name,
+              parallel_name: res.parallel_name  || updates[idx].parallel_name,
+              print_run:     res.print_run != null ? String(res.print_run) : updates[idx].print_run,
+              confidence,
+              ai_status: aiStatus,
+            }
+            updateDraftCardAction(updates[idx].id, {
+              player_name:   updates[idx].player_name,
+              card_set:      updates[idx].card_set,
+              card_number:   updates[idx].card_number,
+              insert_name:   updates[idx].insert_name,
+              parallel_name: updates[idx].parallel_name,
+            }).catch(() => {})
           }
-          updates[stagingIdx] = updated
-          // Persist to DB
-          updateDraftCardAction(updated.id, {
-            player_name:   updated.player_name,
-            card_set:      updated.card_set,
-            card_number:   updated.card_number,
-            insert_name:   updated.insert_name,
-            parallel_name: updated.parallel_name,
-            price:         updated.listed_price,
-          }).catch(() => {})
+        } catch (e: any) {
+          if (e.message === 'credits_exhausted') { creditsExhausted(); return }
+          console.warn(`[identify] card ${card.id} failed:`, e.message)
+          const idx = updates.findIndex(c => c.id === card.id)
+          if (idx !== -1) updates[idx] = { ...updates[idx], ai_status: 'Failed', confidence: 0 }
         }
-
-        setStaging(updates)
-        setReviewCards(updates)
-        setReviewSelected(new Set(updates.map(c => c.id)))
-        setActiveTab('ready')
-        setStep(5)
-      } catch (e: any) {
-        clearInterval(interval)
-        alert('Identification poll error: ' + e.message)
-        setStep(2)
       }
-    }, 3000)
+    } finally {
+      setIdentProgress('')
+    }
+    setStaging(updates)
+    setReviewCards(updates)
+    setReviewSelected(new Set(updates.map(c => c.id)))
+    setActiveTab('ready')
+    setStep(5)
   }
 
   // ── Step 5: re-price a single card ────────────────────────────────────────
@@ -486,6 +440,35 @@ export function BulkIngestionWizard() {
     } catch (e: any) {
       if (e.message === 'credits_exhausted') { creditsExhausted(); return }
       alert('Re-price failed: ' + e.message)
+      setReviewCards(prev => prev.map(c => c.id === id ? { ...c, repricing: false } : c))
+    }
+  }
+
+  const handlePriceFromFields = async (id: string) => {
+    const card = reviewCards.find(c => c.id === id)
+    if (!card || !card.player_name) {
+      alert('Fill in at least Player Name and Card Set before pricing from fields.')
+      return
+    }
+    setReviewCards(prev => prev.map(c => c.id === id ? { ...c, repricing: true } : c))
+    try {
+      const res = await calculatePricingAction({
+        player_name: card.player_name,
+        card_set: card.card_set,
+        insert_name: card.insert_name,
+        parallel_name: card.parallel_name,
+        card_number: card.card_number,
+      })
+      if (res.error === 'credits_exhausted') { creditsExhausted(); return }
+      if (!res.success) {
+        const r = res as { status?: number; statusText?: string; detail?: string }
+        throw new Error([r.status && `HTTP ${r.status}`, r.statusText, r.detail].filter(Boolean).join(' — ') || 'Pricing failed')
+      }
+      const newPrice = String(res.data.projected_target ?? '')
+      setReviewCards(prev => prev.map(c => c.id === id ? { ...c, repricing: false, listed_price: newPrice } : c))
+      await updateDraftCardAction(id, { price: newPrice })
+    } catch (e: any) {
+      alert('Pricing failed: ' + e.message)
       setReviewCards(prev => prev.map(c => c.id === id ? { ...c, repricing: false } : c))
     }
   }
@@ -530,8 +513,8 @@ export function BulkIngestionWizard() {
     setBatchFront(null); setBatchBack(null)
     setSingleFront(null); setSingleBack(null)
     setScanJobId(null); setScanProgress('')
-    setStaging([]); setSelectedIds(new Set()); setShowBack(new Set())
-    setIdentJobId(null); setIdentProgress('')
+    setStaging([]); setSelectedIds(new Set())
+    setIdentProgress('')
     setReviewCards([]); setReviewSelected(new Set())
   }
 
@@ -670,36 +653,41 @@ export function BulkIngestionWizard() {
               const pending = isPendingScan(card)
               const displayFront = pending ? (card.raw_front_url ?? null) : (card.image_url ?? null)
               const displayBack = pending ? (card.raw_back_url ?? null) : (card.back_image_url ?? null)
-              const showToggle = !!(displayFront && displayBack)
               return (
               <div key={card.id}
                 className={`border rounded-xl p-4 bg-surface transition ${selectedIds.has(card.id) ? 'border-brand/50' : 'border-border opacity-60'}`}>
                 <div className="flex gap-4">
-                  {/* Image */}
-                  <div className="flex-shrink-0 w-20 space-y-1">
+                  {/* Images — front + back side by side */}
+                  <div className="flex-shrink-0 flex flex-col gap-1">
                     {pending && (
                       <span className="block text-[9px] font-black uppercase tracking-wide text-orange-600 bg-orange-500/15 rounded px-1 py-0.5 text-center">
                         Uncropped
                       </span>
                     )}
-                    {(showBack.has(card.id) ? displayBack : displayFront) ? (
-                      <img
-                        src={(showBack.has(card.id) ? displayBack : displayFront)!}
-                        alt="card"
-                        className="w-20 h-28 object-contain rounded-lg border border-border bg-surface"
-                      />
-                    ) : (
-                      <div className="w-20 h-28 rounded-lg border border-border bg-surface-hover flex items-center justify-center text-muted text-xs text-center p-1">
-                        No image
+                    <div className="flex gap-2">
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span className="text-[9px] font-bold text-muted uppercase tracking-wide">Front</span>
+                        {displayFront ? (
+                          <img src={displayFront} alt="front"
+                            className="w-24 h-32 object-contain rounded-lg border border-border bg-surface" />
+                        ) : (
+                          <div className="w-24 h-32 rounded-lg border border-border bg-surface-hover flex items-center justify-center text-muted text-[10px] text-center p-1">
+                            No image
+                          </div>
+                        )}
                       </div>
-                    )}
-                    {showToggle && (
-                      <button type="button" onClick={() => toggleBack(card.id)}
-                        className="flex items-center gap-1 text-[10px] text-muted hover:text-brand font-bold w-full justify-center">
-                        {showBack.has(card.id) ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                        {showBack.has(card.id) ? 'Front' : 'Back'}
-                      </button>
-                    )}
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span className="text-[9px] font-bold text-muted uppercase tracking-wide">Back</span>
+                        {displayBack ? (
+                          <img src={displayBack} alt="back"
+                            className="w-24 h-32 object-contain rounded-lg border border-border bg-surface" />
+                        ) : (
+                          <div className="w-24 h-32 rounded-lg border border-border bg-surface-hover flex items-center justify-center text-muted text-[10px] text-center p-1">
+                            No image
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
                   {/* Fields */}
@@ -782,7 +770,7 @@ export function BulkIngestionWizard() {
               className="bg-amber-600 text-white font-black py-3 rounded-xl disabled:opacity-40 hover:bg-amber-700 transition flex items-center justify-center gap-2"
             >
               {isSendingToScanner ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scissors className="w-4 h-4" />}
-              Send to scanner
+              Crop & Rotate
             </button>
             <button
               type="button"
@@ -863,16 +851,30 @@ export function BulkIngestionWizard() {
                 <div key={card.id}
                   className={`border rounded-xl p-4 bg-surface transition ${reviewSelected.has(card.id) ? 'border-brand/50' : 'border-border opacity-60'}`}>
                   <div className="flex gap-4">
-                    {/* Images */}
-                    <div className="flex-shrink-0 flex flex-col gap-1">
-                      {card.image_url && (
-                        <img src={card.image_url} alt="front"
-                          className="w-16 h-22 object-contain rounded-lg border border-border bg-surface" />
-                      )}
-                      {card.back_image_url && (
-                        <img src={card.back_image_url} alt="back"
-                          className="w-16 h-22 object-contain rounded-lg border border-border bg-surface" />
-                      )}
+                    {/* Images — front + back side by side */}
+                    <div className="flex-shrink-0 flex gap-2">
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span className="text-[9px] font-bold text-muted uppercase tracking-wide">Front</span>
+                        {card.image_url ? (
+                          <img src={card.image_url} alt="front"
+                            className="w-24 h-32 object-contain rounded-lg border border-border bg-surface" />
+                        ) : (
+                          <div className="w-24 h-32 rounded-lg border border-border bg-surface-hover flex items-center justify-center text-muted text-[10px] text-center p-1">
+                            No image
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span className="text-[9px] font-bold text-muted uppercase tracking-wide">Back</span>
+                        {card.back_image_url ? (
+                          <img src={card.back_image_url} alt="back"
+                            className="w-24 h-32 object-contain rounded-lg border border-border bg-surface" />
+                        ) : (
+                          <div className="w-24 h-32 rounded-lg border border-border bg-surface-hover flex items-center justify-center text-muted text-[10px] text-center p-1">
+                            No image
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Fields */}
@@ -917,8 +919,8 @@ export function BulkIngestionWizard() {
                         ))}
                       </div>
 
-                      {/* Price + reprice */}
-                      <div className="flex items-center gap-2">
+                      {/* Price + reprice + send to fintech */}
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-bold text-muted">$</span>
                         <input
                           type="number"
@@ -937,6 +939,17 @@ export function BulkIngestionWizard() {
                             ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                             : <RefreshCw className="w-3.5 h-3.5" />}
                           Re-price
+                        </button>
+                        <button
+                          onClick={() => handlePriceFromFields(card.id)}
+                          disabled={card.repricing || !card.player_name}
+                          className="flex items-center gap-1 text-xs font-bold text-emerald-600 hover:text-emerald-700 disabled:opacity-40 transition"
+                          title="Send edited fields to fintech pricing engine"
+                        >
+                          {card.repricing
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : <DollarSign className="w-3.5 h-3.5" />}
+                          Send to Pricing
                         </button>
                       </div>
                     </div>
