@@ -117,7 +117,7 @@ export async function identifyCardPair(payload: {
   side_b_url: string;
 }): Promise<IdentifyCardResult> {
   const apiKey = await getApiKey();
-  const response = await fetch(`${API_BASE_URL}/identify/identify/card`, {
+  const response = await fetch(`${API_BASE_URL}/identify/card`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
     body: JSON.stringify(payload),
@@ -135,7 +135,7 @@ export async function identifyCardDirectAction(
   side_b_url?: string | null,
 ): Promise<IdentifyCardResult> {
   const apiKey = await getApiKey();
-  const response = await fetch(`${API_BASE_URL}/identify/identify/card`, {
+  const response = await fetch(`${API_BASE_URL}/identify/card`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
     body: JSON.stringify({ queue_id, side_a_url, side_b_url: side_b_url || null }),
