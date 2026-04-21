@@ -25,6 +25,7 @@ function normalizeStoreRow(row: Record<string, unknown>): StoreSettings {
   return {
     cart_minimum: num(row.cart_minimum, DEFAULT_STORE_SETTINGS.cart_minimum),
     site_announcement: str(row.site_announcement),
+    site_announcement_url: row.site_announcement_url != null ? str(row.site_announcement_url) : null,
     paypal_email: str(row.paypal_email),
     allow_offers: bool(row.allow_offers, DEFAULT_STORE_SETTINGS.allow_offers),
     store_description: str(row.store_description, DEFAULT_STORE_SETTINGS.store_description),
@@ -84,6 +85,7 @@ export async function updateStoreSettings(settings: StoreSettings) {
     settings.payment_paypal,
     settings.payment_cashapp,
     settings.payment_zelle,
+    settings.site_announcement_url ?? null,
   ];
   try {
     await pool.query(
@@ -92,9 +94,11 @@ export async function updateStoreSettings(settings: StoreSettings) {
               id, cart_minimum, site_announcement, paypal_email, allow_offers, store_description,
               social_instagram, social_twitter, social_facebook, social_discord, social_threads,
               oracle_discount_percentage, site_name, site_author, site_theme,
-              payment_link, payment_instructions, payment_venmo, payment_paypal, payment_cashapp, payment_zelle
+              payment_link, payment_instructions, payment_venmo, payment_paypal, payment_cashapp, payment_zelle,
+              site_announcement_url
             ) VALUES (
-              1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
+              1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
+              $21
             )
             ON CONFLICT (id) DO UPDATE SET
               cart_minimum = EXCLUDED.cart_minimum,
@@ -116,7 +120,8 @@ export async function updateStoreSettings(settings: StoreSettings) {
               payment_venmo = EXCLUDED.payment_venmo,
               payment_paypal = EXCLUDED.payment_paypal,
               payment_cashapp = EXCLUDED.payment_cashapp,
-              payment_zelle = EXCLUDED.payment_zelle
+              payment_zelle = EXCLUDED.payment_zelle,
+              site_announcement_url = EXCLUDED.site_announcement_url
             `,
       v
     );

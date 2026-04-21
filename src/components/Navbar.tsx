@@ -5,7 +5,7 @@ import { ShoppingCart } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import type { StoreSettings } from '@/lib/store-settings';
 
-/** “Get your own site” Railway CTA — only on deploys that opt in (set in Railway, not in the public template). */
+/** “Get your own site” CTA — only on deploys that opt in (Railway env). Default link is Player Index claim flow. */
 function showStoreDeployBanner(): boolean {
   return (
     process.env.NEXT_PUBLIC_SHOW_STORE_DEPLOY_BANNER === 'true' ||
@@ -20,7 +20,7 @@ export function Navbar({ settings }: { settings: StoreSettings }) {
     <div className="flex flex-col w-full sticky top-0 z-50">
       {showStoreDeployBanner() && (
         <a
-          href={process.env.NEXT_PUBLIC_DEPLOY_URL || 'https://railway.com/new/template/playerindex'}
+          href={process.env.NEXT_PUBLIC_DEPLOY_URL || 'https://playerindexdata.com/claim'}
           target="_blank"
           rel="noopener noreferrer"
           className="block relative z-[70] w-full bg-gradient-to-r from-indigo-600 to-cyan-600 hover:opacity-90 transition-opacity"
@@ -40,9 +40,20 @@ export function Navbar({ settings }: { settings: StoreSettings }) {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-300"></span>
             </span>
-            <p className="text-white text-sm sm:text-base font-black tracking-widest uppercase drop-shadow-md text-center">
-              {settings.site_announcement}
-            </p>
+            {settings.site_announcement_url ? (
+              <a
+                href={settings.site_announcement_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-white text-sm sm:text-base font-black tracking-widest uppercase drop-shadow-md text-center hover:underline underline-offset-2"
+              >
+                {settings.site_announcement}
+              </a>
+            ) : (
+              <p className="text-white text-sm sm:text-base font-black tracking-widest uppercase drop-shadow-md text-center">
+                {settings.site_announcement}
+              </p>
+            )}
             <span className="flex h-2 w-2 relative shrink-0">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-300"></span>

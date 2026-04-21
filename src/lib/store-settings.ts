@@ -3,6 +3,7 @@
 export interface StoreSettings {
   cart_minimum: number;
   site_announcement: string;
+  site_announcement_url?: string | null;
   paypal_email: string;
   allow_offers: boolean;
   store_description: string;
@@ -28,6 +29,7 @@ export interface StoreSettings {
 export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   cart_minimum: 20.0,
   site_announcement: '',
+  site_announcement_url: null,
   paypal_email: '',
   allow_offers: true,
   store_description:

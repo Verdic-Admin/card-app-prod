@@ -148,14 +148,25 @@ export default function DesignPage() {
           <div className="space-y-6 p-5 bg-surface md:bg-surface-hover border border-border rounded-xl">
             <div>
               <label className="block text-xs font-bold text-foreground md:text-muted uppercase tracking-wider mb-2">Site Announcement Banner</label>
-              <input 
-                type="text" 
-                value={settings.site_announcement || ''} 
+              <input
+                type="text"
+                value={settings.site_announcement || ''}
                 onChange={e => setSettings({...settings, site_announcement: e.target.value})}
                 className="w-full px-3 py-2.5 bg-surface border border-border md:border-muted/30 rounded-lg text-foreground font-medium focus:ring-2 focus:ring-brand focus:border-brand outline-none shadow-sm transition-all"
                 placeholder="e.g. Huge holiday sale on all Topps Chrome singles! Free shipping over $50."
               />
               <p className="text-[10px] text-muted mt-1.5 font-medium">Displays a highly visible banner at the very top of the store. Leave totally blank to hide the banner.</p>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-foreground md:text-muted uppercase tracking-wider mb-2">Announcement Banner Link (optional)</label>
+              <input
+                type="url"
+                value={settings.site_announcement_url || ''}
+                onChange={e => setSettings({...settings, site_announcement_url: e.target.value || null})}
+                className="w-full px-3 py-2.5 bg-surface border border-border md:border-muted/30 rounded-lg text-foreground font-medium focus:ring-2 focus:ring-brand focus:border-brand outline-none shadow-sm transition-all"
+                placeholder="e.g. https://playerindexdata.com"
+              />
+              <p className="text-[10px] text-muted mt-1.5 font-medium">When set, the announcement text becomes a clickable link opening in a new tab.</p>
             </div>
           </div>
         </div>

@@ -186,6 +186,7 @@ export type Database = {
           paypal_email: string
           projection_timeframe: string | null
           site_announcement: string
+          site_announcement_url: string | null
           social_discord: string | null
           social_facebook: string
           social_instagram: string
@@ -202,6 +203,7 @@ export type Database = {
           oracle_discount_percentage?: number | null
           paypal_email?: string
           site_announcement?: string
+          site_announcement_url?: string | null
           social_discord?: string | null
           social_facebook?: string
           social_instagram?: string
@@ -219,6 +221,7 @@ export type Database = {
           paypal_email?: string
           projection_timeframe?: string | null
           site_announcement?: string
+          site_announcement_url?: string | null
           social_discord?: string | null
           social_facebook?: string
           social_instagram?: string

@@ -41,6 +41,7 @@ ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS payment_cashapp TEXT DEFAULT
 ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS payment_zelle TEXT DEFAULT '';
 ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS shipping_fee NUMERIC(10, 2) DEFAULT 4.00;
 ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS free_shipping_threshold NUMERIC(10, 2) DEFAULT 25.00;
+ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS site_announcement_url TEXT;
 
 -- scan_staging (bulk importer / wizard)
 ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS raw_front_url TEXT;
@@ -223,7 +224,8 @@ async function init() {
       payment_cashapp TEXT DEFAULT '',
       payment_zelle TEXT DEFAULT '',
       shipping_fee NUMERIC(10, 2) DEFAULT 4.00,
-      free_shipping_threshold NUMERIC(10, 2) DEFAULT 25.00
+      free_shipping_threshold NUMERIC(10, 2) DEFAULT 25.00,
+      site_announcement_url TEXT
     );
   `);
   await client.query(`INSERT INTO store_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;`);
