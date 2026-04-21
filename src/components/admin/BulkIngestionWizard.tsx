@@ -432,7 +432,11 @@ export function BulkIngestionWizard() {
     setReviewCards(prev => prev.map(c => c.id === id ? { ...c, repricing: true } : c))
     try {
       const result = await requestPricingAction(imageUrl)
-      const newPrice = String(result.pricing?.afv || '')
+      // Use ?? not || — afv 0 is valid; || would turn 0 into '' and hide the price in the input.
+      const newPrice =
+        result.pricing != null && result.pricing.afv != null
+          ? String(result.pricing.afv)
+          : ''
       setReviewCards(prev => prev.map(c => c.id === id
         ? { ...c, repricing: false, listed_price: newPrice, confidence: result.confidence, ai_status: result.status,
             player_name: result.player_name || c.player_name,
