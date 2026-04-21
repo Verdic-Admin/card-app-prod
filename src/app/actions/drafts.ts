@@ -238,91 +238,123 @@ export async function updateDraftCardAction(id: string, updates: any) {
   return { success: true }
 }
 
-export async function publishDraftCardsAction(ids: string[]) {
-  await checkAuth();
+export type PublishDraftCardsResult =
+  | { success: true }
+  | { success: false; error: string };
+
+/**
+ * Mint staging rows into `inventory` and remove them from `scan_staging`.
+ * Returns `{ success, error? }` instead of throwing so production clients always
+ * get a readable message (Next.js strips thrown server-action messages in prod).
+ */
+export async function publishDraftCardsAction(ids: string[]): Promise<PublishDraftCardsResult> {
+  if (!ids?.length) {
+    return { success: false, error: 'No cards selected to publish.' };
+  }
+
+  if (!(await hasShopOracleApiKey())) {
+    return {
+      success: false,
+      error:
+        'Unauthorized: set PLAYERINDEX_API_KEY in Railway for this service so the store can write to the database.',
+    };
+  }
 
   // 1. Read approved rows from staging
-  let staged = [];
+  let staged: Record<string, unknown>[] = [];
   try {
-     const { rows } = await pool.query(`SELECT player_name, card_set, card_number, insert_name, parallel_name, print_run, image_url, back_image_url, listed_price, market_price, is_rookie, is_auto, is_relic, grading_company, grade FROM scan_staging WHERE id = ANY($1::uuid[])`, [ids as any]);
-     staged = rows;
+    const { rows } = await pool.query(
+      `SELECT player_name, card_set, card_number, insert_name, parallel_name, print_run, image_url, back_image_url, listed_price, market_price, is_rookie, is_auto, is_relic, grading_company, grade FROM scan_staging WHERE id = ANY($1::uuid[])`,
+      [ids as string[]],
+    );
+    staged = rows;
   } catch (error) {
-     console.error(error);
-     throw new Error("Failed to read staged cards");
+    console.error(error);
+    return { success: false, error: 'Failed to read staged cards from the database.' };
   }
 
   if (!staged?.length) {
-    throw new Error("Failed to read staged cards")
+    return {
+      success: false,
+      error: 'No matching staging rows found. They may already be published or the selection is out of date — refresh the page.',
+    };
   }
 
   for (const s of staged) {
     if (!s.image_url) {
-      throw new Error(
-        'Cannot publish rows without a front image. Run the scanner or use "Use as-is (no crop)" first.'
-      );
+      return {
+        success: false,
+        error:
+          'Cannot publish without a front image. Run the scanner or use "Use as-is (no crop)" first.',
+      };
     }
     if (!s.back_image_url) {
-      throw new Error(
-        'Cannot publish without a back image for every card. Stage paired front+back, then scan or promote.'
-      );
+      return {
+        success: false,
+        error:
+          'Cannot publish without a back image for every card. Stage paired front+back, then scan or promote.',
+      };
     }
   }
 
-  // 2. Insert into live inventory
+  // 2–3: Insert inventory + delete staging in one transaction (all-or-nothing)
+  const client = await pool.connect();
   try {
-      for (const s of staged) {
-          const listed = safeNumeric(s.listed_price, 0);
-          const market = safeNumeric(s.market_price, listed);
-          const printRun =
-            s.print_run == null || s.print_run === ''
-              ? null
-              : String(s.print_run);
-          const pit = parallelInsertType(s.insert_name, s.parallel_name);
-          await pool.query(`
+    await client.query('BEGIN');
+    for (const s of staged) {
+      const listed = safeNumeric(s.listed_price, 0);
+      const market = safeNumeric(s.market_price, listed);
+      const printRun =
+        s.print_run == null || s.print_run === '' ? null : String(s.print_run);
+      const pit = parallelInsertType(s.insert_name, s.parallel_name);
+      await client.query(
+        `
              INSERT INTO inventory (
                player_name, card_set, card_number, insert_name, parallel_name, parallel_insert_type,
                print_run, image_url, back_image_url, listed_price, market_price,
                is_rookie, is_auto, is_relic, grading_company, grade, status
              )
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'available')
-          `, [
-            s.player_name,
-            s.card_set,
-            s.card_number,
-            s.insert_name,
-            s.parallel_name,
-            pit,
-            printRun,
-            s.image_url,
-            s.back_image_url,
-            listed,
-            market,
-            Boolean(s.is_rookie),
-            Boolean(s.is_auto),
-            Boolean(s.is_relic),
-            s.grading_company || null,
-            s.grade || null,
-          ]);
-      }
-  } catch (insertError: unknown) {
-      console.error(insertError);
-      const msg =
-        insertError instanceof Error
-          ? insertError.message
-          : typeof insertError === 'object' && insertError != null && 'message' in insertError
-            ? String((insertError as { message: unknown }).message)
-            : String(insertError);
-      throw new Error(`Failed to mint cards to inventory: ${msg}`);
+          `,
+        [
+          s.player_name,
+          s.card_set,
+          s.card_number,
+          s.insert_name,
+          s.parallel_name,
+          pit,
+          printRun,
+          s.image_url,
+          s.back_image_url,
+          listed,
+          market,
+          Boolean(s.is_rookie),
+          Boolean(s.is_auto),
+          Boolean(s.is_relic),
+          s.grading_company || null,
+          s.grade || null,
+        ],
+      );
+    }
+    await client.query(`DELETE FROM scan_staging WHERE id = ANY($1::uuid[])`, [ids as string[]]);
+    await client.query('COMMIT');
+  } catch (e: unknown) {
+    try {
+      await client.query('ROLLBACK');
+    } catch {
+      /* ignore */
+    }
+    console.error(e);
+    const msg =
+      e instanceof Error
+        ? e.message
+        : typeof e === 'object' && e != null && 'message' in e
+          ? String((e as { message: unknown }).message)
+          : String(e);
+    return { success: false, error: `Publish failed: ${msg}` };
+  } finally {
+    client.release();
   }
 
-  // 3. Remove from staging
-  try {
-      await pool.query(`DELETE FROM scan_staging WHERE id = ANY($1::uuid[])`, [ids as any]);
-  } catch (deleteError: unknown) {
-      console.error("Warning: cards minted but staging cleanup failed:", deleteError)
-      const msg = deleteError instanceof Error ? deleteError.message : String(deleteError);
-      throw new Error(`Failed to clean up staging area after publishing: ${msg}`);
-  }
-
-  return { success: true }
+  return { success: true };
 }

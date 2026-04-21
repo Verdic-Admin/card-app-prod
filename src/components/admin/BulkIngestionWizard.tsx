@@ -341,13 +341,15 @@ export function BulkIngestionWizard() {
     }
     setIsPublishingAsIs(true)
     try {
-      await publishDraftCardsAction(ids)
+      const pub = await publishDraftCardsAction(ids)
+      if (!pub.success) {
+        alert('Publish failed: ' + pub.error)
+        return
+      }
       const remaining = staging.filter(c => !selectedIds.has(c.id))
       setStaging(remaining)
       setSelectedIds(new Set(remaining.map(c => c.id)))
       if (remaining.length === 0) resetWizard()
-    } catch (e: any) {
-      alert('Publish failed: ' + e.message)
     } finally {
       setIsPublishingAsIs(false)
     }
@@ -358,13 +360,15 @@ export function BulkIngestionWizard() {
     if (!ids.length) return
     setIsDiscarding(true)
     try {
-      await deleteStagingCardsAction(ids)
+      const del = await deleteStagingCardsAction(ids)
+      if (!del.success) {
+        alert('Discard failed: ' + del.error)
+        return
+      }
       const remaining = staging.filter(c => !selectedIds.has(c.id))
       setStaging(remaining)
       setSelectedIds(new Set(remaining.map(c => c.id)))
       if (remaining.length === 0) resetWizard()
-    } catch (e: any) {
-      alert('Discard failed: ' + e.message)
     } finally {
       setIsDiscarding(false)
     }
@@ -565,12 +569,22 @@ export function BulkIngestionWizard() {
     if (!ids.length) return
     setIsPublishing(true)
     try {
-      await publishDraftCardsAction(ids)
+      const pub = await publishDraftCardsAction(ids)
+      if (!pub.success) {
+        alert('Publish failed: ' + pub.error)
+        return
+      }
       const discard = reviewCards.filter(c => !reviewSelected.has(c.id)).map(c => c.id)
-      if (discard.length) await deleteStagingCardsAction(discard)
+      if (discard.length) {
+        const del = await deleteStagingCardsAction(discard)
+        if (!del.success) {
+          alert(
+            'Cards were published to inventory, but removing the other drafts failed: ' +
+              del.error,
+          )
+        }
+      }
       resetWizard()
-    } catch (e: any) {
-      alert('Publish failed: ' + e.message)
     } finally {
       setIsPublishing(false)
     }

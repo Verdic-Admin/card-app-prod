@@ -597,9 +597,27 @@ export async function setAuctionStatus(id: string, status: 'pending' | 'live' | 
   revalidatePath('/auction')
 }
 
-export async function deleteStagingCardsAction(ids: string[]) {
-  await checkAuth();
-  if (ids.length === 0) return { success: true };
-  await pool.query(`DELETE FROM scan_staging WHERE id = ANY($1::uuid[])`, [ids]);
-  return { success: true };
+export type DeleteStagingCardsResult =
+  | { success: true }
+  | { success: false; error: string };
+
+/** Returns a result object instead of throwing so prod UIs get a real error string. */
+export async function deleteStagingCardsAction(
+  ids: string[],
+): Promise<DeleteStagingCardsResult> {
+  try {
+    if (!(await hasShopOracleApiKey())) {
+      return {
+        success: false,
+        error:
+          'Unauthorized: set PLAYERINDEX_API_KEY in Railway for this service.',
+      };
+    }
+    if (ids.length === 0) return { success: true };
+    await pool.query(`DELETE FROM scan_staging WHERE id = ANY($1::uuid[])`, [ids]);
+    return { success: true };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { success: false, error: msg };
+  }
 }
