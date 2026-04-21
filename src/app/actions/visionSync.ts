@@ -17,7 +17,7 @@ async function getApiKey(): Promise<string> {
 
 export async function uploadImagesToScanner(formData: FormData) {
   const apiKey = await getApiKey();
-  const response = await fetch(`${API_BASE_URL}/scan/scanner/upload`, {
+  const response = await fetch(`${API_BASE_URL}/scan/upload`, {
     method: 'POST',
     headers: { 'X-API-Key': apiKey },
     body: formData,
@@ -41,7 +41,7 @@ export async function pollScannerResult(jobId: string): Promise<{
   error?: string;
 }> {
   const apiKey = await getApiKey();
-  const response = await fetch(`${API_BASE_URL}/scan/scanner/result/${jobId}`, {
+  const response = await fetch(`${API_BASE_URL}/scan/result/${jobId}`, {
     headers: { 'X-API-Key': apiKey },
   });
 
