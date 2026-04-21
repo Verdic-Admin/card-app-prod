@@ -5,13 +5,34 @@ import { CardGrid } from "@/components/CardGrid";
 import { StoreFilters } from "@/components/StoreFilters";
 import { getStoreSettings } from "@/app/actions/settings";
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://intothegapsportscards.com";
-/** Builds the URL for our dynamic /api/og edge route */
-function buildOgImageUrl(base: string, params: { q?: string; team?: string }) {
-  const url = new URL(`${base}/api/og`);
-  if (params.q)    url.searchParams.set('q',    params.q);
-  if (params.team) url.searchParams.set('team', params.team);
-  return url.toString();
+/**
+ * Normalise an env var that may have been pasted with a leading ` =` prefix
+ * (a common Railway copy-paste mistake).  Returns a valid HTTPS origin or ''.
+ */
+function sanitizeOrigin(raw: string | undefined): string {
+  if (!raw) return '';
+  const trimmed = raw.trim().replace(/^=\s*/, '').trim().replace(/\/$/, '');
+  try { new URL(trimmed); return trimmed; } catch { return ''; }
+}
+
+const BASE_URL =
+  sanitizeOrigin(process.env.NEXT_PUBLIC_SITE_URL) ||
+  sanitizeOrigin(process.env.RAILWAY_PUBLIC_DOMAIN
+    ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+    : '') ||
+  '';
+
+/** Builds the URL for our dynamic /api/og edge route, or null if no origin is known. */
+function buildOgImageUrl(base: string, params: { q?: string; team?: string }): string | null {
+  if (!base) return null;
+  try {
+    const url = new URL(`${base}/api/og`);
+    if (params.q)    url.searchParams.set('q',    params.q);
+    if (params.team) url.searchParams.set('team', params.team);
+    return url.toString();
+  } catch {
+    return null;
+  }
 }
 
 type PageProps = { searchParams: Promise<{ [key: string]: string | undefined }> | any };
@@ -36,22 +57,24 @@ export async function generateMetadata({ searchParams }: PageProps): Promise<Met
     ? `Browse ${label} sports cards at ${siteName} — zero fees, direct to you.`
     : defaultDescription;
 
+  const ogImageUrl = buildOgImageUrl(BASE_URL, { q: query, team });
+
   return {
     title,
     description,
     openGraph: {
       title,
       description,
-      url: BASE_URL,
+      ...(BASE_URL ? { url: BASE_URL } : {}),
       siteName,
-      images: [{ url: buildOgImageUrl(BASE_URL, { q: query, team }), width: 1200, height: 630, alt: title }],
+      ...(ogImageUrl ? { images: [{ url: ogImageUrl, width: 1200, height: 630, alt: title }] } : {}),
       type: "website",
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: [buildOgImageUrl(BASE_URL, { q: query, team })],
+      ...(ogImageUrl ? { images: [ogImageUrl] } : {}),
     },
   };
 }
