@@ -377,9 +377,16 @@ export function BulkIngestionWizard() {
   // ── Step 3 → 4: send selected for AI identification (card-identifier direct) ─
 
   const handleIdentify = async () => {
-    const selected = staging.filter((c) => selectedIds.has(c.id) && c.image_url)
+    const selected = staging.filter(
+      (c) =>
+        selectedIds.has(c.id) &&
+        c.image_url &&
+        (c.back_image_url || c.raw_back_url),
+    )
     if (!selected.length) {
-      alert('Select cropped cards with a front image (finish scanner or use as-is first).')
+      alert(
+        'Select cards that have both a front and a back (cropped image_url/back_image_url, or raw pair not yet promoted). Finish the scanner or use "Use as-is" first.',
+      )
       return
     }
     setStep(4)

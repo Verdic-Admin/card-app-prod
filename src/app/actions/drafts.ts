@@ -24,6 +24,15 @@ function parallelInsertType(insertName: string | null, parallelName: string | nu
   return parts.length ? parts.join(' ') : 'Base';
 }
 
+/** First non-empty URL among row columns (staging may keep back only on raw_* until promote). */
+function pickStagingUrl(row: Record<string, unknown>, ...keys: string[]): string | null {
+  for (const k of keys) {
+    const v = row[k];
+    if (v != null && String(v).trim() !== '') return String(v).trim();
+  }
+  return null;
+}
+
 const ALLOWED_COLUMNS = [
   'player_name', 'card_set', 'card_number', 'insert_name',
   'parallel_name', 'print_run', 'listed_price', 'market_price',
@@ -264,7 +273,10 @@ export async function publishDraftCardsAction(ids: string[]): Promise<PublishDra
   let staged: Record<string, unknown>[] = [];
   try {
     const { rows } = await pool.query(
-      `SELECT player_name, card_set, card_number, insert_name, parallel_name, print_run, image_url, back_image_url, listed_price, market_price, is_rookie, is_auto, is_relic, grading_company, grade FROM scan_staging WHERE id = ANY($1::uuid[])`,
+      `SELECT player_name, card_set, card_number, insert_name, parallel_name, print_run,
+              image_url, back_image_url, raw_front_url, raw_back_url,
+              listed_price, market_price, is_rookie, is_auto, is_relic, grading_company, grade
+       FROM scan_staging WHERE id = ANY($1::uuid[])`,
       [ids as string[]],
     );
     staged = rows;
@@ -281,18 +293,20 @@ export async function publishDraftCardsAction(ids: string[]): Promise<PublishDra
   }
 
   for (const s of staged) {
-    if (!s.image_url) {
+    const front = pickStagingUrl(s, 'image_url', 'raw_front_url');
+    const back = pickStagingUrl(s, 'back_image_url', 'raw_back_url');
+    if (!front) {
       return {
         success: false,
         error:
           'Cannot publish without a front image. Run the scanner or use "Use as-is (no crop)" first.',
       };
     }
-    if (!s.back_image_url) {
+    if (!back) {
       return {
         success: false,
         error:
-          'Cannot publish without a back image for every card. Stage paired front+back, then scan or promote.',
+          'Cannot publish without a back image. Upload a paired back (or use "Use as-is" so raw_front/raw_back are set), then try again.',
       };
     }
   }
@@ -302,6 +316,8 @@ export async function publishDraftCardsAction(ids: string[]): Promise<PublishDra
   try {
     await client.query('BEGIN');
     for (const s of staged) {
+      const frontUrl = pickStagingUrl(s, 'image_url', 'raw_front_url')!;
+      const backUrl = pickStagingUrl(s, 'back_image_url', 'raw_back_url')!;
       const listed = safeNumeric(s.listed_price, 0);
       const market = safeNumeric(s.market_price, listed);
       const printRun =
@@ -324,8 +340,8 @@ export async function publishDraftCardsAction(ids: string[]): Promise<PublishDra
           s.parallel_name,
           pit,
           printRun,
-          s.image_url,
-          s.back_image_url,
+          frontUrl,
+          backUrl,
           listed,
           market,
           Boolean(s.is_rookie),
