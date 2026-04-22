@@ -1,4 +1,17 @@
 /**
+ * Coerce a pg NUMERIC column (returned as string) or any unknown value to a
+ * finite JS number so .toFixed() and arithmetic work safely everywhere.
+ *
+ *   price(row.listed_price ?? row.avg_price)          → number
+ *   price(row.listed_price ?? row.avg_price, 9.99)    → fallback when null/NaN
+ */
+export function price(v: unknown, fallback = 0): number {
+  if (v == null) return fallback;
+  const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/,/g, ''));
+  return Number.isFinite(n) ? n : fallback;
+}
+
+/**
  * Calculates the exact median of an array of numbers.
  * Sorts numerically. If the array has an even length, it returns the average of the two middle elements.
  * Critical to prevent massive outliers (e.g., 1/1 superficial cards) from destroying the baseline PBI.

@@ -1,4 +1,5 @@
 import pool from '@/utils/db';
+import { price as p } from '@/utils/math'
 import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
@@ -22,7 +23,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     }
   }
 
-  const displayPrice = (item.listed_price ?? item.avg_price ?? 0).toFixed(2)
+  const displayPrice = p(item.listed_price ?? item.avg_price).toFixed(2)
   const title = `${item.player_name} - ${item.card_set || ''} | $${displayPrice}`
   
   let descriptionParts = []
@@ -71,8 +72,8 @@ export default async function ItemPage({ params }: PageProps) {
   if (item.is_lot) {
     const { rows: children } = await pool.query(`SELECT * FROM inventory WHERE lot_id = $1 AND status = 'available'`, [item.id]);
 
-    const childSum = children.reduce((acc: number, c: any) => acc + (parseFloat(c.listed_price) || 0), 0);
-    const lotPrice = parseFloat(item.listed_price ?? item.avg_price ?? 0);
+    const childSum = children.reduce((acc: number, c: any) => acc + p(c.listed_price), 0);
+    const lotPrice = p(item.listed_price ?? item.avg_price);
     const savings = childSum - lotPrice;
     const savingsPct = childSum > 0 ? (savings / childSum) * 100 : 0;
 
@@ -92,7 +93,7 @@ export default async function ItemPage({ params }: PageProps) {
 
           <div className="flex flex-wrap items-center gap-4">
             <span className="text-5xl font-black text-white tracking-tighter">
-              ${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}
+              ${p(item.listed_price ?? item.avg_price).toFixed(2)}
             </span>
             <span className="text-muted font-bold text-sm">
               {children?.length ?? 0} cards included
@@ -174,7 +175,7 @@ export default async function ItemPage({ params }: PageProps) {
               </span>{' '}
               lot — buy the whole bundle for{' '}
               <span className="text-amber-300 font-black">
-                ${(parentLot.listed_price ?? parentLot.avg_price ?? 0).toFixed(2)}
+                ${p(parentLot.listed_price ?? parentLot.avg_price).toFixed(2)}
               </span>
             </p>
           </div>
@@ -262,12 +263,12 @@ export default async function ItemPage({ params }: PageProps) {
                 <p className="text-[11px] uppercase tracking-widest text-indigo-400 font-bold mb-1">
                   🔮 Player Index Value:{' '}
                   <span className="line-through opacity-60">
-                    ${(item as any).oracle_projection.toFixed(2)}
+                    ${p((item as any).oracle_projection).toFixed(2)}
                   </span>
                 </p>
                 <div className="flex items-center gap-3">
                   <p className="text-5xl font-black text-white tracking-tighter">
-                    ${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}
+                    ${p(item.listed_price ?? item.avg_price).toFixed(2)}
                   </p>
                   {(item as any).trend_data && Array.isArray((item as any).trend_data) && (item as any).trend_data.length > 0 && (
                     <MarketSparkline 
@@ -276,16 +277,16 @@ export default async function ItemPage({ params }: PageProps) {
                     />
                   )}
                 </div>
-                {item.listed_price && item.listed_price < (item as any).oracle_projection && (
+                {p(item.listed_price) > 0 && p(item.listed_price) < p((item as any).oracle_projection) && (
                   <p className="text-emerald-400 font-bold text-sm mt-1">
-                    You save ${((item as any).oracle_projection - item.listed_price).toFixed(2)}
+                    You save ${(p((item as any).oracle_projection) - p(item.listed_price)).toFixed(2)}
                   </p>
                 )}
               </div>
             ) : (
               <div className="flex items-center gap-3">
                 <p className="text-5xl font-black text-white tracking-tighter">
-                  ${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}
+                  ${p(item.listed_price ?? item.avg_price).toFixed(2)}
                 </p>
                 {(item as any).trend_data && Array.isArray((item as any).trend_data) && (item as any).trend_data.length > 0 && (
                   <MarketSparkline 
