@@ -28,6 +28,7 @@ const EMPTY_DRAFT: ItemStagingDraft = {
 }
 
 export function LiveAuctionStudio({ initialItems, initialProjectionTimeframe, initialAuctionQrUrl }: LiveAuctionStudioProps) {
+  const router = useRouter()
   const [items, setItems] = useState<any[]>(initialItems)
   const [timeframe, setTimeframe] = useState(initialProjectionTimeframe || '90-Day')
   const [isSavingTimeframe, setIsSavingTimeframe] = useState(false)
