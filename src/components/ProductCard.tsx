@@ -7,19 +7,27 @@ import { TradeModal } from '@/components/TradeModal';
 import Link from 'next/link';
 import { MarketSparkline } from '@/components/MarketSparkline';
 import { price as p } from '@/utils/math';
+import { deriveDisplayPricing } from '@/utils/pricing';
 
 type InventoryItem = Database['public']['Tables']['inventory']['Row'];
 
 interface ProductCardProps {
   item: InventoryItem;
+  discountRate?: number;
 }
 
-export function ProductCard({ item }: ProductCardProps) {
+export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
   const isAvailable = item.status === 'available';
   const { addToCart, cartItems } = useCart();
   const isInCart = cartItems.some(i => i.id === item.id);
   const [isFlipped, setIsFlipped] = useState(false);
   const [isTradeModalOpen, setIsTradeModalOpen] = useState(false);
+  const pricing = deriveDisplayPricing({
+    listed_price: item.listed_price,
+    avg_price: item.avg_price,
+    oracle_projection: (item as any).oracle_projection,
+    oracle_discount_percentage: discountRate,
+  });
 
   return (
     <>
@@ -30,9 +38,9 @@ export function ProductCard({ item }: ProductCardProps) {
            href={`/item/${item.id}`}
            className="relative aspect-[2.5/3.5] w-full bg-background perspective-1000 cursor-pointer block"
         >
-          {isAvailable && p((item as any).oracle_projection) > 0 && p(item.listed_price) > 0 && p(item.listed_price) < p((item as any).oracle_projection) && (
+          {isAvailable && pricing.hasProjection && pricing.percentBelowPlayerIndex > 0 && (
             <div className="absolute top-2 left-2 z-20 bg-indigo-900 text-indigo-300 text-xs px-2.5 py-1 rounded-full border border-indigo-700 font-bold shadow-[0_0_12px_rgba(79,70,229,0.4)] pointer-events-none flex items-center gap-1">
-               🔥 {((1 - p(item.listed_price) / p((item as any).oracle_projection)) * 100).toFixed(0)}% Below Player Index
+               🔥 {pricing.percentBelowPlayerIndex.toFixed(0)}% Below Player Index
             </div>
           )}
           <div className={`w-full h-full relative transition-transform duration-700 transform-style-3d ${item.back_image_url ? 'lg:group-hover:rotate-y-180' : ''}`}>
@@ -120,12 +128,17 @@ export function ProductCard({ item }: ProductCardProps) {
           </div>
 
           <div className="flex flex-col mt-auto gap-3">
-            {(item as any).oracle_projection && (item as any).oracle_projection > 0 ? (
+            {pricing.hasProjection ? (
               <div className="flex flex-col">
                 <div className="flex items-center gap-2 mb-0.5">
                   <span className="text-[10px] uppercase tracking-widest font-bold text-indigo-400 flex items-center gap-1">
-                     🔮 Player Index Value: <span className="line-through opacity-60">${p((item as any).oracle_projection).toFixed(2)}</span>
+                     🔮 Player Index Value: <span className="line-through opacity-60">${pricing.playerIndexPrice.toFixed(2)}</span>
                   </span>
+                  {pricing.discountPercent > 0 && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-950/70 text-indigo-300 border border-indigo-700">
+                      {pricing.discountPercent.toFixed(0)}% off
+                    </span>
+                  )}
                   {(item as any).oracle_trend_percentage != null && (
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${p((item as any).oracle_trend_percentage) >= 0 ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800' : 'bg-red-950/60 text-red-400 border border-red-800'}`}>
                       {p((item as any).oracle_trend_percentage) >= 0 ? '↑' : '↓'} {Math.abs(p((item as any).oracle_trend_percentage)).toFixed(1)}%
@@ -134,7 +147,7 @@ export function ProductCard({ item }: ProductCardProps) {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="font-black text-3xl text-white tracking-tighter">
-                    ${p(item.listed_price ?? item.avg_price).toFixed(2)}
+                    ${pricing.effectiveStorePrice.toFixed(2)}
                   </span>
                   {(item as any).trend_data && Array.isArray((item as any).trend_data) && (item as any).trend_data.length > 0 && (
                     <MarketSparkline 
@@ -143,9 +156,14 @@ export function ProductCard({ item }: ProductCardProps) {
                     />
                   )}
                 </div>
-                {p(item.listed_price) > 0 && p(item.listed_price) < p((item as any).oracle_projection) && (
+                {pricing.savingsAmount > 0 && (
                   <span className="text-xs font-bold text-emerald-400 mt-0.5">
-                    You save ${(p((item as any).oracle_projection) - p(item.listed_price)).toFixed(2)}
+                    You save ${pricing.savingsAmount.toFixed(2)}
+                  </span>
+                )}
+                {pricing.hasManualOverride && (
+                  <span className="text-[10px] font-semibold text-amber-300 mt-0.5">
+                    Manual price override active
                   </span>
                 )}
               </div>

@@ -7,6 +7,8 @@ import { CardGrid } from '@/components/CardGrid'
 import { ProductCard } from '@/components/ProductCard'
 import { ItemDetailClient, ImageMagnifier } from '@/components/ItemDetailClient'
 import { MarketSparkline } from '@/components/MarketSparkline'
+import { getStoreSettings } from '@/app/actions/settings'
+import { deriveDisplayPricing } from '@/utils/pricing'
 
 type PageProps = { params: Promise<{ id: string }> }
 
@@ -55,6 +57,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function ItemPage({ params }: PageProps) {
   const { id } = await params
+  const settings = await getStoreSettings()
   
   // ── Fetch the primary item ──────────────────────────────────────────────
   let item;
@@ -130,7 +133,7 @@ export default async function ItemPage({ params }: PageProps) {
             <div className="flex gap-6 overflow-x-auto pb-8 snap-x snap-mandatory hide-scrollbars" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
               {children.map(child => (
                 <div key={child.id} className="snap-start flex-shrink-0 w-[280px]">
-                  <ProductCard item={child as any} />
+                  <ProductCard item={child as any} discountRate={settings.oracle_discount_percentage} />
                 </div>
               ))}
             </div>
@@ -154,6 +157,12 @@ export default async function ItemPage({ params }: PageProps) {
     const lot = lotRows[0];
     parentLot = lot ?? null
   }
+  const pricing = deriveDisplayPricing({
+    listed_price: item.listed_price,
+    avg_price: item.avg_price,
+    oracle_projection: (item as any).oracle_projection,
+    oracle_discount_percentage: settings.oracle_discount_percentage,
+  })
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-20">
@@ -258,17 +267,22 @@ export default async function ItemPage({ params }: PageProps) {
 
           {/* Pricing */}
           <div className="border-t border-border pt-4">
-            {(item as any).oracle_projection && (item as any).oracle_projection > 0 ? (
+            {pricing.hasProjection ? (
               <div>
                 <p className="text-[11px] uppercase tracking-widest text-indigo-400 font-bold mb-1">
                   🔮 Player Index Value:{' '}
                   <span className="line-through opacity-60">
-                    ${p((item as any).oracle_projection).toFixed(2)}
+                    ${pricing.playerIndexPrice.toFixed(2)}
                   </span>
                 </p>
+                {pricing.discountPercent > 0 && (
+                  <p className="text-[11px] uppercase tracking-widest text-indigo-300 font-bold mb-2">
+                    {pricing.discountPercent.toFixed(0)}% below Player Index
+                  </p>
+                )}
                 <div className="flex items-center gap-3">
                   <p className="text-5xl font-black text-white tracking-tighter">
-                    ${p(item.listed_price ?? item.avg_price).toFixed(2)}
+                    ${pricing.effectiveStorePrice.toFixed(2)}
                   </p>
                   {(item as any).trend_data && Array.isArray((item as any).trend_data) && (item as any).trend_data.length > 0 && (
                     <MarketSparkline 
@@ -277,9 +291,14 @@ export default async function ItemPage({ params }: PageProps) {
                     />
                   )}
                 </div>
-                {p(item.listed_price) > 0 && p(item.listed_price) < p((item as any).oracle_projection) && (
+                {pricing.savingsAmount > 0 && (
                   <p className="text-emerald-400 font-bold text-sm mt-1">
-                    You save ${(p((item as any).oracle_projection) - p(item.listed_price)).toFixed(2)}
+                    You save ${pricing.savingsAmount.toFixed(2)}
+                  </p>
+                )}
+                {pricing.hasManualOverride && (
+                  <p className="text-amber-300 font-semibold text-xs mt-1">
+                    Manual price override active
                   </p>
                 )}
               </div>

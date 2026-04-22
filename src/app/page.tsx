@@ -185,7 +185,11 @@ export default async function Home(props: { searchParams: Promise<{ [key: string
               Failed to load inventory. Please try again later.
             </div>
           ) : (
-            <CardGrid items={items || []} emptyMessage="Zero cards match those filters. Try clearing your search!" />
+            <CardGrid
+              items={items || []}
+              discountRate={settings.oracle_discount_percentage}
+              emptyMessage="Zero cards match those filters. Try clearing your search!"
+            />
           )}
         </div>
       </div>

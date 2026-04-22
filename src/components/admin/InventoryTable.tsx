@@ -6,6 +6,7 @@ import { toggleCardStatus, editCardAction, deleteCardAction, bulkDeleteCardsActi
 import { syncSingleItemWithOracle, syncInventoryWithOracle, applyOracleDiscount, applyOracleDiscountAll, applyCorrection, approvePriceOnly, denyCorrection } from '@/app/actions/oracleSync'
 import { Loader2, Trash2, Edit2, Check, X, Search, Download, RotateCw, RefreshCw, DollarSign, Save, AlertCircle, Gavel, Tv, Radio, Package } from 'lucide-react'
 import { price } from '@/utils/math'
+import { deriveDisplayPricing } from '@/utils/pricing'
 
 type InventoryItem = Database['public']['Tables']['inventory']['Row']
 
@@ -1227,6 +1228,15 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
               ) : (
                 /* ── View Mode ── */
                 <>
+                  {(() => {
+                    const pricing = deriveDisplayPricing({
+                      listed_price: item.listed_price,
+                      avg_price: item.avg_price,
+                      oracle_projection: (item as any).oracle_projection,
+                      oracle_discount_percentage: discountRate,
+                    });
+                    return (
+                      <>
                   <div>
                     <div className="font-black text-slate-900 text-base leading-tight flex items-center gap-1.5 flex-wrap">
                       {item.player_name}
@@ -1295,11 +1305,21 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                         )}
                       </div>
                       <div className="flex items-baseline gap-2">
-                        <span className="text-sm font-black text-purple-900">${price((item as any).oracle_projection).toFixed(2)}</span>
+                        <span className="text-sm font-black text-purple-900">${pricing.playerIndexPrice.toFixed(2)}</span>
                         <span className="text-[10px] text-purple-500 font-semibold">player index value</span>
                       </div>
-                      {price(item.listed_price) > 0 && price((item as any).oracle_projection) > price(item.listed_price) && (
-                        <div className="text-[10px] text-emerald-600 font-bold mt-0.5">Your price: ${price(item.listed_price).toFixed(2)} ({((1 - price(item.listed_price) / price((item as any).oracle_projection)) * 100).toFixed(0)}% below)</div>
+                      {pricing.discountPercent > 0 && (
+                        <div className="text-[10px] text-purple-700 font-bold mt-0.5">
+                          Configured discount: {pricing.discountPercent.toFixed(0)}%
+                        </div>
+                      )}
+                      {pricing.savingsAmount > 0 && (
+                        <div className="text-[10px] text-emerald-600 font-bold mt-0.5">
+                          Your price: ${pricing.effectiveStorePrice.toFixed(2)} ({pricing.percentBelowPlayerIndex.toFixed(0)}% below)
+                        </div>
+                      )}
+                      {pricing.hasManualOverride && (
+                        <div className="text-[10px] text-amber-600 font-bold mt-0.5">Manual override active</div>
                       )}
                       <button
                         onClick={() => handleApplyOracleDiscount(item)}
@@ -1318,13 +1338,13 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                       <div className="relative flex items-center -ml-1">
                         <span className="absolute left-1 text-xl font-black text-slate-400 pointer-events-none">$</span>
                         <input
-                          key={`price-${item.id}-${price(item.listed_price ?? item.avg_price)}`}
+                          key={`price-${item.id}-${pricing.effectiveStorePrice}`}
                           type="number"
                           step="0.01"
-                          defaultValue={price(item.listed_price ?? item.avg_price).toFixed(2)}
+                          defaultValue={pricing.effectiveStorePrice.toFixed(2)}
                           onBlur={async (e) => {
                               const val = parseFloat(e.target.value);
-                              const currentVal = price(item.listed_price ?? item.avg_price);
+                              const currentVal = pricing.effectiveStorePrice;
                               if (!isNaN(val) && val !== currentVal) {
                                  await editCardAction(item.id, { listed_price: val });
                               }
@@ -1398,6 +1418,9 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                     </div>
                   </div>
                 </>
+                      </>
+                    );
+                  })()}
               )}
             </div>
           </div>
