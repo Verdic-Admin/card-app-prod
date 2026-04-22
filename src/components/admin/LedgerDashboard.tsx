@@ -10,6 +10,17 @@ type InventoryItem = Database['public']['Tables']['inventory']['Row']
 export function LedgerDashboard({ soldItems }: { soldItems: InventoryItem[] }) {
   const [shippingRate] = useState<number>(4.00)
 
+  const transactionKeyFromSoldAt = (soldAt: unknown, fallbackId: string): string => {
+    // Postgres adapters may return sold_at as string, Date, or null.
+    if (typeof soldAt === 'string') {
+      return soldAt.length >= 16 ? soldAt.substring(0, 16) : soldAt
+    }
+    if (soldAt instanceof Date) {
+      return Number.isNaN(soldAt.getTime()) ? fallbackId : soldAt.toISOString().substring(0, 16)
+    }
+    return fallbackId
+  }
+
   const { grossRevenue, totalCostBasis, netProfit, transactionsCount } = useMemo(() => {
     let gross = 0
     let cost = 0
@@ -22,7 +33,7 @@ export function LedgerDashboard({ soldItems }: { soldItems: InventoryItem[] }) {
       cost += price(item.cost_basis)
       
       // If no sold_at exists from legacy data, fallback to ID to assume individual transaction
-      const txKey = item.sold_at ? item.sold_at.substring(0, 16) : item.id
+      const txKey = transactionKeyFromSoldAt(item.sold_at, item.id)
       transactions.add(txKey)
     })
 
