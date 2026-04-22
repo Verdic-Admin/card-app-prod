@@ -4,6 +4,7 @@ import pool from '@/utils/db';
 import { getOracleGatewayBaseUrl } from '@/lib/oracle-gateway-url';
 import { getShopOracleApiKey } from '@/lib/shop-oracle-credentials';
 import { vercelBatchUpdatePrices } from '@/app/actions/inventory'
+import { calculatePricingAction } from '@/app/actions/oracleAPI'
 
 const ALLOWED_COLUMNS = [
   'player_name', 'card_set', 'card_number', 'insert_name', 
@@ -32,18 +33,16 @@ export async function syncInventoryWithOracle() {
     return { success: true, count: 0, message: 'No available inventory to sync.' };
   }
 
-  // Fetch discount percentage from shop_config
+  // Fetch discount percentage from canonical store_settings
   let discountRate = 0;
   try {
-    const { rows: configRows } = await pool.query(`SELECT discount_rate FROM shop_config LIMIT 1`);
-    if (configRows.length > 0) {
-      discountRate = parseFloat(configRows[0].discount_rate) || 0;
-    }
+    const { rows } = await pool.query(`SELECT oracle_discount_percentage FROM store_settings WHERE id = 1`);
+    discountRate = parseFloat(String(rows?.[0]?.oracle_discount_percentage ?? 0)) || 0;
   } catch (e) {
-    console.warn("Could not fetch discount_rate", e);
+    console.warn("Could not fetch oracle_discount_percentage", e);
   }
 
-  console.log(`-> Batching ${inventory.length} items to shop-api...`);
+  console.log(`-> Repricing ${inventory.length} items via Oracle calculate endpoint...`);
 
   const apiKey = await getShopOracleApiKey();
   if (!apiKey) {
@@ -54,49 +53,97 @@ export async function syncInventoryWithOracle() {
     };
   }
 
-  const cards = inventory.map((i: any) => ({
-    card_id: i.id,
-    player_name: i.player_name || '',
-    card_set: i.card_set || '',
-    card_number: i.card_number || '',
-    insert_name: i.insert_name || 'Base',
-    parallel_name: i.parallel_name || 'Base',
-    is_auto: Boolean(i.is_auto),
-    is_relic: Boolean(i.is_relic),
-    is_rookie: Boolean(i.is_rookie),
-    print_run: i.print_run ? Number(i.print_run) : null,
-  }));
+  // Keep throughput reasonable without overloading the remote pricing API.
+  const CONCURRENCY = 10;
+  const updates: Array<{
+    id: string;
+    listed_price: number;
+    market_price: number;
+    trend_data: number[];
+    player_index_url: string;
+    oracle_projection: number;
+    oracle_trend_percentage: number | null;
+  }> = [];
+  let pricedCount = 0;
 
-  const base = await getOracleGatewayBaseUrl();
-  const res = await fetch(`${base}/shop-api/batch-price`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
-    body: JSON.stringify({ cards, discount_rate: discountRate }),
-  });
+  for (let i = 0; i < inventory.length; i += CONCURRENCY) {
+    const chunk = inventory.slice(i, i + CONCURRENCY) as any[];
+    const chunkResults = await Promise.all(
+      chunk.map(async (row) => {
+        const res = await calculatePricingAction({
+          player_name: toTitleCase(String(row.player_name || "")),
+          card_set: String(row.card_set || ""),
+          card_number: String(row.card_number || ""),
+          insert_name: String(row.insert_name || "Base"),
+          parallel_name: String(row.parallel_name || "Base"),
+          is_auto: Boolean(row.is_auto || false),
+          is_relic: Boolean(row.is_relic || false),
+          is_rookie: Boolean(row.is_rookie || false),
+          print_run: row.print_run ? Number(row.print_run) : null,
+        });
 
-  if (!res.ok) {
-    if (res.status === 402) {
-      console.error("Payment Required (402) - credits exhausted.");
-      return { success: false, message: "API Credits exhausted. Please refill.", count: 0 };
+        if (!res || typeof res !== 'object' || !('success' in res) || !res.success) {
+          if (res && typeof res === 'object' && 'error' in res && res.error === 'credits_exhausted') {
+            throw new Error('credits_exhausted');
+          }
+          return null;
+        }
+
+        const data = (res as any).data || {};
+        const projection = Number(data.projected_target ?? data.target_price ?? 0);
+        if (!Number.isFinite(projection) || projection <= 0) return null;
+
+        const listed = projection * (1 - discountRate / 100);
+        return {
+          id: String(row.id),
+          listed_price: listed,
+          market_price: projection,
+          trend_data: Array.isArray(data.trend_points) ? data.trend_points : [],
+          player_index_url: String(data.player_index_url || ''),
+          oracle_projection: projection,
+          oracle_trend_percentage: data.trend_percentage != null ? Number(data.trend_percentage) : null,
+        };
+      })
+    );
+
+    for (const result of chunkResults) {
+      if (!result) continue;
+      updates.push(result);
+      pricedCount++;
     }
-    throw new Error(`Failed to batch price items. Status: ${res.status}`);
   }
 
-  const data = await res.json();
-  if (!data.items) {
-    throw new Error('Invalid response from shop-api batch-price endpoint.');
+  if (updates.length === 0) {
+    return {
+      success: false,
+      message: 'Oracle did not return valid projected_target values for available inventory.',
+      count: 0,
+      total: inventory.length,
+    };
   }
 
-  const updates = data.items.map((item: any) => ({
-    id: item.card_id,
-    listed_price: item.listed_price,
-    market_price: item.oracle_value,
-    trend_data: item.trend_points || [],
-    player_index_url: item.player_index_url || ''
-  }));
+  try {
+    console.log(`-> Performing single atomic DB update for ${updates.length} items...`);
+    await vercelBatchUpdatePrices(updates.map(u => ({
+      id: u.id,
+      listed_price: u.listed_price,
+      market_price: u.market_price,
+      trend_data: u.trend_data,
+      player_index_url: u.player_index_url,
+    })));
 
-  console.log(`-> Performing single atomic DB update for ${updates.length} items...`);
-  await vercelBatchUpdatePrices(updates);
+    for (const u of updates) {
+      await pool.query(
+        `UPDATE inventory SET oracle_projection = $1, oracle_trend_percentage = $2 WHERE id = $3`,
+        [u.oracle_projection, u.oracle_trend_percentage, u.id]
+      );
+    }
+  } catch (err: any) {
+    if (String(err?.message || '').includes('credits_exhausted')) {
+      return { success: false, message: "API Credits exhausted. Please refill.", count: 0, total: inventory.length };
+    }
+    throw err;
+  }
 
   console.log(`-> Checking Lot-Aware Pricing Validity...`);
   await pool.query(`
@@ -112,7 +159,7 @@ export async function syncInventoryWithOracle() {
     WHERE i.id = agg.parent_id AND agg.children_sum < agg.parent_listed_price;
   `);
 
-  return { success: true, count: updates.length };
+  return { success: true, count: pricedCount, total: inventory.length, batches: Math.ceil(inventory.length / CONCURRENCY) };
 }
 
 export async function syncSingleItemWithOracle(id: string) {
