@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import { Database } from '@/types/database.types'
 import { Download, TrendingUp, DollarSign, Package } from 'lucide-react'
+import { price } from '@/utils/math'
 
 type InventoryItem = Database['public']['Tables']['inventory']['Row']
 
@@ -17,8 +18,8 @@ export function LedgerDashboard({ soldItems }: { soldItems: InventoryItem[] }) {
     const transactions = new Set<string>()
 
     soldItems.forEach(item => {
-      gross += (item.listed_price ?? item.avg_price ?? 0)
-      cost += (item.cost_basis ?? 0)
+      gross += price(item.listed_price ?? item.avg_price)
+      cost += price(item.cost_basis)
       
       // If no sold_at exists from legacy data, fallback to ID to assume individual transaction
       const txKey = item.sold_at ? item.sold_at.substring(0, 16) : item.id
@@ -42,8 +43,8 @@ export function LedgerDashboard({ soldItems }: { soldItems: InventoryItem[] }) {
       item.id,
       `"${(item.player_name || '').replace(/"/g, '""')}"`,
       `"${(item.card_set || '').replace(/"/g, '""')}"`,
-      (item.listed_price ?? item.avg_price ?? 0).toFixed(2),
-      (item.cost_basis ?? 0).toFixed(2),
+      price(item.listed_price ?? item.avg_price).toFixed(2),
+      price(item.cost_basis).toFixed(2),
       item.sold_at || 'Unknown'
     ].join(','))
 

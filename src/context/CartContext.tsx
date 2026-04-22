@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { Database } from '@/types/database.types';
+import { price } from '@/utils/math'
 
 type InventoryItem = Database['public']['Tables']['inventory']['Row'];
 
@@ -146,7 +147,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   // Natively exclude Trade targets from Cart Price calculations!
   const cartTotal = cartItems.reduce((sum, item) => {
      if (item.isTradeProposal) return sum;
-     return sum + (item.listed_price ?? item.avg_price ?? 0);
+     return sum + price(item.listed_price ?? item.avg_price);
   }, 0);
 
   return (

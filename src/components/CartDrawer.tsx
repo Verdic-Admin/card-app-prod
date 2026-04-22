@@ -8,6 +8,7 @@ import { submitTradeOffer } from '@/app/actions/trades'
 import { TradeModal } from '@/components/TradeModal'
 import type { StoreSettings } from '@/lib/store-settings'
 import { paymentUrlWithAmount } from '@/lib/payment-links'
+import { price as p } from '@/utils/math'
 
 type CheckoutSuccessPayload = {
   orderId: string
@@ -156,7 +157,7 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
               )}
            </div>
         ) : (
-           <span className="font-black text-foreground mt-auto tracking-tight pt-1">${(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}</span>
+           <span className="font-black text-foreground mt-auto tracking-tight pt-1">${p(item.listed_price ?? item.avg_price).toFixed(2)}</span>
         )}
       </div>
 
