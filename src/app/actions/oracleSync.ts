@@ -200,7 +200,7 @@ export async function syncSingleItemWithOracle(id: string) {
 
   // Fetch discount percentage
   const { rows: settingsRows } = await pool.query(`SELECT oracle_discount_percentage FROM store_settings WHERE id = 1`); const settings = settingsRows[0]
-  const discountRate = settings?.oracle_discount_percentage || 0;
+  const discountRate = parseFloat(String(settings?.oracle_discount_percentage ?? 0)) || 0;
 
   let item, inventoryError;
   try {
@@ -257,7 +257,17 @@ export async function syncSingleItemWithOracle(id: string) {
       [new_price, projection, projection, trend, JSON.stringify(trendPoints), playerIndexUrl, item.id]
     );
 
-    return { success: true, message: `Repriced to $${new_price.toFixed(2)}`, new_price };
+    return {
+      success: true,
+      message: `Repriced to $${new_price.toFixed(2)} (Player Index $${projection.toFixed(2)}${discountRate > 0 ? `, ${discountRate}% store discount applied to listed price` : ''}).`,
+      new_price,
+      listed_price: new_price,
+      market_price: projection,
+      oracle_projection: projection,
+      oracle_trend_percentage: trend,
+      trend_data: trendPoints,
+      player_index_url: playerIndexUrl,
+    };
   } catch (err: any) {
     return { success: false, message: `Error processing item: ${err.message}` };
   }

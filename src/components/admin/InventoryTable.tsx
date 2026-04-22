@@ -341,7 +341,22 @@ export function InventoryTable({ initialItems, discountRate = 0, projectionTimef
       if (result.is_pending) {
         setPendingCorrections([result.pending_correction])
       } else if (result.success) {
-        setItems(items.map(i => i.id === id ? { ...i, listed_price: result.new_price ?? null } : i))
+        setItems(
+          items.map((i) =>
+            i.id === id
+              ? {
+                  ...i,
+                  listed_price: result.new_price ?? (i as any).listed_price,
+                  market_price: result.market_price ?? (i as any).market_price,
+                  oracle_projection: result.oracle_projection ?? (i as any).oracle_projection,
+                  oracle_trend_percentage:
+                    result.oracle_trend_percentage ?? (i as any).oracle_trend_percentage,
+                  trend_data: result.trend_data ?? (i as any).trend_data,
+                  player_index_url: result.player_index_url ?? (i as any).player_index_url,
+                }
+              : i,
+          ),
+        )
       } else {
         alert(result.message)
       }
