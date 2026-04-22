@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { AuctionQRCode } from './AuctionQRCode'
 import {
   stageAuctionItems,
@@ -42,6 +43,7 @@ export function LiveAuctionStudio({ initialItems, initialProjectionTimeframe, in
   const [liveSuccess, setLiveSuccess] = useState<number | null>(null)
   const [editingLiveId, setEditingLiveId] = useState<string | null>(null)
   const [savingLiveId, setSavingLiveId] = useState<string | null>(null)
+  const [goingLive, setGoingLive] = useState(false)
 
   const pendingItems = useMemo(
     () => items.filter(i => i.is_auction && i.auction_status === 'pending'),
@@ -164,8 +166,24 @@ export function LiveAuctionStudio({ initialItems, initialProjectionTimeframe, in
   ) => {
     setSavingLiveId(itemId)
     try {
-      await import('@/app/actions/inventory').then(m =>
+      const res = await import('@/app/actions/inventory').then(m =>
         m.updateStagedAuction(itemId, formData),
+      )
+      setItems(prev =>
+        prev.map(i =>
+          i.id === itemId
+            ? {
+                ...i,
+                coined_image_url: res.coined_image_url ?? i.coined_image_url,
+                auction_reserve_price: formData.get('reservePrice')
+                  ? Number(formData.get('reservePrice'))
+                  : i.auction_reserve_price,
+                auction_end_time: (formData.get('endTime') as string) || i.auction_end_time,
+                auction_description:
+                  (formData.get('description') as string) || i.auction_description,
+              }
+            : i,
+        ),
       )
       alert('Live auction item updated.')
       setEditingLiveId(null)
@@ -449,20 +467,37 @@ export function LiveAuctionStudio({ initialItems, initialProjectionTimeframe, in
             <button onClick={handleGenBatch} className="bg-slate-100 hover:bg-slate-200 text-slate-800 px-4 py-2 rounded-lg font-bold transition-colors disabled:opacity-50 text-sm" disabled={pendingItems.length === 0}>
               Generate Batch Codes
             </button>
-            <button 
+            <button
+              type="button"
+              disabled={goingLive || pendingItems.length === 0}
               onClick={async () => {
                 const checked = document.querySelectorAll('input[name="stagedItemRadio"]:checked')
+                let ids: string[]
                 if (checked.length > 0) {
-                  const ids = Array.from(checked).map(i => (i as HTMLInputElement).value)
-                  await import('@/app/actions/inventory').then(m => m.goLiveWithAuctions(ids))
+                  ids = Array.from(checked).map(i => (i as HTMLInputElement).value)
                 } else if (pendingItems.length > 0) {
-                  await import('@/app/actions/inventory').then(m => m.goLiveWithAuctions(pendingItems.map(p => p.id)))
+                  ids = pendingItems.map(p => p.id)
                 } else {
                   alert('No staged items.')
+                  return
+                }
+                setGoingLive(true)
+                try {
+                  await import('@/app/actions/inventory').then(m => m.goLiveWithAuctions(ids))
+                  setItems(prev =>
+                    prev.map(i => (ids.includes(i.id) ? { ...i, auction_status: 'live' } : i)),
+                  )
+                  router.refresh()
+                } catch (e: unknown) {
+                  const msg = e instanceof Error ? e.message : String(e)
+                  alert(`Could not go live: ${msg}`)
+                } finally {
+                  setGoingLive(false)
                 }
               }}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-2 rounded-lg font-black tracking-widest transition-colors shadow-lg"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-2 rounded-lg font-black tracking-widest transition-colors shadow-lg disabled:opacity-50 disabled:pointer-events-none inline-flex items-center gap-2"
             >
+              {goingLive ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
               GO LIVE
             </button>
           </div>
@@ -489,12 +524,37 @@ export function LiveAuctionStudio({ initialItems, initialProjectionTimeframe, in
               </div>
               
               <div className="flex-1 w-full flex flex-col gap-3 border-l border-slate-200 pl-0 lg:pl-6">
-                <form 
+                <form
+                  encType="multipart/form-data"
                   onSubmit={async e => {
                     e.preventDefault()
                     const fd = new FormData(e.currentTarget)
-                    await import('@/app/actions/inventory').then(m => m.updateStagedAuction(item.id, fd))
-                    alert("Draft saved!")
+                    try {
+                      const res = await import('@/app/actions/inventory').then(m =>
+                        m.updateStagedAuction(item.id, fd),
+                      )
+                      setItems(prev =>
+                        prev.map(i =>
+                          i.id === item.id
+                            ? {
+                                ...i,
+                                coined_image_url: res.coined_image_url ?? i.coined_image_url,
+                                auction_reserve_price: fd.get('reservePrice')
+                                  ? Number(fd.get('reservePrice'))
+                                  : i.auction_reserve_price,
+                                auction_end_time: (fd.get('endTime') as string) || i.auction_end_time,
+                                auction_description:
+                                  (fd.get('description') as string) || i.auction_description,
+                              }
+                            : i,
+                        ),
+                      )
+                      router.refresh()
+                      alert('Draft saved!')
+                    } catch (err: unknown) {
+                      const msg = err instanceof Error ? err.message : String(err)
+                      alert(`Could not save draft: ${msg}`)
+                    }
                   }}
                   className="flex flex-col gap-2"
                 >
@@ -552,6 +612,7 @@ export function LiveAuctionStudio({ initialItems, initialProjectionTimeframe, in
 
                 {editingLiveId === item.id && (
                   <form
+                    encType="multipart/form-data"
                     onSubmit={async e => {
                       e.preventDefault()
                       const fd = new FormData(e.currentTarget)

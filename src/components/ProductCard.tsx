@@ -9,6 +9,7 @@ import { MarketSparkline } from '@/components/MarketSparkline';
 import { price as p } from '@/utils/math';
 import { deriveDisplayPricing } from '@/utils/pricing';
 import { Share2 } from 'lucide-react';
+import { buildPlayerIndexForecasterUrl } from '@/lib/player-index-deeplink';
 
 type InventoryItem = Database['public']['Tables']['inventory']['Row'];
 
@@ -30,6 +31,7 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
     oracle_projection: (item as any).oracle_projection,
     oracle_discount_percentage: discountRate,
   });
+  const playerIndexCalcUrl = buildPlayerIndexForecasterUrl(item as any);
 
   const handleShare = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -57,16 +59,12 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
     <>
       <div className="bg-surface rounded-xl shadow-md border border-border overflow-hidden flex flex-col group transition-all hover:shadow-lg hover:border-muted">
         
-        {/* Dual Image Container */}
-        <Link 
-           href={`/item/${item.id}`}
-           className="relative aspect-[2.5/3.5] w-full bg-background perspective-1000 cursor-pointer block"
-        >
-          {isAvailable && !isLiveAuction && pricing.hasProjection && pricing.percentBelowPlayerIndex > 0 && (
-            <div className="absolute top-2 left-2 z-20 bg-indigo-900 text-indigo-300 text-xs px-2.5 py-1 rounded-full border border-indigo-700 font-bold shadow-[0_0_12px_rgba(79,70,229,0.4)] pointer-events-none flex items-center gap-1">
-               🔥 {pricing.percentBelowPlayerIndex.toFixed(0)}% Below Player Index
-            </div>
-          )}
+        {/* Dual Image Container — outer wrapper so PI promo link is not nested inside the item <Link> */}
+        <div className="relative aspect-[2.5/3.5] w-full bg-background perspective-1000 group">
+          <Link
+            href={`/item/${item.id}`}
+            className="absolute inset-0 z-0 block cursor-pointer"
+          >
           <div className={`w-full h-full relative transition-transform duration-700 transform-style-3d ${item.back_image_url ? 'lg:group-hover:rotate-y-180' : ''}`}>
             
             {/* FRONT */}
@@ -107,7 +105,19 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
               </span>
             </div>
           )}
-        </Link>
+          </Link>
+          {isAvailable && !isLiveAuction && pricing.hasProjection && pricing.percentBelowPlayerIndex > 0 && (
+            <a
+              href={playerIndexCalcUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="absolute top-2 left-2 z-20 bg-indigo-900 text-indigo-300 text-xs px-2.5 py-1 rounded-full border border-indigo-700 font-bold shadow-[0_0_12px_rgba(79,70,229,0.4)] pointer-events-auto flex items-center gap-1 hover:bg-indigo-800 transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
+              🔥 {pricing.percentBelowPlayerIndex.toFixed(0)}% Below Player Index
+            </a>
+          )}
+        </div>
 
         {/* Details Footer */}
         <div className="p-5 flex flex-col flex-grow border-t border-border bg-surface">
@@ -172,9 +182,14 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
             ) : pricing.hasProjection ? (
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[10px] uppercase tracking-widest font-bold text-indigo-300">
+                  <a
+                    href={playerIndexCalcUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] uppercase tracking-widest font-bold text-indigo-300 hover:text-indigo-200 underline-offset-2 hover:underline"
+                  >
                     Player Index <span className="line-through opacity-70 ml-1">${pricing.playerIndexPrice.toFixed(2)}</span>
-                  </span>
+                  </a>
                   {pricing.discountPercent > 0 && (
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-950/70 text-indigo-200 border border-indigo-700/70">
                       {pricing.discountPercent.toFixed(0)}% off
@@ -191,9 +206,9 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
                     ${pricing.effectiveStorePrice.toFixed(2)}
                   </span>
                   {(item as any).trend_data && Array.isArray((item as any).trend_data) && (item as any).trend_data.length > 0 && (
-                    <MarketSparkline 
-                       data={(item as any).trend_data} 
-                       playerIndexUrl={(item as any).player_index_url || '#'} 
+                    <MarketSparkline
+                       data={(item as any).trend_data}
+                       playerIndexUrl={playerIndexCalcUrl}
                     />
                   )}
                 </div>
@@ -218,9 +233,9 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
                     ${p(item.listed_price ?? item.avg_price).toFixed(2)}
                   </span>
                   {(item as any).trend_data && Array.isArray((item as any).trend_data) && (item as any).trend_data.length > 0 && (
-                    <MarketSparkline 
-                       data={(item as any).trend_data} 
-                       playerIndexUrl={(item as any).player_index_url || '#'} 
+                    <MarketSparkline
+                       data={(item as any).trend_data}
+                       playerIndexUrl={playerIndexCalcUrl}
                     />
                   )}
                 </div>

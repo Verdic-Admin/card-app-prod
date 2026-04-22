@@ -954,35 +954,67 @@ export async function placeBidAction(itemId: string, bidderEmail: string, bidAmo
   return { success: true };
 }
 
-export async function updateStagedAuction(itemId: string, formData: FormData) {
+export type UpdateStagedAuctionResult = {
+  success: true;
+  coined_image_url: string | null;
+};
+
+export async function updateStagedAuction(
+  itemId: string,
+  formData: FormData,
+): Promise<UpdateStagedAuctionResult> {
   await checkAuth();
-    
+
   const reservePrice = formData.get('reservePrice') as string;
   const endTime = formData.get('endTime') as string;
   const description = formData.get('description') as string;
-  const file = formData.get('coinedImage') as File;
-  
-  if (reservePrice) await pool.query(`UPDATE inventory SET auction_reserve_price = $1 WHERE id = $2`, [Number(reservePrice), itemId]);
-  if (endTime) await pool.query(`UPDATE inventory SET auction_end_time = $1 WHERE id = $2`, [endTime, itemId]);
-  if (description) await pool.query(`UPDATE inventory SET auction_description = $1 WHERE id = $2`, [description, itemId]);
-  
-  if (file && file.size > 0) {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `auction-coin-${Date.now()}.${fileExt}`;
-    const blob = await put(`card-images/${fileName}`, file, { access: 'public' });
-    await pool.query(`UPDATE inventory SET coined_image_url = $1 WHERE id = $2`, [blob.url, itemId]);
+  const file = formData.get('coinedImage') as File | null;
+
+  if (reservePrice) {
+    await pool.query(`UPDATE inventory SET auction_reserve_price = $1 WHERE id = $2::uuid`, [
+      Number(reservePrice),
+      itemId,
+    ]);
   }
-  
-  revalidatePath('/admin')
+  if (endTime) {
+    await pool.query(`UPDATE inventory SET auction_end_time = $1 WHERE id = $2::uuid`, [endTime, itemId]);
+  }
+  if (description) {
+    await pool.query(`UPDATE inventory SET auction_description = $1 WHERE id = $2::uuid`, [
+      description,
+      itemId,
+    ]);
+  }
+
+  if (file && typeof (file as File).size === 'number' && (file as File).size > 0) {
+    const fileExt = (file as File).name.split('.').pop();
+    const fileName = `auction-coin-${Date.now()}.${fileExt}`;
+    const blob = await put(`card-images/${fileName}`, file as File, { access: 'public' });
+    await pool.query(`UPDATE inventory SET coined_image_url = $1 WHERE id = $2::uuid`, [
+      blob.url,
+      itemId,
+    ]);
+  }
+
+  revalidatePath('/admin');
+  revalidatePath('/admin/auction-studio');
+  revalidatePath('/auction');
+
+  const { rows } = await pool.query<{ coined_image_url: string | null }>(
+    `SELECT coined_image_url FROM inventory WHERE id = $1::uuid`,
+    [itemId],
+  );
+  return { success: true, coined_image_url: rows[0]?.coined_image_url ?? null };
 }
 
 export async function goLiveWithAuctions(itemIds: string[]) {
   await checkAuth();
-    if (itemIds.length > 0) {
+  if (itemIds.length > 0) {
     await pool.query(`UPDATE inventory SET auction_status = 'live' WHERE id = ANY($1::uuid[])`, [itemIds]);
   }
-  revalidatePath('/admin')
-  revalidatePath('/auction')
+  revalidatePath('/admin');
+  revalidatePath('/admin/auction-studio');
+  revalidatePath('/auction');
 }
 
 export async function generateBatchCodes(ids: string[]) {

@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { price } from '@/utils/math'
-import { ChevronLeft, ChevronRight, Radio, Loader2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
+import { buildPlayerIndexForecasterUrl } from '@/lib/player-index-deeplink'
 
 interface Item {
   id: string
@@ -12,6 +13,11 @@ interface Item {
   video_url?: string
   player_name: string
   card_set: string
+  card_number?: string | null
+  insert_name?: string | null
+  parallel_name?: string | null
+  parallel_insert_type?: string | null
+  print_run?: string | null
   current_bid: number
   listed_price: number
   bidder_count: number
@@ -38,7 +44,6 @@ function slidesForItem(item: Item): Slide[] {
 export function LiveAuctionGrid({ initialItems }: { initialItems: Item[] }) {
   const [items, setItems] = useState<Item[]>(initialItems)
   const [slideById, setSlideById] = useState<Record<string, number>>({})
-  const [macroLoadingId, setMacroLoadingId] = useState<string | null>(null)
 
   const setSlide = useCallback((id: string, slides: Slide[], next: number) => {
     const len = slides.length
@@ -72,28 +77,6 @@ export function LiveAuctionGrid({ initialItems }: { initialItems: Item[] }) {
     }, 3000)
     return () => clearInterval(interval)
   }, [])
-
-  const handleMacro = async (item: Item) => {
-    setMacroLoadingId(item.id)
-    try {
-      const { getLiveAuctionBroadcastMacro } = await import('@/app/actions/inventory')
-      const res = await getLiveAuctionBroadcastMacro(item.id)
-      if (!res.success) {
-        alert(res.error)
-        return
-      }
-      try {
-        await navigator.clipboard.writeText(res.text)
-        alert(`${res.text}\n\n(Copied to clipboard.)`)
-      } catch {
-        alert(res.text)
-      }
-    } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : String(e))
-    } finally {
-      setMacroLoadingId(null)
-    }
-  }
 
   return (
     <>
@@ -172,13 +155,19 @@ export function LiveAuctionGrid({ initialItems }: { initialItems: Item[] }) {
 
                 {(item.oracle_projection != null && Number(item.oracle_projection) > 0) ||
                 item.oracle_trend_percentage != null ? (
-                  <div className="mt-2 mb-2 rounded-lg border border-indigo-800/60 bg-indigo-950/40 px-2.5 py-2">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-indigo-300 mb-1">
-                      Player Index (on card)
+                  <a
+                    href={buildPlayerIndexForecasterUrl(item)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 mb-2 block rounded-lg border border-indigo-700/50 bg-indigo-950/50 px-2.5 py-2 hover:bg-indigo-900/50 transition-colors"
+                  >
+                    <div className="text-[10px] font-black uppercase tracking-widest text-indigo-200 mb-1 flex items-center justify-between gap-1">
+                      <span>Player Index</span>
+                      <ExternalLink className="w-3 h-3 shrink-0 opacity-80" aria-hidden />
                     </div>
                     {item.oracle_projection != null && Number(item.oracle_projection) > 0 && (
-                      <div className="text-xs text-indigo-100 font-bold">
-                        Fair marker: ${price(item.oracle_projection).toFixed(2)}
+                      <div className="text-xs text-indigo-50 font-bold">
+                        Store fair marker: ${price(item.oracle_projection).toFixed(2)}
                       </div>
                     )}
                     {item.oracle_trend_percentage != null && (
@@ -189,7 +178,11 @@ export function LiveAuctionGrid({ initialItems }: { initialItems: Item[] }) {
                         {Math.abs(price(item.oracle_trend_percentage)).toFixed(1)}%
                       </div>
                     )}
-                  </div>
+                    <p className="text-[10px] text-indigo-300/90 mt-1.5 leading-snug">
+                      Open on Player Index to see the live projected value and run the calculator with this
+                      card&apos;s details.
+                    </p>
+                  </a>
                 ) : null}
 
                 {(item.is_rookie || item.is_auto || item.is_relic || (item.grading_company && item.grade)) && (
@@ -226,19 +219,15 @@ export function LiveAuctionGrid({ initialItems }: { initialItems: Item[] }) {
                   )}
                 </div>
 
-                <button
-                  type="button"
-                  disabled={macroLoadingId === item.id}
-                  onClick={() => handleMacro(item)}
-                  className="w-full mb-2 flex items-center justify-center gap-2 text-[11px] font-black uppercase tracking-widest py-2 rounded-lg border border-indigo-500/50 bg-indigo-950/50 text-indigo-200 hover:bg-indigo-900/60 transition-colors disabled:opacity-50"
+                <a
+                  href={buildPlayerIndexForecasterUrl(item)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full mb-2 flex items-center justify-center gap-2 text-[11px] font-black uppercase tracking-widest py-2 rounded-lg border border-indigo-500/50 bg-indigo-950/50 text-indigo-100 hover:bg-indigo-900/60 transition-colors"
                 >
-                  {macroLoadingId === item.id ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Radio className="w-3.5 h-3.5" />
-                  )}
-                  Player Index macro (copy)
-                </button>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Run on Player Index
+                </a>
 
                 <div className="grid grid-cols-2 gap-2 mt-2">
                   <button
