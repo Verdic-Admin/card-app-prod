@@ -32,6 +32,8 @@ interface EditCardPayload {
   listed_price?: number;
 }
 
+export type EditCardActionResult = { success: true; patch: Record<string, unknown> };
+
 interface SoldStatusPayload {
   status: string;
   sold_at: string | null;
@@ -391,16 +393,83 @@ export async function toggleCardStatus(id: string, currentStatus: string) {
   revalidatePath('/sold')
 }
 
-export async function editCardAction(id: string, payload: EditCardPayload) {
+export async function editCardAction(id: string, payload: EditCardPayload): Promise<EditCardActionResult> {
   await checkAuth();
 
-    
-  // Manual generic update for now (or loop over keys)
-  if(payload.listed_price) await pool.query(`UPDATE inventory SET listed_price = $1 WHERE id = $2`, [payload.listed_price, id]);
+  const p = payload as Record<string, unknown>;
+  if (!('listed_price' in p)) {
+    revalidatePath('/');
+    revalidatePath('/admin');
+    revalidatePath('/sold');
+    return { success: true, patch: {} };
+  }
 
-  revalidatePath('/')
-  revalidatePath('/admin')
-  revalidatePath('/sold')
+  const newListed = parseFloat(String(p.listed_price ?? ''));
+  if (!Number.isFinite(newListed) || newListed < 0) {
+    revalidatePath('/');
+    revalidatePath('/admin');
+    revalidatePath('/sold');
+    return { success: true, patch: {} };
+  }
+
+  const { rows } = await pool.query(
+    `SELECT oracle_projection FROM inventory WHERE id = $1::uuid`,
+    [id],
+  );
+  const oracleRaw = rows[0]?.oracle_projection;
+  const oracle =
+    oracleRaw != null && String(oracleRaw).trim() !== ''
+      ? parseFloat(String(oracleRaw).replace(/,/g, ''))
+      : NaN;
+
+  let discountRate = 0;
+  try {
+    const { rows: dr } = await pool.query(
+      `SELECT oracle_discount_percentage FROM store_settings WHERE id = 1`,
+    );
+    discountRate = parseFloat(String(dr?.[0]?.oracle_discount_percentage ?? 0)) || 0;
+  } catch {
+    discountRate = 0;
+  }
+
+  const hasOracle = Number.isFinite(oracle) && oracle > 0;
+  const expectedStore = hasOracle ? oracle * (1 - discountRate / 100) : null;
+  const manualBreak =
+    hasOracle && expectedStore != null && Math.abs(newListed - expectedStore) > 0.01;
+
+  if (manualBreak) {
+    await pool.query(
+      `UPDATE inventory SET
+         listed_price = $1,
+         oracle_projection = NULL,
+         market_price = NULL,
+         oracle_trend_percentage = NULL,
+         trend_data = NULL,
+         player_index_url = NULL
+       WHERE id = $2::uuid`,
+      [newListed, id],
+    );
+    revalidatePath('/');
+    revalidatePath('/admin');
+    revalidatePath('/sold');
+    return {
+      success: true,
+      patch: {
+        listed_price: newListed,
+        oracle_projection: null,
+        market_price: null,
+        oracle_trend_percentage: null,
+        trend_data: null,
+        player_index_url: null,
+      },
+    };
+  }
+
+  await pool.query(`UPDATE inventory SET listed_price = $1 WHERE id = $2::uuid`, [newListed, id]);
+  revalidatePath('/');
+  revalidatePath('/admin');
+  revalidatePath('/sold');
+  return { success: true, patch: { listed_price: newListed } };
 }
 
 export type DuplicateInventoryItemResult =

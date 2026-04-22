@@ -292,8 +292,12 @@ export function InventoryTable({ initialItems, discountRate = 0, projectionTimef
           payload.cost_basis = parseFloat(payload.cost_basis as any) || 0;
       }
       
-      await editCardAction(id, payload)
-      setItems(items.map(i => i.id === id ? { ...i, ...payload } : i))
+      const editRes = await editCardAction(id, payload)
+      setItems(
+        items.map((i) =>
+          i.id === id ? { ...i, ...payload, ...(editRes?.patch ?? {}) } : i,
+        ),
+      )
       setEditingId(null)
     } catch (err: any) {
       setErrorId(id)
@@ -1362,7 +1366,12 @@ export function InventoryTable({ initialItems, discountRate = 0, projectionTimef
                               const val = parseFloat(e.target.value);
                               const currentVal = pricing.effectiveStorePrice;
                               if (!isNaN(val) && val !== currentVal) {
-                                 await editCardAction(item.id, { listed_price: val });
+                                const editRes = await editCardAction(item.id, { listed_price: val });
+                                setItems((prev) =>
+                                  prev.map((row) =>
+                                    row.id === item.id ? { ...row, ...(editRes?.patch ?? {}) } : row,
+                                  ),
+                                );
                               }
                           }}
                           onKeyDown={(e) => {
