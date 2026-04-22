@@ -5,13 +5,25 @@ import { PLAYER_INDEX_BILLING_URL } from '@/lib/player-index-urls';
 import { getOracleGatewayBaseUrl } from '@/lib/oracle-gateway-url';
 
 async function CreditsInner() {
-  const base = await getOracleGatewayBaseUrl();
-  const res = await submitOracleRequest(`${base}/account/balance`);
-  const data = res.success && res.data ? (res.data as Record<string, unknown>) : null;
-  const exempt = data?.billing_exempt === true;
-  const balance =
-    res.success && data != null && !exempt ? Number(data.token_balance ?? 0) : null;
-  const showUnavailable = !res.success || data == null || (!exempt && balance === null);
+  let exempt = false;
+  let balance: number | null = null;
+  let showUnavailable = true;
+
+  try {
+    const base = await getOracleGatewayBaseUrl();
+    const res = await submitOracleRequest(`${base}/account/balance`);
+    const data = res.success && res.data ? (res.data as Record<string, unknown>) : null;
+    exempt = data?.billing_exempt === true;
+    balance =
+      res.success && data != null && !exempt ? Number(data.token_balance ?? 0) : null;
+    showUnavailable = !res.success || data == null || (!exempt && balance === null);
+  } catch (error) {
+    // Never let this status banner break /admin route rendering.
+    console.error('[AdminApiCreditsStrip] failed to render credits:', error);
+    exempt = false;
+    balance = null;
+    showUnavailable = true;
+  }
 
   return (
     <div className="border-b border-border bg-surface/90 backdrop-blur-sm">
