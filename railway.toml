@@ -3,9 +3,11 @@ builder = "nixpacks"
 buildCommand = "npm run build"
 
 [deploy]
-startCommand = "node init_db.js && sh -c 'set -a; [ -f /tmp/shop-oracle.env ] && . /tmp/shop-oracle.env; set +a; exec npm run start'"
-healthcheckPath = "/"
-healthcheckTimeout = 120
+# Sourcing the ephemeral file must not fail the whole start (use || true on source).
+# Health uses /api/health so checks do not wait on the home page (DB + RSC).
+startCommand = "node init_db.js && sh -c 'set -a; ( [ -f /tmp/shop-oracle.env ] && . /tmp/shop-oracle.env ) || true; set +a; exec npm run start'"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 300
 restartPolicyType = "on_failure"
 
 [deploy.environmentVariables]

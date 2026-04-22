@@ -131,6 +131,8 @@ async function init() {
 
   const client = new Client({ connectionString, connectionTimeoutMillis: 10_000 });
   await client.connect();
+  // Avoid hanging Railway deploy if another session holds a lock; keep init bounded.
+  await client.query("SET statement_timeout = '60s'");
 
   console.log('Connected to Postgres. Initializing schema...');
 
