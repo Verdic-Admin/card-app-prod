@@ -5,11 +5,27 @@ interface MarketSparklineProps {
   playerIndexUrl: string;
 }
 
+/** `new URL()` throws on relative paths, bare hostnames, or many pasted values — that crashed the whole page. */
+function safeHttpUrl(href: string | undefined | null): URL | null {
+  const t = (href ?? '').trim();
+  if (!t || t === '#') return null;
+  try {
+    const u = new URL(t);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+    return u;
+  } catch {
+    return null;
+  }
+}
+
 export function MarketSparkline({ data, playerIndexUrl }: MarketSparklineProps) {
-  if (!data || data.length < 2) return null;
+  const nums = Array.isArray(data)
+    ? data.map((v) => Number(v)).filter((n) => Number.isFinite(n))
+    : [];
+  if (nums.length < 2) return null;
 
   const shopId = process.env.NEXT_PUBLIC_SHOP_ID || 'IndependentStore';
-  const urlObj = playerIndexUrl !== '#' ? new URL(playerIndexUrl) : null;
+  const urlObj = safeHttpUrl(playerIndexUrl);
   if (urlObj) {
     urlObj.searchParams.set('ref_name', shopId);
   }
@@ -18,18 +34,18 @@ export function MarketSparkline({ data, playerIndexUrl }: MarketSparklineProps) 
   const width = 60;
   const height = 20;
 
-  const min = Math.min(...data);
-  const max = Math.max(...data);
+  const min = Math.min(...nums);
+  const max = Math.max(...nums);
   const range = max - min || 1;
 
   // points logic mapping array indices to x,y coords
-  const points = data.map((val, i) => {
-    const x = (i / (data.length - 1)) * width;
+  const points = nums.map((val, i) => {
+    const x = (i / (nums.length - 1)) * width;
     const y = height - ((val - min) / range) * height;
     return `${x},${y}`;
   }).join(' ');
 
-  const isUp = data[data.length - 1] >= data[data.length - 2];
+  const isUp = nums[nums.length - 1] >= nums[nums.length - 2];
   const color = isUp ? '#10b981' : '#ef4444'; // emerald-500 : red-500
 
   return (
