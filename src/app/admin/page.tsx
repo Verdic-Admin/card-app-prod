@@ -9,8 +9,21 @@ import { AuctionManager } from '@/components/admin/AuctionManager'
 
 import Link from 'next/link'
 import { InstructionTrigger } from '@/components/admin/DraggableGuide'
+import { price } from '@/utils/math'
 
 export const dynamic = 'force-dynamic'
+
+function normalizeInventoryMoneyFields<T extends Record<string, unknown>>(row: T): T {
+  return {
+    ...row,
+    listed_price: row.listed_price == null ? null : price(row.listed_price),
+    avg_price: row.avg_price == null ? null : price(row.avg_price),
+    cost_basis: row.cost_basis == null ? null : price(row.cost_basis),
+    current_bid: row.current_bid == null ? null : price(row.current_bid),
+    oracle_projection: row.oracle_projection == null ? null : price(row.oracle_projection),
+    oracle_trend_percentage: row.oracle_trend_percentage == null ? null : price(row.oracle_trend_percentage),
+  };
+}
 
 /** Pull a readable message off an unknown error. Next.js strips thrown messages in prod,
  *  so we render this text in a banner instead of letting the digest hide it. */
@@ -27,7 +40,7 @@ export default async function AdminPage() {
   let inventoryError: string | null = null;
   try {
     const { rows } = await pool.query(`SELECT * FROM inventory ORDER BY player_name ASC`);
-    inventory = rows as any[];
+    inventory = (rows as Record<string, unknown>[]).map(normalizeInventoryMoneyFields) as any[];
   } catch (e) {
     inventoryError = errorMessage(e);
     console.error('[admin] inventory query failed:', e);

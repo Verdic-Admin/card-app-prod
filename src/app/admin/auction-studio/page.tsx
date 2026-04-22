@@ -3,12 +3,27 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { LiveAuctionStudio } from '@/components/admin/LiveAuctionStudio'
 import { InstructionTrigger } from '@/components/admin/DraggableGuide'
+import { price } from '@/utils/math'
 
 
 export const dynamic = 'force-dynamic'
 
+function normalizeInventoryMoneyFields<T extends Record<string, unknown>>(row: T): T {
+  return {
+    ...row,
+    listed_price: row.listed_price == null ? null : price(row.listed_price),
+    avg_price: row.avg_price == null ? null : price(row.avg_price),
+    cost_basis: row.cost_basis == null ? null : price(row.cost_basis),
+    current_bid: row.current_bid == null ? null : price(row.current_bid),
+    auction_reserve_price: row.auction_reserve_price == null ? null : price(row.auction_reserve_price),
+    oracle_projection: row.oracle_projection == null ? null : price(row.oracle_projection),
+    oracle_trend_percentage: row.oracle_trend_percentage == null ? null : price(row.oracle_trend_percentage),
+  };
+}
+
 export default async function AuctionStudioPage() {
-  const { rows: inventory } = await pool.query(`SELECT * FROM inventory ORDER BY player_name ASC`);
+  const { rows } = await pool.query(`SELECT * FROM inventory ORDER BY player_name ASC`);
+  const inventory = (rows as Record<string, unknown>[]).map(normalizeInventoryMoneyFields);
 
   // Fetch Oracle discount percentage and stream settings
   const { rows: storeRows } = await pool.query(`SELECT live_stream_url, projection_timeframe FROM store_settings WHERE id = 1`);

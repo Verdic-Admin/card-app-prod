@@ -4,6 +4,7 @@ import { Hero } from "@/components/Hero";
 import { CardGrid } from "@/components/CardGrid";
 import { StoreFilters } from "@/components/StoreFilters";
 import { getStoreSettings } from "@/app/actions/settings";
+import Link from "next/link";
 
 /**
  * Normalise an env var that may have been pasted with a leading ` =` prefix
@@ -159,6 +160,11 @@ export default async function Home(props: { searchParams: Promise<{ [key: string
               Check back shortly as we go live with our first batch of premium cards!
             </p>
           </div>
+          <div className="pt-8">
+            <Link href="/admin" className="text-sm text-muted hover:text-foreground underline underline-offset-4">
+              admin
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -188,6 +194,11 @@ export default async function Home(props: { searchParams: Promise<{ [key: string
             <CardGrid items={items || []} emptyMessage="Zero cards match those filters. Try clearing your search!" />
           )}
         </div>
+      </div>
+      <div className="pb-8 text-center">
+        <Link href="/admin" className="text-sm text-muted hover:text-foreground underline underline-offset-4">
+          admin
+        </Link>
       </div>
     </div>
   );

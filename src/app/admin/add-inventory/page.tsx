@@ -6,6 +6,7 @@ import { Upload, Crop, RefreshCcw, Sparkles, Image as ImageIcon, CheckCircle2, A
 import { BulkIngestionWizard } from '@/components/admin/BulkIngestionWizard';
 import { uploadAssetAction, addCardAction } from '@/app/actions/inventory';
 import { identifyCardPair } from '@/app/actions/visionSync';
+import { price } from '@/utils/math';
 
 type StagedSingle = {
   id: string;
@@ -343,7 +344,7 @@ export default function AddInventoryPage() {
                     <h3 className="text-xl font-bold text-foreground">Card Details</h3>
                     <div className="text-right">
                       <p className="text-xs font-bold text-muted uppercase tracking-widest mb-1">Market Value</p>
-                      <p className="text-2xl font-black text-emerald-500">${single.data.avg_price.toFixed(2)}</p>
+                      <p className="text-2xl font-black text-emerald-500">${price(single.data.avg_price).toFixed(2)}</p>
                     </div>
                   </div>
 

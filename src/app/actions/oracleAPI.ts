@@ -6,7 +6,17 @@ import { getShopOracleApiKey } from '@/lib/shop-oracle-credentials';
 export async function submitOracleRequest(url: string, options: RequestInit = {}) {
   const headers = new Headers(options.headers || {});
 
-  const apiKey = await getShopOracleApiKey();
+  let apiKey = '';
+  try {
+    apiKey = await getShopOracleApiKey();
+  } catch (error) {
+    console.error('[oracleAPI] failed to resolve API key:', error);
+    return {
+      error: 'api_failed',
+      status: 500,
+      statusText: 'Failed to load store credentials.',
+    };
+  }
 
   if (!apiKey) {
     return {
@@ -22,10 +32,20 @@ export async function submitOracleRequest(url: string, options: RequestInit = {}
     headers.set("Content-Type", "application/json");
   }
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+    });
+  } catch (error) {
+    console.error('[oracleAPI] request failed:', error);
+    return {
+      error: 'api_failed',
+      status: 503,
+      statusText: 'Oracle gateway unavailable.',
+    };
+  }
 
   if (response.status === 402) {
     return { error: 'credits_exhausted' };
