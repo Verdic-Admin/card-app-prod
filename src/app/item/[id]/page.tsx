@@ -11,8 +11,20 @@ import { getStoreSettings } from '@/app/actions/settings'
 import { deriveDisplayPricing } from '@/utils/pricing'
 import { buildPlayerIndexForecasterUrl } from '@/lib/player-index-deeplink'
 import { PlayerIndexForecastLink } from '@/components/PlayerIndexForecastLink'
+import { getAppOrigin } from '@/utils/app-origin'
 
 type PageProps = { params: Promise<{ id: string }> }
+
+/** Facebook / iMessage / Discord crawlers need absolute `og:image` URLs. */
+function absoluteOgImageUrl(url: string | null | undefined): string | undefined {
+  if (url == null || typeof url !== 'string') return undefined
+  const t = url.trim()
+  if (!t) return undefined
+  if (/^https?:\/\//i.test(t)) return t
+  const base = getAppOrigin()
+  if (!base) return undefined
+  return t.startsWith('/') ? `${base.replace(/\/$/, '')}${t}` : `${base.replace(/\/$/, '')}/${t}`
+}
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params
@@ -42,20 +54,34 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     ? descriptionParts.join(' · ') 
     : 'View this card and more on our zero-fee storefront.'
 
+  const absImage = absoluteOgImageUrl(item.image_url)
+  const origin = getAppOrigin()
+  const pageUrl = origin ? `${origin.replace(/\/$/, '')}/item/${id}` : undefined
+
   return {
     title,
     description,
     openGraph: {
       title,
       description,
-      images: item.image_url ? [item.image_url] : [],
       type: 'website',
+      ...(pageUrl ? { url: pageUrl } : {}),
+      ...(absImage
+        ? {
+            images: [
+              {
+                url: absImage,
+                alt: `${item.player_name} — card photo`,
+              },
+            ],
+          }
+        : {}),
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description,
-      images: item.image_url ? [item.image_url] : [],
+      ...(absImage ? { images: [absImage] } : {}),
     },
   }
 }

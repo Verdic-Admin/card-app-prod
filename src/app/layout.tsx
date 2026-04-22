@@ -8,6 +8,7 @@ import { CartProvider } from "@/context/CartContext";
 import { CartDrawer } from "@/components/CartDrawer";
 import { FloatingCart } from "@/components/FloatingCart";
 import { getStoreSettings } from "@/app/actions/settings";
+import { getAppOrigin } from "@/utils/app-origin";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -19,7 +20,10 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const siteOrigin = getAppOrigin();
+
 export const metadata: Metadata = {
+  ...(siteOrigin ? { metadataBase: new URL(siteOrigin) } : {}),
   title: "The Gap Sportscards",
   description: "Zero-fee sports card storefront — buy, sell and trade cards.",
   manifest: "/manifest.json",
