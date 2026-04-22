@@ -1,6 +1,7 @@
 import pool from '@/utils/db';
 import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
+import { price } from '@/utils/math';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,8 +30,8 @@ export async function GET(request: Request) {
     let failedCount = 0;
 
     for (const item of expiredItems) {
-       const reserve = item.auction_reserve_price || 0;
-       const bid = item.current_bid || 0;
+       const reserve = price(item.auction_reserve_price);
+       const bid = price(item.current_bid);
 
        if (bid >= reserve) {
           // Reserve met

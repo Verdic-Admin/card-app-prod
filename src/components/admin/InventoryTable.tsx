@@ -5,6 +5,7 @@ import { Database } from '@/types/database.types'
 import { toggleCardStatus, editCardAction, deleteCardAction, bulkDeleteCardsAction, bulkUpdateMetricsAction, rotateCardImageAction, sendToAuctionBlock, removeFromAuctionBlock, setAuctionStatus, updateLiveStreamUrl, updateProjectionTimeframe, createLotAction, breakLotAction, updateLotChildren } from '@/app/actions/inventory'
 import { syncSingleItemWithOracle, syncInventoryWithOracle, applyOracleDiscount, applyOracleDiscountAll, applyCorrection, approvePriceOnly, denyCorrection } from '@/app/actions/oracleSync'
 import { Loader2, Trash2, Edit2, Check, X, Search, Download, RotateCw, RefreshCw, DollarSign, Save, AlertCircle, Gavel, Tv, Radio, Package } from 'lucide-react'
+import { price } from '@/utils/math'
 
 type InventoryItem = Database['public']['Tables']['inventory']['Row']
 
@@ -797,7 +798,7 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                           )}
                         </td>
                         <td className="px-5 py-3 font-mono font-bold text-slate-700">
-                          ${c.projected_target.toFixed(2)}
+                          ${price(c.projected_target).toFixed(2)}
                         </td>
                         <td className="px-5 py-3 text-right space-x-2">
                           <button 
@@ -955,7 +956,7 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                         </div>
                       </td>
                       <td className="px-4 py-3 font-mono font-black text-cyan-400 text-sm">
-                        ${(item.current_bid || item.listed_price || 0).toFixed(2)}
+                        ${price(item.current_bid || item.listed_price).toFixed(2)}
                       </td>
                       <td className="px-4 py-3">
                         <span className={`text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-wider ${
@@ -1288,17 +1289,17 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-[10px] font-bold text-purple-700 uppercase tracking-wider flex items-center gap-1">🔮 Player Index Value</span>
                         {(item as any).oracle_trend_percentage != null && (
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${(item as any).oracle_trend_percentage >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                            {(item as any).oracle_trend_percentage >= 0 ? '↑' : '↓'} {Math.abs((item as any).oracle_trend_percentage).toFixed(1)}%
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${price((item as any).oracle_trend_percentage) >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                            {price((item as any).oracle_trend_percentage) >= 0 ? '↑' : '↓'} {Math.abs(price((item as any).oracle_trend_percentage)).toFixed(1)}%
                           </span>
                         )}
                       </div>
                       <div className="flex items-baseline gap-2">
-                        <span className="text-sm font-black text-purple-900">${(item as any).oracle_projection.toFixed(2)}</span>
+                        <span className="text-sm font-black text-purple-900">${price((item as any).oracle_projection).toFixed(2)}</span>
                         <span className="text-[10px] text-purple-500 font-semibold">player index value</span>
                       </div>
-                      {item.listed_price && (item as any).oracle_projection > item.listed_price && (
-                        <div className="text-[10px] text-emerald-600 font-bold mt-0.5">Your price: ${item.listed_price.toFixed(2)} ({((1 - item.listed_price / (item as any).oracle_projection) * 100).toFixed(0)}% below)</div>
+                      {price(item.listed_price) > 0 && price((item as any).oracle_projection) > price(item.listed_price) && (
+                        <div className="text-[10px] text-emerald-600 font-bold mt-0.5">Your price: ${price(item.listed_price).toFixed(2)} ({((1 - price(item.listed_price) / price((item as any).oracle_projection)) * 100).toFixed(0)}% below)</div>
                       )}
                       <button
                         onClick={() => handleApplyOracleDiscount(item)}
@@ -1317,13 +1318,13 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                       <div className="relative flex items-center -ml-1">
                         <span className="absolute left-1 text-xl font-black text-slate-400 pointer-events-none">$</span>
                         <input
-                          key={`price-${item.id}-${item.listed_price ?? item.avg_price ?? 0}`}
+                          key={`price-${item.id}-${price(item.listed_price ?? item.avg_price)}`}
                           type="number"
                           step="0.01"
-                          defaultValue={(item.listed_price ?? item.avg_price ?? 0).toFixed(2)}
+                          defaultValue={price(item.listed_price ?? item.avg_price).toFixed(2)}
                           onBlur={async (e) => {
                               const val = parseFloat(e.target.value);
-                              const currentVal = Number(item.listed_price ?? item.avg_price ?? 0);
+                              const currentVal = price(item.listed_price ?? item.avg_price);
                               if (!isNaN(val) && val !== currentVal) {
                                  await editCardAction(item.id, { listed_price: val });
                               }
@@ -1334,7 +1335,7 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                           className="text-xl font-black text-slate-900 w-28 pl-5 py-0 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 outline-none transition-colors"
                         />
                       </div>
-                      {item.cost_basis != null && <div className="text-xs text-emerald-600 font-bold uppercase tracking-wider mt-1">Cost: ${item.cost_basis.toFixed(2)}</div>}
+                      {item.cost_basis != null && <div className="text-xs text-emerald-600 font-bold uppercase tracking-wider mt-1">Cost: ${price(item.cost_basis).toFixed(2)}</div>}
                       {item.accepts_offers && <div className="text-xs text-indigo-500 font-bold uppercase tracking-wider">Takes Offers</div>}
                     </div>
 

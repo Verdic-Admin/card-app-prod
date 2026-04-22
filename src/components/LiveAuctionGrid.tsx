@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { price } from '@/utils/math'
 
 interface Item {
   id: string;
@@ -97,7 +98,7 @@ export function LiveAuctionGrid({ initialItems }: { initialItems: Item[] }) {
               )}
               
               <div className="text-center font-mono font-black text-3xl text-cyan-400 bg-zinc-950 py-3 rounded-lg mb-2 shadow-inner border border-zinc-800 relative">
-                ${item.current_bid || item.listed_price || '0.00'}
+                ${price(item.current_bid || item.listed_price).toFixed(2)}
                 {item.bidder_count > 0 && (
                    <span className="absolute -top-3 -right-2 bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full shadow border border-red-400">
                       {item.bidder_count} Bids
