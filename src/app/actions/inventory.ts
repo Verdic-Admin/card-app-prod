@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache'
 import pool from '@/utils/db';
 import { put, del } from '@/utils/storage';
 import { hasShopOracleApiKey } from '@/lib/shop-oracle-credentials';
+import { calculatePricingAction } from '@/app/actions/oracleAPI';
+import { price } from '@/utils/math';
 
 interface BulkInventoryItem {
   player_name: string;
@@ -401,10 +403,97 @@ export async function editCardAction(id: string, payload: EditCardPayload) {
   revalidatePath('/sold')
 }
 
+export type DuplicateInventoryItemResult =
+  | { success: true; newItem: Record<string, unknown> }
+  | { success: false; error: string };
+
+/** Clone catalog + media + pricing into a new available row (new id). Not allowed for lot parents or lot children. */
+export async function duplicateInventoryItem(id: string): Promise<DuplicateInventoryItemResult> {
+  await checkAuth();
+
+  function errMessage(e: unknown): string {
+    if (e instanceof Error) return e.message;
+    if (typeof e === 'object' && e != null && 'message' in e) {
+      return String((e as { message: unknown }).message);
+    }
+    return String(e);
+  }
+
+  try {
+    const { rows: meta } = await pool.query<{ is_lot: boolean; lot_id: string | null }>(
+      `SELECT is_lot, lot_id FROM inventory WHERE id = $1::uuid`,
+      [id],
+    );
+    if (!meta.length) {
+      return { success: false, error: 'Item not found.' };
+    }
+    const m = meta[0];
+    if (m.lot_id) {
+      return {
+        success: false,
+        error: 'Cannot duplicate a card that is inside a bundle. Remove it from the lot first.',
+      };
+    }
+    if (m.is_lot) {
+      return {
+        success: false,
+        error: 'Cannot duplicate a bundle row. Break the lot or duplicate individual cards.',
+      };
+    }
+
+    const { rows } = await pool.query(
+      `
+      INSERT INTO inventory (
+        player_name, team_name, card_set, insert_name, parallel_name, parallel_insert_type, card_number, print_run,
+        high_price, low_price, avg_price, listed_price, market_price, cost_basis, accepts_offers,
+        is_lot, lot_id,
+        image_url, back_image_url, coined_image_url,
+        status, trend_data, player_index_url, oracle_projection, oracle_trend_percentage,
+        needs_correction, needs_price_approval,
+        sold_at, checkout_expires_at,
+        is_auction, auction_status, auction_reserve_price, auction_end_time, auction_description,
+        current_bid, bidder_count, verification_code,
+        video_url, is_verified_flip,
+        is_rookie, is_auto, is_relic, grading_company, grade,
+        filename
+      )
+      SELECT
+        player_name, team_name, card_set, insert_name, parallel_name, parallel_insert_type, card_number, print_run,
+        high_price, low_price, avg_price, listed_price, market_price, cost_basis, accepts_offers,
+        false, NULL,
+        image_url, back_image_url, coined_image_url,
+        'available', trend_data, player_index_url, oracle_projection, oracle_trend_percentage,
+        false, false,
+        NULL, NULL,
+        false, 'pending', NULL, NULL, NULL,
+        NULL, 0, NULL,
+        video_url, is_verified_flip,
+        is_rookie, is_auto, is_relic, grading_company, grade,
+        filename
+      FROM inventory WHERE id = $1::uuid
+      RETURNING *
+      `,
+      [id],
+    );
+
+    if (!rows.length) {
+      return { success: false, error: 'Duplicate failed (source row missing).' };
+    }
+
+    revalidatePath('/');
+    revalidatePath('/admin');
+    revalidatePath('/sold');
+
+    return { success: true, newItem: rows[0] as Record<string, unknown> };
+  } catch (e) {
+    return { success: false, error: errMessage(e) };
+  }
+}
+
 export async function deleteCardAction(id: string, imageUrl?: string | null) {
   await checkAuth();
 
-  
+
   if (imageUrl) {
     try {
       await del(imageUrl);
@@ -639,6 +728,126 @@ export async function stageAuctionItems(
     revalidatePath('/auction');
 
     return { success: true, count: items.length };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { success: false, error: msg };
+  }
+}
+
+export type LiveAuctionMacroResult =
+  | {
+      success: true;
+      text: string;
+      projection: number;
+      trend: number | null;
+      discountedFair: number;
+      currentBid: number;
+    }
+  | { success: false; error: string };
+
+/**
+ * Fetches a fresh Player Index valuation for a live auction card and returns
+ * copy-ready lines for stream / social broadcast (does not mutate inventory).
+ */
+export async function getLiveAuctionBroadcastMacro(
+  itemId: string,
+): Promise<LiveAuctionMacroResult> {
+  try {
+    if (!(await hasShopOracleApiKey())) {
+      return { success: false, error: 'Store Oracle API is not provisioned.' };
+    }
+
+    const { rows: settingsRows } = await pool.query(
+      `SELECT oracle_discount_percentage FROM store_settings WHERE id = 1`,
+    );
+    const discountRate = Number(settingsRows[0]?.oracle_discount_percentage ?? 0);
+
+    const { rows } = await pool.query(`SELECT * FROM inventory WHERE id = $1`, [itemId]);
+    const item = rows[0];
+    if (!item) return { success: false, error: 'Item not found.' };
+    if (!item.is_auction || item.auction_status !== 'live') {
+      return { success: false, error: 'Item is not a live auction listing.' };
+    }
+
+    const gradeStr =
+      item.grading_company && item.grade
+        ? `${item.grading_company} ${item.grade}`
+        : undefined;
+
+    const res = await calculatePricingAction({
+      player_name: String(item.player_name || ''),
+      card_set: String(item.card_set || ''),
+      insert_name: String(item.insert_name || 'Base'),
+      parallel_name: String(item.parallel_name || 'Base'),
+      card_number: String(item.card_number || ''),
+      print_run: item.print_run != null ? Number(item.print_run) : null,
+      is_rookie: Boolean(item.is_rookie),
+      is_auto: Boolean(item.is_auto),
+      is_relic: Boolean(item.is_relic),
+      grade: gradeStr,
+    });
+
+    if (!res || typeof res !== 'object' || !('success' in res) || !res.success) {
+      const exhausted =
+        res && typeof res === 'object' && 'error' in res && (res as { error?: string }).error === 'credits_exhausted';
+      return {
+        success: false,
+        error: exhausted ? 'Player Index credits exhausted.' : 'Unable to fetch Player Index macro for this card.',
+      };
+    }
+
+    const data = (res as { data?: Record<string, unknown> }).data || {};
+    const projection = Number(data.projected_target ?? data.target_price ?? 0);
+    if (!Number.isFinite(projection) || projection <= 0) {
+      return {
+        success: false,
+        error: 'Player Index did not return a fair value for this card.',
+      };
+    }
+
+    const trendRaw = data.trend_percentage;
+    const trend =
+      trendRaw != null && Number.isFinite(Number(trendRaw)) ? Number(trendRaw) : null;
+    const discountedFair = projection * (1 - Math.max(0, discountRate) / 100);
+    const currentBid = price(item.current_bid, 0);
+    const delta = discountedFair - currentBid;
+    let verdict: string;
+    if (currentBid <= 0) {
+      verdict =
+        'No bids yet — opening is still below the configured Player Index discount target.';
+    } else if (delta > 0.02) {
+      verdict = `Bid is about $${delta.toFixed(2)} under the discount target vs catalog (reads undervalued vs fair).`;
+    } else if (delta < -0.02) {
+      verdict = `Bid is about $${Math.abs(delta).toFixed(2)} over the discount target vs catalog (heated / above fair marker).`;
+    } else {
+      verdict = 'Bid is roughly on the discount target vs catalog.';
+    }
+
+    const header = `${String(item.player_name || '').trim()} — ${String(item.card_set || 'Unknown set').trim()}${item.card_number ? ` #${item.card_number}` : ''}`.trim();
+
+    const lines = [
+      header,
+      `Player Index catalog fair: $${projection.toFixed(2)}`,
+      discountRate > 0
+        ? `Configured storefront discount (${discountRate}% off PI): $${discountedFair.toFixed(2)}`
+        : null,
+      trend != null
+        ? `Catalog trend vs prior window: ${trend >= 0 ? '+' : ''}${trend.toFixed(1)}%`
+        : null,
+      currentBid > 0 ? `Live high bid: $${currentBid.toFixed(2)}` : 'Live high bid: (none yet)',
+      verdict,
+      '',
+      'Tap the macro button again after bids move to refresh this blurb.',
+    ].filter((line): line is string => Boolean(line));
+
+    return {
+      success: true,
+      text: lines.join('\n'),
+      projection,
+      trend,
+      discountedFair,
+      currentBid,
+    };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return { success: false, error: msg };

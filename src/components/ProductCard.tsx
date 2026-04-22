@@ -62,7 +62,7 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
            href={`/item/${item.id}`}
            className="relative aspect-[2.5/3.5] w-full bg-background perspective-1000 cursor-pointer block"
         >
-          {isAvailable && pricing.hasProjection && pricing.percentBelowPlayerIndex > 0 && (
+          {isAvailable && !isLiveAuction && pricing.hasProjection && pricing.percentBelowPlayerIndex > 0 && (
             <div className="absolute top-2 left-2 z-20 bg-indigo-900 text-indigo-300 text-xs px-2.5 py-1 rounded-full border border-indigo-700 font-bold shadow-[0_0_12px_rgba(79,70,229,0.4)] pointer-events-none flex items-center gap-1">
                🔥 {pricing.percentBelowPlayerIndex.toFixed(0)}% Below Player Index
             </div>
@@ -119,7 +119,7 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
           <span className="text-xs font-bold text-muted mt-1 uppercase tracking-widest">
             {item.card_set} • #{item.card_number}{(item as any).print_run ? ` / ${(item as any).print_run}` : ''}
           </span>
-          <div className="flex flex-wrap gap-2 mt-2 mb-4 flex-grow font-semibold">
+          <div className="flex flex-wrap gap-2 mt-2 mb-2 font-semibold">
             {item.insert_name && item.insert_name.toLowerCase() !== 'base' && (
               <span className="text-[10px] text-indigo-300 bg-indigo-900/40 border border-indigo-700/50 px-2 py-0.5 rounded-full uppercase tracking-wider">
                 {item.insert_name}
@@ -152,7 +152,24 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
           </div>
 
           <div className="flex flex-col mt-auto gap-3">
-            {pricing.hasProjection ? (
+            {isLiveAuction ? (
+              <div className="rounded-lg border border-amber-500/40 bg-amber-950/30 px-3 py-2.5">
+                <p className="text-[10px] font-black uppercase tracking-widest text-amber-300">
+                  Live on auction
+                </p>
+                {(item as any).current_bid != null && p((item as any).current_bid) > 0 && (
+                  <p className="text-sm text-white mt-1">
+                    Current high bid:{' '}
+                    <span className="font-mono font-black text-cyan-400">
+                      ${p((item as any).current_bid).toFixed(2)}
+                    </span>
+                  </p>
+                )}
+                <p className="text-[11px] text-zinc-400 mt-1 leading-snug">
+                  Store price is hidden while this card is on the live block — use Live Auctions to bid.
+                </p>
+              </div>
+            ) : pricing.hasProjection ? (
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-[10px] uppercase tracking-widest font-bold text-indigo-300">
@@ -192,13 +209,11 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
                 )}
               </div>
             ) : (
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">
-                    Store Price
+              <div className="space-y-1">
+                <div className="flex items-end gap-2 flex-wrap">
+                  <span className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 shrink-0">
+                    Store
                   </span>
-                </div>
-                <div className="flex items-end gap-2">
                   <span className="font-black text-3xl text-white tracking-tighter">
                     ${p(item.listed_price ?? item.avg_price).toFixed(2)}
                   </span>
@@ -209,8 +224,8 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
                     />
                   )}
                 </div>
-                <span className="text-[10px] font-semibold text-zinc-500 mt-0.5">
-                  Direct listing price
+                <span className="text-[10px] font-semibold text-zinc-500">
+                  Direct listing (no Player Index projection on file)
                 </span>
               </div>
             )}

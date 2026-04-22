@@ -25,8 +25,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     }
   }
 
+  const isLiveAuction = Boolean(item.is_auction) && item.auction_status === 'live'
   const displayPrice = p(item.listed_price ?? item.avg_price).toFixed(2)
-  const title = `${item.player_name} - ${item.card_set || ''} | $${displayPrice}`
+  const title = isLiveAuction
+    ? `${item.player_name} - ${item.card_set || ''} | Live Auction`
+    : `${item.player_name} - ${item.card_set || ''} | $${displayPrice}`
   
   let descriptionParts = []
   if (item.parallel_insert_type) descriptionParts.push(`Parallel/Insert: ${item.parallel_insert_type}`)
@@ -163,6 +166,7 @@ export default async function ItemPage({ params }: PageProps) {
     oracle_projection: (item as any).oracle_projection,
     oracle_discount_percentage: settings.oracle_discount_percentage,
   })
+  const isLiveAuction = Boolean((item as any).is_auction) && (item as any).auction_status === 'live'
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-20">
@@ -265,9 +269,30 @@ export default async function ItemPage({ params }: PageProps) {
             </div>
           )}
 
-          {/* Pricing */}
+          {/* Pricing — hidden for live auction so store price never conflicts with bidding */}
           <div className="border-t border-border pt-4">
-            {pricing.hasProjection ? (
+            {isLiveAuction ? (
+              <div className="rounded-xl border border-amber-500/40 bg-amber-950/30 px-4 py-4">
+                <p className="text-xs font-black uppercase tracking-widest text-amber-300">
+                  Live on auction
+                </p>
+                {p((item as any).current_bid) > 0 && (
+                  <p className="text-lg text-white mt-2">
+                    Current high bid:{' '}
+                    <span className="font-mono font-black text-cyan-400">
+                      ${p((item as any).current_bid).toFixed(2)}
+                    </span>
+                  </p>
+                )}
+                <p className="text-sm text-zinc-400 mt-2 leading-relaxed">
+                  This card is on the live block — storefront buy-now pricing is hidden. Open{' '}
+                  <Link href="/auction" className="text-amber-300 font-bold hover:underline">
+                    Live Auctions
+                  </Link>{' '}
+                  to place a bid.
+                </p>
+              </div>
+            ) : pricing.hasProjection ? (
               <div className="space-y-2">
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="text-[11px] uppercase tracking-widest text-indigo-300 font-bold">

@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { Database } from '@/types/database.types'
-import { toggleCardStatus, editCardAction, deleteCardAction, bulkDeleteCardsAction, bulkUpdateMetricsAction, rotateCardImageAction, sendToAuctionBlock, removeFromAuctionBlock, setAuctionStatus, updateProjectionTimeframe, createLotAction, breakLotAction, updateLotChildren } from '@/app/actions/inventory'
+import { toggleCardStatus, editCardAction, deleteCardAction, bulkDeleteCardsAction, bulkUpdateMetricsAction, rotateCardImageAction, sendToAuctionBlock, removeFromAuctionBlock, setAuctionStatus, updateProjectionTimeframe, createLotAction, breakLotAction, updateLotChildren, duplicateInventoryItem } from '@/app/actions/inventory'
 import { syncSingleItemWithOracle, syncInventoryWithOracle, applyOracleDiscount, applyOracleDiscountAll, applyCorrection, approvePriceOnly, denyCorrection } from '@/app/actions/oracleSync'
-import { Loader2, Trash2, Edit2, Check, X, Search, Download, RotateCw, RefreshCw, DollarSign, Save, AlertCircle, Gavel, Package, Share2 } from 'lucide-react'
+import { Loader2, Trash2, Edit2, Check, X, Search, Download, RotateCw, RefreshCw, DollarSign, Save, AlertCircle, Gavel, Package, Share2, CopyPlus } from 'lucide-react'
 import { price } from '@/utils/math'
 import { deriveDisplayPricing } from '@/utils/pricing'
 
@@ -138,6 +138,7 @@ export function InventoryTable({ initialItems, discountRate = 0, projectionTimef
   }
   const [editForm, setEditForm] = useState<Partial<InventoryItem>>({})
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -298,6 +299,23 @@ export function InventoryTable({ initialItems, discountRate = 0, projectionTimef
       setErrorId(id)
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const handleDuplicate = async (item: InventoryItem) => {
+    setDuplicatingId(item.id)
+    setErrorId(null)
+    try {
+      const result = await duplicateInventoryItem(item.id)
+      if (!result.success) {
+        alert(result.error)
+        return
+      }
+      setItems((prev) => [result.newItem as InventoryItem, ...prev])
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : String(e))
+    } finally {
+      setDuplicatingId(null)
     }
   }
 
@@ -1385,6 +1403,19 @@ export function InventoryTable({ initialItems, discountRate = 0, projectionTimef
                           title="Open & copy share link"
                         >
                           <Share2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDuplicate(item)}
+                          disabled={duplicatingId === item.id || Boolean((item as any).is_lot) || Boolean((item as any).lot_id)}
+                          className="text-violet-600 hover:text-violet-800 hover:bg-violet-100 bg-violet-50 h-7 w-7 rounded disabled:opacity-40 flex items-center justify-center transition-colors"
+                          title={
+                            (item as any).is_lot || (item as any).lot_id
+                              ? 'Duplicate is only for standalone cards (not bundles)'
+                              : 'Duplicate item'
+                          }
+                        >
+                          {duplicatingId === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CopyPlus className="w-3.5 h-3.5" />}
                         </button>
                         <button onClick={() => handleDelete(item.id, item.image_url)} disabled={isDeleting === item.id} className="text-red-600 hover:text-red-800 hover:bg-red-100 bg-red-50 h-7 w-7 rounded disabled:opacity-50 flex items-center justify-center transition-colors" title="Delete">
                           {isDeleting === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
