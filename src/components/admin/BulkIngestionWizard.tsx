@@ -24,6 +24,7 @@ import { InstructionTrigger } from '@/components/admin/DraggableGuide'
 interface StagingCard {
   id: string
   player_name: string
+  team_name: string
   card_set: string
   card_number: string
   insert_name: string
@@ -52,6 +53,7 @@ function rowToStagingCard(row: Record<string, unknown>): StagingCard {
   return {
     id: String(row.id),
     player_name:      String(row.player_name ?? ''),
+    team_name:        String(row.team_name ?? ''),
     card_set:         String(row.card_set ?? ''),
     card_number:      String(row.card_number ?? ''),
     insert_name:      String(row.insert_name ?? ''),
@@ -401,9 +403,13 @@ export function BulkIngestionWizard() {
           const aiStatus = confidence >= 0.85 ? 'High Confidence' : 'Manual Correction'
           const idx = updates.findIndex(c => c.id === card.id)
           if (idx !== -1) {
+            // Prefer AI team when non-empty; never overwrite a user-typed team with null.
+            const aiTeam = (res.team_name ?? '').trim()
+            const mergedTeam = aiTeam || updates[idx].team_name
             updates[idx] = {
               ...updates[idx],
               player_name:   res.player_name   || updates[idx].player_name,
+              team_name:     mergedTeam,
               card_set:      res.card_set       || updates[idx].card_set,
               card_number:   res.card_number    || updates[idx].card_number,
               insert_name:   res.insert_name    || updates[idx].insert_name,
@@ -412,13 +418,15 @@ export function BulkIngestionWizard() {
               confidence,
               ai_status: aiStatus,
             }
-            updateDraftCardAction(updates[idx].id, {
+            const dbPayload: Record<string, unknown> = {
               player_name:   updates[idx].player_name,
               card_set:      updates[idx].card_set,
               card_number:   updates[idx].card_number,
               insert_name:   updates[idx].insert_name,
               parallel_name: updates[idx].parallel_name,
-            }).catch(() => {})
+            }
+            if (aiTeam) dbPayload.team_name = aiTeam
+            updateDraftCardAction(updates[idx].id, dbPayload).catch(() => {})
           }
         } catch (e: any) {
           if (e.message === 'credits_exhausted') { creditsExhausted(); return }
@@ -793,6 +801,13 @@ export function BulkIngestionWizard() {
                         className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
                       />
                       <input
+                        value={card.team_name}
+                        onChange={e => updateField(card.id, 'team_name', e.target.value)}
+                        onBlur={e => saveField(card.id, 'team_name', e.target.value)}
+                        placeholder="Team"
+                        className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
+                      />
+                      <input
                         value={card.card_set}
                         onChange={e => updateField(card.id, 'card_set', e.target.value)}
                         onBlur={e => saveField(card.id, 'card_set', e.target.value)}
@@ -1052,6 +1067,7 @@ export function BulkIngestionWizard() {
                       <div className="grid grid-cols-2 gap-1.5">
                         {[
                           { field: 'player_name', placeholder: 'Player Name' },
+                          { field: 'team_name', placeholder: 'Team' },
                           { field: 'card_set', placeholder: 'Card Set' },
                           { field: 'card_number', placeholder: 'Card #' },
                           { field: 'insert_name', placeholder: 'Insert' },

@@ -46,7 +46,7 @@ function sqlText(v: unknown, fallback = ''): string {
 }
 
 const ALLOWED_COLUMNS = [
-  'player_name', 'card_set', 'card_number', 'insert_name',
+  'player_name', 'team_name', 'card_set', 'card_number', 'insert_name',
   'parallel_name', 'print_run', 'listed_price', 'market_price',
   'image_url', 'back_image_url',
   'is_rookie', 'is_auto', 'is_relic', 'grading_company', 'grade',
@@ -97,7 +97,7 @@ export async function stagePairedUploadAction(formData: FormData) {
   const { rows } = await pool.query(
     `INSERT INTO scan_staging (raw_front_url, raw_back_url, image_url, back_image_url)
      VALUES ($1, $2, NULL, NULL)
-     RETURNING id, player_name, card_set, card_number, insert_name,
+     RETURNING id, player_name, team_name, card_set, card_number, insert_name,
                parallel_name, print_run, raw_front_url, raw_back_url,
                image_url, back_image_url, listed_price, market_price,
                is_rookie, is_auto, is_relic, grading_company, grade`,
@@ -121,6 +121,7 @@ export async function stageSingleCardAction(formData: FormData) {
 export async function createDraftCardsAction(cards: any[]) {
   const payload = cards.map(c => ({
     player_name: c.player_name || '',
+    team_name: c.team_name || '',
     card_set: c.card_set || '',
     card_number: c.card_number || '',
     insert_name: c.insert_name || '',
@@ -141,10 +142,10 @@ export async function createDraftCardsAction(cards: any[]) {
   try {
      for (const item of payload) {
         const { rows } = await pool.query(`
-           INSERT INTO scan_staging (player_name, card_set, card_number, insert_name, parallel_name, print_run, image_url, back_image_url, listed_price, market_price, is_rookie, is_auto, is_relic, grading_company, grade)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-           RETURNING id, player_name, card_set, card_number, insert_name, parallel_name, print_run, image_url, back_image_url, listed_price, market_price, is_rookie, is_auto, is_relic, grading_company, grade
-        `, [item.player_name, item.card_set, item.card_number, item.insert_name, item.parallel_name, item.print_run, item.image_url, item.back_image_url, item.listed_price, item.market_price, item.is_rookie, item.is_auto, item.is_relic, item.grading_company, item.grade]);
+           INSERT INTO scan_staging (player_name, team_name, card_set, card_number, insert_name, parallel_name, print_run, image_url, back_image_url, listed_price, market_price, is_rookie, is_auto, is_relic, grading_company, grade)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+           RETURNING id, player_name, team_name, card_set, card_number, insert_name, parallel_name, print_run, image_url, back_image_url, listed_price, market_price, is_rookie, is_auto, is_relic, grading_company, grade
+        `, [item.player_name, item.team_name, item.card_set, item.card_number, item.insert_name, item.parallel_name, item.print_run, item.image_url, item.back_image_url, item.listed_price, item.market_price, item.is_rookie, item.is_auto, item.is_relic, item.grading_company, item.grade]);
         if (rows.length > 0) results.push(rows[0]);
      }
   } catch (error) {
@@ -158,7 +159,7 @@ export async function createDraftCardsAction(cards: any[]) {
 export async function listScanStagingAction() {
   await checkAuth();
   const { rows } = await pool.query(`
-    SELECT id, player_name, card_set, card_number, insert_name, parallel_name, print_run,
+    SELECT id, player_name, team_name, card_set, card_number, insert_name, parallel_name, print_run,
            raw_front_url, raw_back_url, image_url, back_image_url, listed_price, market_price,
            is_rookie, is_auto, is_relic, grading_company, grade
     FROM scan_staging
@@ -222,6 +223,7 @@ export async function promoteRawStagingToCroppedAction(ids: string[]) {
 export async function updateDraftCardAction(id: string, updates: any) {
   const payload: any = {}
   if (updates.player_name !== undefined) payload.player_name = updates.player_name
+  if (updates.team_name !== undefined) payload.team_name = updates.team_name == null ? '' : String(updates.team_name)
   if (updates.card_set !== undefined) payload.card_set = updates.card_set
   if (updates.card_number !== undefined) payload.card_number = updates.card_number
   if (updates.insert_name !== undefined) payload.insert_name = updates.insert_name
@@ -285,7 +287,7 @@ export async function publishDraftCardsAction(ids: string[]): Promise<PublishDra
   let staged: Record<string, unknown>[] = [];
   try {
     const { rows } = await pool.query(
-      `SELECT player_name, card_set, card_number, insert_name, parallel_name, print_run,
+      `SELECT player_name, team_name, card_set, card_number, insert_name, parallel_name, print_run,
               image_url, back_image_url, raw_front_url, raw_back_url,
               listed_price, market_price, is_rookie, is_auto, is_relic, grading_company, grade
        FROM scan_staging WHERE id = ANY($1::uuid[])`,
@@ -341,14 +343,15 @@ export async function publishDraftCardsAction(ids: string[]): Promise<PublishDra
       await client.query(
         `
              INSERT INTO inventory (
-               player_name, card_set, card_number, insert_name, parallel_name, parallel_insert_type,
+               player_name, team_name, card_set, card_number, insert_name, parallel_name, parallel_insert_type,
                print_run, image_url, back_image_url, listed_price, market_price,
                is_rookie, is_auto, is_relic, grading_company, grade, status
              )
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'available')
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, 'available')
           `,
         [
           sqlText(s.player_name),
+          sqlNullableText(s.team_name),
           sqlText(s.card_set),
           sqlText(s.card_number),
           sqlNullableText(s.insert_name),

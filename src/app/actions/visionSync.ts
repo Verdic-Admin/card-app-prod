@@ -85,6 +85,7 @@ export interface IdentifyCardResult {
   card_number: string | null;
   insert_name: string | null;
   parallel_name: string | null; // mapped from card_details.parallel_type
+  team_name: string | null;     // catalog-hit only; null for vector/vision paths
   print_run: number | null;
 }
 
@@ -98,6 +99,7 @@ function normalizeIdentifyResponse(raw: any): IdentifyCardResult {
     card_number:  cd.card_number     ?? null,
     insert_name:  cd.insert_name     ?? null,
     parallel_name: cd.parallel_type  ?? null,
+    team_name:    cd.team_name       ?? null,
     print_run:    null, // always user-input; AI value intentionally ignored
   };
 }

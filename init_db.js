@@ -45,6 +45,10 @@ ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS payment_zelle TEXT DEFAULT '
 ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS shipping_fee NUMERIC(10, 2) DEFAULT 4.00;
 ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS free_shipping_threshold NUMERIC(10, 2) DEFAULT 25.00;
 ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS site_announcement_url TEXT;
+-- columns read by /admin/page.tsx on older installs (schema drift)
+ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS oracle_discount_percentage NUMERIC(5, 2) DEFAULT 0.0;
+ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS live_stream_url TEXT;
+ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS projection_timeframe TEXT DEFAULT '90-Day';
 
 -- shop_config: optional legacy columns (Oracle URL was mirrored here in older templates)
 ALTER TABLE shop_config ADD COLUMN IF NOT EXISTS playerindex_api_base_url TEXT;
@@ -61,11 +65,13 @@ ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS is_auto BOOLEAN DEFAULT false;
 ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS is_relic BOOLEAN DEFAULT false;
 ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS grading_company TEXT;
 ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS grade TEXT;
+ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS team_name TEXT DEFAULT '';
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS is_rookie BOOLEAN DEFAULT false;
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS is_auto BOOLEAN DEFAULT false;
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS is_relic BOOLEAN DEFAULT false;
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS grading_company TEXT;
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS grade TEXT;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS team_name TEXT;
 -- Older Railway templates created inventory before these columns existed on some installs
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS market_price NUMERIC(10, 2);
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS listed_price NUMERIC(10, 2);
@@ -296,6 +302,7 @@ async function init() {
     CREATE TABLE IF NOT EXISTS scan_staging (
       id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
       player_name TEXT DEFAULT '',
+      team_name TEXT DEFAULT '',
       card_set TEXT DEFAULT '',
       card_number TEXT DEFAULT '',
       insert_name TEXT DEFAULT '',

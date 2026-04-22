@@ -12,15 +12,43 @@ import { InstructionTrigger } from '@/components/admin/DraggableGuide'
 
 export const dynamic = 'force-dynamic'
 
+/** Pull a readable message off an unknown error. Next.js strips thrown messages in prod,
+ *  so we render this text in a banner instead of letting the digest hide it. */
+function errorMessage(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (typeof e === 'object' && e != null && 'message' in e) {
+    return String((e as { message: unknown }).message);
+  }
+  return String(e);
+}
+
 export default async function AdminPage() {
-  const { rows: inventory } = await pool.query(`SELECT * FROM inventory ORDER BY player_name ASC`);
+  let inventory: any[] = [];
+  let inventoryError: string | null = null;
+  try {
+    const { rows } = await pool.query(`SELECT * FROM inventory ORDER BY player_name ASC`);
+    inventory = rows as any[];
+  } catch (e) {
+    inventoryError = errorMessage(e);
+    console.error('[admin] inventory query failed:', e);
+  }
 
   // Fetch Oracle discount percentage and stream settings
-  const { rows: storeRows } = await pool.query(`SELECT oracle_discount_percentage, live_stream_url, projection_timeframe FROM store_settings WHERE id = 1`);
-  const settings = storeRows[0];
-  const discountRate = settings?.oracle_discount_percentage || 0
-  const liveStreamUrl = settings?.live_stream_url || null
-  const projectionTimeframe = settings?.projection_timeframe || '90-Day'
+  let settings: Record<string, unknown> | undefined;
+  let settingsError: string | null = null;
+  try {
+    const { rows: storeRows } = await pool.query(
+      `SELECT oracle_discount_percentage, live_stream_url, projection_timeframe FROM store_settings WHERE id = 1`,
+    );
+    settings = storeRows[0];
+  } catch (e) {
+    settingsError = errorMessage(e);
+    console.error('[admin] store_settings query failed:', e);
+  }
+
+  const discountRate = (settings?.oracle_discount_percentage as number | undefined) || 0
+  const liveStreamUrl = (settings?.live_stream_url as string | null | undefined) || null
+  const projectionTimeframe = (settings?.projection_timeframe as string | undefined) || '90-Day'
 
   const soldItems = (inventory as any[] || []).filter(item => item.status === 'sold')
 
@@ -45,7 +73,29 @@ export default async function AdminPage() {
       </div>
 
       <div className="flex flex-col space-y-10">
-        {inventory.length === 0 && (
+        {(inventoryError || settingsError) && (
+          <div className="bg-red-50 border border-red-300 text-red-800 rounded-xl p-4 space-y-2">
+            <p className="font-black uppercase tracking-wide text-xs">
+              Admin data loader error — contact support if this persists
+            </p>
+            {inventoryError && (
+              <p className="text-sm font-mono break-words">
+                <span className="font-black">inventory:</span> {inventoryError}
+              </p>
+            )}
+            {settingsError && (
+              <p className="text-sm font-mono break-words">
+                <span className="font-black">store_settings:</span> {settingsError}
+              </p>
+            )}
+            <p className="text-xs font-medium text-red-700">
+              The page rendered with empty data so you can still access the wizard and other tools below.
+              A redeploy normally runs <code className="bg-red-100 px-1 rounded">init_db.js</code>, which adds any missing columns automatically.
+            </p>
+          </div>
+        )}
+
+        {inventory.length === 0 && !inventoryError && (
           <div className="bg-indigo-600 rounded-2xl shadow-xl overflow-hidden relative mb-6">
             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay pointer-events-none"></div>
             <div className="px-6 py-6 md:px-10 md:py-8 relative z-10 text-center md:text-left flex flex-col md:flex-row items-center justify-between gap-6">
