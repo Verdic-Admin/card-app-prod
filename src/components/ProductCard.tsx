@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { MarketSparkline } from '@/components/MarketSparkline';
 import { price as p } from '@/utils/math';
 import { deriveDisplayPricing } from '@/utils/pricing';
+import { Share2 } from 'lucide-react';
 
 type InventoryItem = Database['public']['Tables']['inventory']['Row'];
 
@@ -18,6 +19,7 @@ interface ProductCardProps {
 
 export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
   const isAvailable = item.status === 'available';
+  const isLiveAuction = Boolean((item as any).is_auction) && (item as any).auction_status === 'live';
   const { addToCart, cartItems } = useCart();
   const isInCart = cartItems.some(i => i.id === item.id);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -28,6 +30,28 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
     oracle_projection: (item as any).oracle_projection,
     oracle_discount_percentage: discountRate,
   });
+
+  const handleShare = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const shareUrl = `${window.location.origin}/item/${item.id}`;
+    const shareTitle = `${item.player_name} ${item.card_set ? `- ${item.card_set}` : ''}`.trim();
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: shareTitle,
+          text: `Check out this card: ${shareTitle}`,
+          url: shareUrl,
+        });
+        return;
+      }
+      await navigator.clipboard.writeText(shareUrl);
+      alert('Item link copied.');
+    } catch {
+      // User canceled or clipboard unavailable.
+    }
+  };
 
   return (
     <>
@@ -168,8 +192,13 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
                 )}
               </div>
             ) : (
-              <div className="flex flex-col">
-                <div className="flex items-center gap-2">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">
+                    Store Price
+                  </span>
+                </div>
+                <div className="flex items-end gap-2">
                   <span className="font-black text-3xl text-white tracking-tighter">
                     ${p(item.listed_price ?? item.avg_price).toFixed(2)}
                   </span>
@@ -180,6 +209,9 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
                     />
                   )}
                 </div>
+                <span className="text-[10px] font-semibold text-zinc-500 mt-0.5">
+                  Direct listing price
+                </span>
               </div>
             )}
             {isAvailable && (
@@ -190,19 +222,36 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
                      >
                         Propose Trade
                      </button>
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); addToCart(item); }}
-                    disabled={isInCart}
-                    className={`w-full text-sm font-bold py-3 rounded-lg transition-all shadow-md active:scale-95 flex items-center justify-center ${
-                      isInCart 
-                        ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-900 cursor-default shadow-none' 
-                        : 'bg-white hover:bg-brand-hover hover:text-white text-background border border-border hover:border-brand-hover'
-                    }`}
-                  >
-                    {isInCart ? 'In Cart' : 'Add to Cart'}
-                  </button>
+                  {isLiveAuction ? (
+                    <Link
+                      href="/auction"
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-full text-sm font-bold py-3 rounded-lg transition-all shadow-md active:scale-95 flex items-center justify-center bg-amber-500 hover:bg-amber-400 text-black border border-amber-300"
+                    >
+                      Place Bid
+                    </Link>
+                  ) : (
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); addToCart(item); }}
+                      disabled={isInCart}
+                      className={`w-full text-sm font-bold py-3 rounded-lg transition-all shadow-md active:scale-95 flex items-center justify-center ${
+                        isInCart 
+                          ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-900 cursor-default shadow-none' 
+                          : 'bg-white hover:bg-brand-hover hover:text-white text-background border border-border hover:border-brand-hover'
+                      }`}
+                    >
+                      {isInCart ? 'In Cart' : 'Add to Cart'}
+                    </button>
+                  )}
               </div>
             )}
+            <button
+              onClick={handleShare}
+              className="w-full text-xs font-bold py-2.5 rounded-lg transition-all text-zinc-300 border border-zinc-700 hover:text-white hover:bg-zinc-800 flex items-center justify-center gap-2 uppercase tracking-widest"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              Share Item
+            </button>
           </div>
         </div>
       </div>

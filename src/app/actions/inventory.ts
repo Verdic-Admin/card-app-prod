@@ -495,13 +495,6 @@ export async function bulkUpdateMetricsAction(ids: string[], costBasis: number, 
   revalidatePath('/sold')
 }
 
-export async function updateLiveStreamUrl(url: string | null) {
-  await checkAuth();
-    await pool.query(`UPDATE store_settings SET live_stream_url = $1 WHERE id = 1`, [url]);
-  revalidatePath('/admin')
-  revalidatePath('/auction')
-}
-
 export async function updateProjectionTimeframe(timeframe: string) {
   await checkAuth();
     await pool.query(`UPDATE store_settings SET projection_timeframe = $1 WHERE id = 1`, [timeframe]);

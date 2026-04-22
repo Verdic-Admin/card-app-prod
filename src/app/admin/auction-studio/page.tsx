@@ -25,11 +25,10 @@ export default async function AuctionStudioPage() {
   const { rows } = await pool.query(`SELECT * FROM inventory ORDER BY player_name ASC`);
   const inventory = (rows as Record<string, unknown>[]).map(normalizeInventoryMoneyFields);
 
-  // Fetch Oracle discount percentage and stream settings
-  const { rows: storeRows } = await pool.query(`SELECT live_stream_url, projection_timeframe, auction_qr_url FROM store_settings WHERE id = 1`);
+  // Fetch auction studio settings
+  const { rows: storeRows } = await pool.query(`SELECT projection_timeframe, auction_qr_url FROM store_settings WHERE id = 1`);
   const settings = storeRows[0] || {};
 
-  const liveStreamUrl = settings?.live_stream_url || null
   const projectionTimeframe = settings?.projection_timeframe || '90-Day'
   const auctionQrUrl = settings?.auction_qr_url || null
 
@@ -51,20 +50,19 @@ export default async function AuctionStudioPage() {
               <InstructionTrigger 
                  title="Live Auction Setup Guide"
                  steps={[
-                    { title: "Step 1: Configure Stream", content: "First, navigate to your 'Store Operations' settings and past your YouTube or Twitch Live URL. This synchronizes the Edge platform so buyers can view your stream directly alongside the bidding UI." },
-                    { title: "Step 2: Staging the Block", content: "Identify which items from your inventory you plan to auction today. Switch their status to 'Pending Block'. This queues them up locally in this studio without immediately sending out push notifications." },
-                    { title: "Step 3: Going Live", content: "Once on stream, you can 'Push' an item from your Pending Block to 'Active'. This instantly displays the specific card to all connected viewers and begins accepting real-time bids routed directly to your ledger." }
+                    { title: "Step 1: Stage the Block", content: "Select cards for your session and set reserve/end/description per card. This queues them in Pending without exposing them live yet." },
+                    { title: "Step 2: Share Your Own Stream", content: "Run your livestream wherever you want (Instagram, Whatnot, YouTube, TikTok, etc.) and share your own stream link on socials." },
+                    { title: "Step 3: Push Cards Live", content: "When you're ready, push selected pending cards to live status so bidders can place bids on the public auction page." }
                  ]}
               />
           </h1>
-          <p className="text-muted mt-1 font-medium">Manage streams, stage pending block inventory, and go live.</p>
+          <p className="text-muted mt-1 font-medium">Stage inventory, control live status, and run your stream however you want.</p>
         </div>
       </div>
 
       <div className="flex flex-col space-y-10">
         <LiveAuctionStudio 
           initialItems={inventory || []} 
-          initialStreamUrl={liveStreamUrl} 
           initialProjectionTimeframe={projectionTimeframe}
           initialAuctionQrUrl={auctionQrUrl}
         />

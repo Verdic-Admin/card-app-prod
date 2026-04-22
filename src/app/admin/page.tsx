@@ -46,12 +46,12 @@ export default async function AdminPage() {
     console.error('[admin] inventory query failed:', e);
   }
 
-  // Fetch Oracle discount percentage and stream settings
+  // Fetch Oracle discount percentage and auction settings
   let settings: Record<string, unknown> | undefined;
   let settingsError: string | null = null;
   try {
     const { rows: storeRows } = await pool.query(
-      `SELECT oracle_discount_percentage, live_stream_url, projection_timeframe FROM store_settings WHERE id = 1`,
+      `SELECT oracle_discount_percentage, projection_timeframe FROM store_settings WHERE id = 1`,
     );
     settings = storeRows[0];
   } catch (e) {
@@ -60,7 +60,6 @@ export default async function AdminPage() {
   }
 
   const discountRate = (settings?.oracle_discount_percentage as number | undefined) || 0
-  const liveStreamUrl = (settings?.live_stream_url as string | null | undefined) || null
   const projectionTimeframe = (settings?.projection_timeframe as string | undefined) || '90-Day'
 
   const soldItems = (inventory as any[] || []).filter(item => item.status === 'sold')
@@ -157,7 +156,7 @@ export default async function AdminPage() {
                + Add Inventory
              </Link>
           </h2>
-          <InventoryTable initialItems={(inventory as any[]) || []} discountRate={discountRate} liveStreamUrl={liveStreamUrl} projectionTimeframe={projectionTimeframe} />
+          <InventoryTable initialItems={(inventory as any[]) || []} discountRate={discountRate} projectionTimeframe={projectionTimeframe} />
         </div>
       </div>
     </div>

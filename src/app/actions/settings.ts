@@ -36,7 +36,6 @@ function normalizeStoreRow(row: Record<string, unknown>): StoreSettings {
     social_threads: str(row.social_threads),
     oracle_discount_percentage: num(row.oracle_discount_percentage, 0),
     projection_timeframe: row.projection_timeframe != null ? str(row.projection_timeframe) : undefined,
-    live_stream_url: row.live_stream_url != null ? str(row.live_stream_url) : undefined,
     auction_qr_url: row.auction_qr_url != null ? str(row.auction_qr_url) : null,
     site_name: str(row.site_name, DEFAULT_STORE_SETTINGS.site_name),
     site_author: row.site_author != null && String(row.site_author).length ? str(row.site_author) : null,

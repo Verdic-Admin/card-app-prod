@@ -5,6 +5,7 @@ import { useCart } from '@/context/CartContext'
 import { Database } from '@/types/database.types'
 import { submitCoinRequest } from '@/app/actions/coins'
 import { Camera, X, Loader2 } from 'lucide-react'
+import Link from 'next/link'
 
 type InventoryItem = Database['public']['Tables']['inventory']['Row']
 
@@ -16,6 +17,7 @@ export function ItemDetailClient({ item }: Props) {
   const { addToCart, cartItems } = useCart()
   const isInCart = cartItems.some(i => i.id === item.id)
   const isAvailable = item.status === 'available'
+  const isLiveAuction = Boolean((item as any).is_auction) && (item as any).auction_status === 'live'
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [email, setEmail] = useState('')
@@ -53,17 +55,26 @@ export function ItemDetailClient({ item }: Props) {
             As priced by PlayerIndexData.com
           </a>
         </div>
-        <button
-          onClick={() => addToCart(item)}
-          disabled={isInCart}
-          className={`w-full py-4 rounded-xl font-black text-base uppercase tracking-widest transition-all shadow-lg active:scale-[0.98] ${
-            isInCart
-              ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-900 cursor-default'
-              : 'bg-white hover:bg-cyan-500 hover:text-white text-zinc-950 border border-zinc-200 hover:border-cyan-500'
-          }`}
-        >
-          {isInCart ? '✓ In Cart' : (item.is_lot ? '📦 Add Lot to Cart' : 'Add to Cart')}
-        </button>
+        {isLiveAuction ? (
+          <Link
+            href="/auction"
+            className="w-full py-4 rounded-xl font-black text-base uppercase tracking-widest transition-all shadow-lg active:scale-[0.98] bg-amber-500 hover:bg-amber-400 text-black border border-amber-300 flex items-center justify-center"
+          >
+            Place Bid On Live Auction
+          </Link>
+        ) : (
+          <button
+            onClick={() => addToCart(item)}
+            disabled={isInCart}
+            className={`w-full py-4 rounded-xl font-black text-base uppercase tracking-widest transition-all shadow-lg active:scale-[0.98] ${
+              isInCart
+                ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-900 cursor-default'
+                : 'bg-white hover:bg-cyan-500 hover:text-white text-zinc-950 border border-zinc-200 hover:border-cyan-500'
+            }`}
+          >
+            {isInCart ? '✓ In Cart' : (item.is_lot ? '📦 Add Lot to Cart' : 'Add to Cart')}
+          </button>
+        )}
 
         <button 
           onClick={() => setIsModalOpen(true)}

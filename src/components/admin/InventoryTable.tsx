@@ -2,15 +2,15 @@
 
 import { useState, useEffect } from 'react'
 import { Database } from '@/types/database.types'
-import { toggleCardStatus, editCardAction, deleteCardAction, bulkDeleteCardsAction, bulkUpdateMetricsAction, rotateCardImageAction, sendToAuctionBlock, removeFromAuctionBlock, setAuctionStatus, updateLiveStreamUrl, updateProjectionTimeframe, createLotAction, breakLotAction, updateLotChildren } from '@/app/actions/inventory'
+import { toggleCardStatus, editCardAction, deleteCardAction, bulkDeleteCardsAction, bulkUpdateMetricsAction, rotateCardImageAction, sendToAuctionBlock, removeFromAuctionBlock, setAuctionStatus, updateProjectionTimeframe, createLotAction, breakLotAction, updateLotChildren } from '@/app/actions/inventory'
 import { syncSingleItemWithOracle, syncInventoryWithOracle, applyOracleDiscount, applyOracleDiscountAll, applyCorrection, approvePriceOnly, denyCorrection } from '@/app/actions/oracleSync'
-import { Loader2, Trash2, Edit2, Check, X, Search, Download, RotateCw, RefreshCw, DollarSign, Save, AlertCircle, Gavel, Tv, Radio, Package } from 'lucide-react'
+import { Loader2, Trash2, Edit2, Check, X, Search, Download, RotateCw, RefreshCw, DollarSign, Save, AlertCircle, Gavel, Package, Share2 } from 'lucide-react'
 import { price } from '@/utils/math'
 import { deriveDisplayPricing } from '@/utils/pricing'
 
 type InventoryItem = Database['public']['Tables']['inventory']['Row']
 
-export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl = null, projectionTimeframe: initialProjectionTimeframe = '90-Day' }: { initialItems: InventoryItem[], discountRate?: number, liveStreamUrl?: string | null, projectionTimeframe?: string }) {
+export function InventoryTable({ initialItems, discountRate = 0, projectionTimeframe: initialProjectionTimeframe = '90-Day' }: { initialItems: InventoryItem[], discountRate?: number, projectionTimeframe?: string }) {
   const [items, setItems] = useState(initialItems)
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [errorId, setErrorId] = useState<string | null>(null)
@@ -33,8 +33,6 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
   const [showCorrectionsModal, setShowCorrectionsModal] = useState(false)
 
   // Auction Block State
-  const [streamUrl, setStreamUrl] = useState(liveStreamUrl || '')
-  const [isSavingStream, setIsSavingStream] = useState(false)
   const [auctionLoadingId, setAuctionLoadingId] = useState<string | null>(null)
   const [projectionTimeframe, setProjectionTimeframe] = useState(initialProjectionTimeframe)
   const [isSavingTimeframe, setIsSavingTimeframe] = useState(false)
@@ -452,19 +450,23 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
     finally { setAuctionLoadingId(null) }
   }
 
-  const handleSaveStream = async () => {
-    setIsSavingStream(true)
-    try { await updateLiveStreamUrl(streamUrl || null) }
-    catch (e: any) { alert('Failed: ' + e.message) }
-    finally { setIsSavingStream(false) }
-  }
-
   const handleSaveTimeframe = async (val: string) => {
     setProjectionTimeframe(val)
     setIsSavingTimeframe(true)
     try { await updateProjectionTimeframe(val) }
     catch (e: any) { alert('Failed to save timeframe: ' + e.message) }
     finally { setIsSavingTimeframe(false) }
+  }
+
+  const handleShareItem = async (id: string) => {
+    const shareUrl = `${window.location.origin}/item/${id}`
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      window.open(shareUrl, '_blank', 'noopener,noreferrer')
+      alert('Item link copied and opened.')
+    } catch {
+      window.open(shareUrl, '_blank', 'noopener,noreferrer')
+    }
   }
 
   if (items.length === 0) {
@@ -876,25 +878,6 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
             {auctionItems.length > 0 && (
               <span className="bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full">{auctionItems.length}</span>
             )}
-          </div>
-          {/* Stream URL */}
-          <div className="flex items-center gap-2">
-            <Tv className="w-4 h-4 text-zinc-400 shrink-0" />
-            <input
-              type="text"
-              value={streamUrl}
-              onChange={e => setStreamUrl(e.target.value)}
-              placeholder="Stream URL (YouTube / Twitch)"
-              className="w-64 bg-zinc-800 border border-zinc-700 text-zinc-100 text-xs font-medium px-3 py-1.5 rounded-lg outline-none focus:ring-1 focus:ring-red-500 placeholder:text-zinc-600"
-            />
-            <button
-              onClick={handleSaveStream}
-              disabled={isSavingStream}
-              className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
-            >
-              {isSavingStream ? <Loader2 className="w-3 h-3 animate-spin" /> : <Radio className="w-3 h-3" />}
-              Save
-            </button>
           </div>
           {/* Projection Timeframe */}
           <div className="flex items-center gap-2">
@@ -1396,6 +1379,13 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                         >
                           <Search className="w-3.5 h-3.5" />
                         </a>
+                        <button
+                          onClick={() => handleShareItem(item.id)}
+                          className="text-cyan-600 hover:text-cyan-800 hover:bg-cyan-100 bg-cyan-50 h-7 w-7 rounded flex items-center justify-center transition-colors"
+                          title="Open & copy share link"
+                        >
+                          <Share2 className="w-3.5 h-3.5" />
+                        </button>
                         <button onClick={() => handleDelete(item.id, item.image_url)} disabled={isDeleting === item.id} className="text-red-600 hover:text-red-800 hover:bg-red-100 bg-red-50 h-7 w-7 rounded disabled:opacity-50 flex items-center justify-center transition-colors" title="Delete">
                           {isDeleting === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                         </button>

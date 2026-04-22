@@ -10,7 +10,6 @@ import { Loader2, CheckCircle2, X, AlertTriangle, Tv } from 'lucide-react'
 
 interface LiveAuctionStudioProps {
   initialItems: any[]
-  initialStreamUrl: string | null
   initialProjectionTimeframe: string
   initialAuctionQrUrl?: string | null
 }
@@ -27,9 +26,8 @@ const EMPTY_DRAFT: ItemStagingDraft = {
   description: '',
 }
 
-export function LiveAuctionStudio({ initialItems, initialStreamUrl, initialProjectionTimeframe, initialAuctionQrUrl }: LiveAuctionStudioProps) {
+export function LiveAuctionStudio({ initialItems, initialProjectionTimeframe, initialAuctionQrUrl }: LiveAuctionStudioProps) {
   const [items, setItems] = useState<any[]>(initialItems)
-  const [streamUrl, setStreamUrl] = useState(initialStreamUrl || '')
   const [timeframe, setTimeframe] = useState(initialProjectionTimeframe || '90-Day')
   const [isSavingTimeframe, setIsSavingTimeframe] = useState(false)
   const [showQR, setShowQR] = useState(true)
@@ -143,11 +141,6 @@ export function LiveAuctionStudio({ initialItems, initialStreamUrl, initialProje
     }
   }
 
-  const handleSaveStream = async () => {
-    await import('@/app/actions/inventory').then(m => m.updateLiveStreamUrl(streamUrl))
-    alert("Live stream updated!")
-  }
-
   const handleSaveTimeframe = async (val: string) => {
     setIsSavingTimeframe(true)
     setTimeframe(val)
@@ -172,23 +165,12 @@ export function LiveAuctionStudio({ initialItems, initialStreamUrl, initialProje
 
       <div className="bg-white text-slate-900 p-6 rounded-xl shadow-sm border border-slate-200">
         <div className="flex items-center justify-between mb-4">
-           <h2 className="text-xl font-bold">Live Stream Control</h2>
+           <h2 className="text-xl font-bold">Auction Studio Controls</h2>
            <button onClick={() => setShowQR(!showQR)} className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow-sm transition-colors">
               Toggle Live QR
            </button>
         </div>
         <div className="flex flex-col gap-4">
-          <div className="flex gap-4">
-            <input 
-              className="border border-slate-300 bg-white placeholder-slate-400 p-2 rounded flex-1 focus:ring-2 focus:ring-indigo-500" 
-              value={streamUrl} 
-              onChange={e => setStreamUrl(e.target.value)} 
-              placeholder="YouTube or Twitch URL" 
-            />
-            <button className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-bold transition-colors" onClick={handleSaveStream}>
-              Save Stream
-            </button>
-          </div>
           <div className="flex items-center gap-4">
             <label className="text-sm font-bold text-slate-700 whitespace-nowrap">Projection Timeframe</label>
             <select
