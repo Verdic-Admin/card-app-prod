@@ -4,7 +4,7 @@ import {
   Upload, Loader2, Play, CheckCircle2, Wand2,
   RefreshCw, Trash2, Send, Scissors, DollarSign
 } from 'lucide-react'
-import { pollScannerResult, requestPricingAction, identifyCardDirectAction } from '@/app/actions/visionSync'
+import { pollScannerResult, identifyCardDirectAction } from '@/app/actions/visionSync'
 import {
   stagePairedUploadAction,
   listScanStagingAction,
@@ -13,9 +13,10 @@ import {
   promoteRawStagingToCroppedAction,
   updateDraftCardAction,
   publishDraftCardsAction,
+  applyStagingDraftFieldPricingAction,
+  applyStagingDraftImagePricingAction,
 } from '@/app/actions/drafts'
 import { deleteStagingCardsAction } from '@/app/actions/inventory'
-import { calculatePricingAction } from '@/app/actions/oracleAPI'
 import { TaxonomySearch } from '@/components/admin/TaxonomySearch'
 import { InstructionTrigger } from '@/components/admin/DraggableGuide'
 
@@ -456,32 +457,41 @@ export function BulkIngestionWizard() {
   const handleReprice = async (id: string, imageUrl: string) => {
     setReviewCards(prev => prev.map(c => c.id === id ? { ...c, repricing: true } : c))
     try {
-      const result = await requestPricingAction(imageUrl)
-      // Use ?? not || — afv 0 is valid; || would turn 0 into '' and hide the price in the input.
+      const result = await applyStagingDraftImagePricingAction(id, imageUrl)
+      if (!result.success) {
+        if (result.error === 'credits_exhausted') {
+          creditsExhausted()
+          return
+        }
+        alert('Re-price failed: ' + result.error)
+        setReviewCards(prev => prev.map(c => (c.id === id ? { ...c, repricing: false } : c)))
+        return
+      }
       const newPrice =
-        result.pricing != null && result.pricing.afv != null
-          ? String(result.pricing.afv)
+        result.listed_price != null && Number.isFinite(result.listed_price)
+          ? String(result.listed_price)
           : ''
-      setReviewCards(prev => prev.map(c => c.id === id
-        ? { ...c, repricing: false, listed_price: newPrice, confidence: result.confidence, ai_status: result.status,
-            player_name: result.player_name || c.player_name,
-            card_set: result.card_set || c.card_set,
-            card_number: result.card_number || c.card_number,
-            insert_name: result.insert_name || c.insert_name,
-            parallel_name: result.parallel_name || c.parallel_name,
-          }
-        : c
+      setReviewCards(prev => prev.map(c =>
+        c.id === id
+          ? {
+              ...c,
+              repricing: false,
+              listed_price: newPrice,
+              confidence: result.confidence ?? c.confidence,
+              ai_status: result.ai_status ?? c.ai_status,
+              player_name: result.player_name || c.player_name,
+              card_set: result.card_set || c.card_set,
+              card_number: result.card_number || c.card_number,
+              insert_name: result.insert_name || c.insert_name,
+              parallel_name: result.parallel_name || c.parallel_name,
+            }
+          : c,
       ))
-      await updateDraftCardAction(id, {
-        player_name: result.player_name,
-        card_set: result.card_set,
-        card_number: result.card_number,
-        insert_name: result.insert_name,
-        parallel_name: result.parallel_name,
-        price: newPrice,
-      })
     } catch (e: any) {
-      if (e.message === 'credits_exhausted') { creditsExhausted(); return }
+      if (e.message === 'credits_exhausted') {
+        creditsExhausted()
+        return
+      }
       alert('Re-price failed: ' + e.message)
       setReviewCards(prev => prev.map(c => c.id === id ? { ...c, repricing: false } : c))
     }
@@ -495,29 +505,19 @@ export function BulkIngestionWizard() {
     }
     setReviewCards(prev => prev.map(c => c.id === id ? { ...c, repricing: true } : c))
     try {
-      const gradeStr = card.grading_company && card.grade
-        ? `${card.grading_company} ${card.grade}`
-        : undefined
-      const res = await calculatePricingAction({
-        player_name:  card.player_name,
-        card_set:     card.card_set,
-        insert_name:  card.insert_name,
-        parallel_name: card.parallel_name,
-        card_number:  card.card_number,
-        print_run:    card.print_run ? Number(card.print_run) : null,
-        is_rookie:    card.is_rookie,
-        is_auto:      card.is_auto,
-        is_relic:     card.is_relic,
-        grade:        gradeStr,
-      })
-      if (res.error === 'credits_exhausted') { creditsExhausted(); return }
+      const res = await applyStagingDraftFieldPricingAction(id)
       if (!res.success) {
-        const r = res as { status?: number; statusText?: string; detail?: string }
-        throw new Error([r.status && `HTTP ${r.status}`, r.statusText, r.detail].filter(Boolean).join(' — ') || 'Pricing failed')
+        if (res.error === 'credits_exhausted') {
+          creditsExhausted()
+          return
+        }
+        throw new Error(res.error)
       }
-      const newPrice = String(res.data.projected_target ?? '')
-      setReviewCards(prev => prev.map(c => c.id === id ? { ...c, repricing: false, listed_price: newPrice } : c))
-      await updateDraftCardAction(id, { price: newPrice })
+      const newPrice =
+        res.listed_price != null && Number.isFinite(res.listed_price)
+          ? String(res.listed_price)
+          : ''
+      setReviewCards(prev => prev.map(c => (c.id === id ? { ...c, repricing: false, listed_price: newPrice } : c)))
     } catch (e: any) {
       alert('Pricing failed: ' + e.message)
       setReviewCards(prev => prev.map(c => c.id === id ? { ...c, repricing: false } : c))
@@ -538,28 +538,20 @@ export function BulkIngestionWizard() {
     for (const card of visibleCards) {
       setReviewCards(prev => prev.map(c => c.id === card.id ? { ...c, repricing: true } : c))
       try {
-        const gradeStr = card.grading_company && card.grade
-          ? `${card.grading_company} ${card.grade}`
-          : undefined
-        const res = await calculatePricingAction({
-          player_name:  card.player_name,
-          card_set:     card.card_set,
-          insert_name:  card.insert_name,
-          parallel_name: card.parallel_name,
-          card_number:  card.card_number,
-          print_run:    card.print_run ? Number(card.print_run) : null,
-          is_rookie:    card.is_rookie,
-          is_auto:      card.is_auto,
-          is_relic:     card.is_relic,
-          grade:        gradeStr,
-        })
-        if (res.error === 'credits_exhausted') { creditsExhausted(); setIsPricingAll(false); return }
-        if (res.success) {
-          const newPrice = String(res.data.projected_target ?? '')
-          setReviewCards(prev => prev.map(c => c.id === card.id ? { ...c, repricing: false, listed_price: newPrice } : c))
-          updateDraftCardAction(card.id, { price: newPrice }).catch(() => {})
+        const res = await applyStagingDraftFieldPricingAction(card.id)
+        if (!res.success) {
+          if (res.error === 'credits_exhausted') {
+            creditsExhausted()
+            setIsPricingAll(false)
+            return
+          }
+          setReviewCards(prev => prev.map(c => (c.id === card.id ? { ...c, repricing: false } : c)))
         } else {
-          setReviewCards(prev => prev.map(c => c.id === card.id ? { ...c, repricing: false } : c))
+          const newPrice =
+            res.listed_price != null && Number.isFinite(res.listed_price)
+              ? String(res.listed_price)
+              : ''
+          setReviewCards(prev => prev.map(c => (c.id === card.id ? { ...c, repricing: false, listed_price: newPrice } : c)))
         }
       } catch {
         setReviewCards(prev => prev.map(c => c.id === card.id ? { ...c, repricing: false } : c))

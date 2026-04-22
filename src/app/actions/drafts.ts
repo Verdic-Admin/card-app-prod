@@ -2,8 +2,9 @@
 import pool from '@/utils/db';
 import { put } from '@/utils/storage';
 import { getAppOrigin } from '@/utils/app-origin';
-import { uploadImagesToScanner } from '@/app/actions/visionSync';
+import { uploadImagesToScanner, requestPricingAction } from '@/app/actions/visionSync';
 import { hasShopOracleApiKey } from '@/lib/shop-oracle-credentials';
+import { calculatePricingAction } from '@/app/actions/oracleAPI';
 
 async function checkAuth() {
   if (!(await hasShopOracleApiKey())) {
@@ -15,6 +16,22 @@ function safeNumeric(v: unknown, fallback = 0): number {
   if (v == null || v === '') return fallback;
   const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/,/g, ''));
   return Number.isFinite(n) ? n : fallback;
+}
+
+function toTitleCase(str: string) {
+  if (!str) return '';
+  return str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+}
+
+async function getOracleDiscountRate(): Promise<number> {
+  try {
+    const { rows } = await pool.query(
+      `SELECT oracle_discount_percentage FROM store_settings WHERE id = 1`,
+    );
+    return parseFloat(String(rows?.[0]?.oracle_discount_percentage ?? 0)) || 0;
+  } catch {
+    return 0;
+  }
 }
 
 function parallelInsertType(insertName: string | null, parallelName: string | null): string {
@@ -161,11 +178,210 @@ export async function listScanStagingAction() {
   const { rows } = await pool.query(`
     SELECT id, player_name, team_name, card_set, card_number, insert_name, parallel_name, print_run,
            raw_front_url, raw_back_url, image_url, back_image_url, listed_price, market_price,
+           trend_data, player_index_url, oracle_projection, oracle_trend_percentage,
            is_rookie, is_auto, is_relic, grading_company, grade
     FROM scan_staging
     ORDER BY id DESC
   `);
   return rows;
+}
+
+export type ApplyStagingDraftPricingResult =
+  | {
+      success: true;
+      listed_price: number;
+      market_price: number;
+      player_name: string;
+      team_name: string;
+      card_set: string;
+      card_number: string;
+      insert_name: string;
+      parallel_name: string;
+      confidence?: number;
+      ai_status?: string;
+    }
+  | { success: false; error: string };
+
+/**
+ * Price a staging draft from current row fields: one Oracle /v1/calculate call, then persist
+ * listed_price (after store discount), market_price, trend_data, player_index_url, and oracle_* — same
+ * shape as post-mint sync so users are not forced to re-sync for the same numbers.
+ */
+export async function applyStagingDraftFieldPricingAction(
+  id: string,
+): Promise<ApplyStagingDraftPricingResult> {
+  await checkAuth();
+
+  const { rows } = await pool.query(`SELECT * FROM scan_staging WHERE id = $1::uuid`, [id]);
+  if (!rows.length) {
+    return { success: false, error: 'Draft not found.' };
+  }
+  const row = rows[0] as Record<string, unknown>;
+  const playerName = String(row.player_name ?? '').trim();
+  if (!playerName) {
+    return { success: false, error: 'Player name is required before pricing.' };
+  }
+
+  const discountRate = await getOracleDiscountRate();
+  const gradeStr =
+    row.grading_company && row.grade
+      ? `${String(row.grading_company)} ${String(row.grade)}`
+      : undefined;
+
+  const printRaw = row.print_run;
+  const printRun =
+    printRaw != null && String(printRaw).trim() !== ''
+      ? Number(String(printRaw).replace(/,/g, ''))
+      : null;
+
+  const res = await calculatePricingAction({
+    player_name: toTitleCase(playerName),
+    card_set: String(row.card_set ?? ''),
+    insert_name: String(row.insert_name ?? ''),
+    parallel_name: String(row.parallel_name ?? ''),
+    card_number: String(row.card_number ?? ''),
+    print_run: printRun != null && Number.isFinite(printRun) ? printRun : null,
+    is_rookie: Boolean(row.is_rookie),
+    is_auto: Boolean(row.is_auto),
+    is_relic: Boolean(row.is_relic),
+    grade: gradeStr,
+  });
+
+  if (res && typeof res === 'object' && 'error' in res && res.error === 'credits_exhausted') {
+    return { success: false, error: 'credits_exhausted' };
+  }
+  if (!res || typeof res !== 'object' || !('success' in res) || !res.success) {
+    const r = res as { status?: number; statusText?: string; detail?: string };
+    const msg = [r.status && `HTTP ${r.status}`, r.statusText, r.detail].filter(Boolean).join(' — ');
+    return { success: false, error: msg || 'Oracle pricing failed.' };
+  }
+
+  const data = res.data as Record<string, unknown>;
+  const projection = Number(data.projected_target ?? data.target_price ?? 0);
+  if (!Number.isFinite(projection) || projection <= 0) {
+    return { success: false, error: 'Oracle returned an invalid projected price.' };
+  }
+
+  const listed = roundMoney(projection * (1 - discountRate / 100));
+  const trend = data.trend_percentage != null ? Number(data.trend_percentage) : null;
+  const trendPoints = Array.isArray(data.trend_points) ? data.trend_points : [];
+  const playerIndexUrl = String(data.player_index_url || '');
+
+  await pool.query(
+    `UPDATE scan_staging SET
+       listed_price = $1,
+       market_price = $2,
+       oracle_projection = $3,
+       oracle_trend_percentage = $4,
+       trend_data = $5::jsonb,
+       player_index_url = $6
+     WHERE id = $7::uuid`,
+    [listed, projection, projection, trend, JSON.stringify(trendPoints), playerIndexUrl || null, id],
+  );
+
+  return {
+    success: true,
+    listed_price: listed,
+    market_price: projection,
+    player_name: String(row.player_name ?? ''),
+    team_name: String(row.team_name ?? ''),
+    card_set: String(row.card_set ?? ''),
+    card_number: String(row.card_number ?? ''),
+    insert_name: String(row.insert_name ?? ''),
+    parallel_name: String(row.parallel_name ?? ''),
+  };
+}
+
+function roundMoney(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/**
+ * Vision + orchestrator pricing for a draft: one process-asset call, then persist the same
+ * discounted listed / market / trend / URLs as field-based pricing.
+ */
+export async function applyStagingDraftImagePricingAction(
+  id: string,
+  imageUrl: string,
+): Promise<ApplyStagingDraftPricingResult> {
+  await checkAuth();
+
+  const { rows } = await pool.query(`SELECT * FROM scan_staging WHERE id = $1::uuid`, [id]);
+  if (!rows.length) {
+    return { success: false, error: 'Draft not found.' };
+  }
+  const row = rows[0] as Record<string, unknown>;
+
+  let result: Awaited<ReturnType<typeof requestPricingAction>>;
+  try {
+    result = await requestPricingAction(imageUrl);
+  } catch (e) {
+    if (e instanceof Error && e.message === 'credits_exhausted') {
+      return { success: false, error: 'credits_exhausted' };
+    }
+    throw e;
+  }
+  const afv = Number(result.pricing?.afv ?? NaN);
+  if (!Number.isFinite(afv) || afv < 0) {
+    return { success: false, error: 'Pricing service returned no usable AFV.' };
+  }
+
+  const discountRate = await getOracleDiscountRate();
+  const listed = roundMoney(afv * (1 - discountRate / 100));
+  const trendPoints = Array.isArray(result.pricing?.trend_points) ? result.pricing!.trend_points : [];
+  const playerIndexUrl = String(result.pricing?.player_index_url || '');
+
+  const pick = (v: string | undefined, fallback: string) =>
+    (v != null && String(v).trim() !== '' ? String(v).trim() : fallback);
+
+  const player_name = pick(result.player_name, String(row.player_name ?? ''));
+  const card_set = pick(result.card_set, String(row.card_set ?? ''));
+  const card_number = pick(result.card_number, String(row.card_number ?? ''));
+  const insert_name = pick(result.insert_name, String(row.insert_name ?? ''));
+  const parallel_name = pick(result.parallel_name, String(row.parallel_name ?? ''));
+
+  await pool.query(
+    `UPDATE scan_staging SET
+       player_name = $1,
+       card_set = $2,
+       card_number = $3,
+       insert_name = $4,
+       parallel_name = $5,
+       listed_price = $6,
+       market_price = $7,
+       oracle_projection = $8,
+       oracle_trend_percentage = NULL,
+       trend_data = $9::jsonb,
+       player_index_url = $10
+     WHERE id = $11::uuid`,
+    [
+      player_name,
+      card_set,
+      card_number,
+      insert_name,
+      parallel_name,
+      listed,
+      afv,
+      afv,
+      JSON.stringify(trendPoints),
+      playerIndexUrl || null,
+      id,
+    ],
+  );
+
+  return {
+    success: true,
+    listed_price: listed,
+    market_price: afv,
+    player_name,
+    team_name: String(row.team_name ?? ''),
+    card_set,
+    card_number,
+    insert_name,
+    parallel_name,
+    confidence: result.confidence,
+    ai_status: result.status,
+  };
 }
 
 /** Submit one raw-pair staging row to the platform scanner (burns 1 credit on upload). */
@@ -289,7 +505,9 @@ export async function publishDraftCardsAction(ids: string[]): Promise<PublishDra
     const { rows } = await pool.query(
       `SELECT player_name, team_name, card_set, card_number, insert_name, parallel_name, print_run,
               image_url, back_image_url, raw_front_url, raw_back_url,
-              listed_price, market_price, is_rookie, is_auto, is_relic, grading_company, grade
+              listed_price, market_price,
+              trend_data, player_index_url, oracle_projection, oracle_trend_percentage,
+              is_rookie, is_auto, is_relic, grading_company, grade
        FROM scan_staging WHERE id = ANY($1::uuid[])`,
       [ids as string[]],
     );
@@ -340,14 +558,29 @@ export async function publishDraftCardsAction(ids: string[]): Promise<PublishDra
         sqlNullableText(s.insert_name),
         sqlNullableText(s.parallel_name),
       );
+      const trendRaw = s.trend_data;
+      const trendJson =
+        trendRaw == null
+          ? '[]'
+          : typeof trendRaw === 'string'
+            ? trendRaw
+            : JSON.stringify(trendRaw);
+      const playerIndexUrl = sqlText(s.player_index_url, '');
+      const oracleProj =
+        s.oracle_projection != null && String(s.oracle_projection).trim() !== ''
+          ? safeNumeric(s.oracle_projection, market)
+          : market;
+      const oracleTrendParsed = parseFloat(String(s.oracle_trend_percentage ?? ''));
+      const oracleTrend = Number.isFinite(oracleTrendParsed) ? oracleTrendParsed : null;
       await client.query(
         `
              INSERT INTO inventory (
                player_name, team_name, card_set, card_number, insert_name, parallel_name, parallel_insert_type,
                print_run, image_url, back_image_url, listed_price, market_price,
+               trend_data, player_index_url, oracle_projection, oracle_trend_percentage,
                is_rookie, is_auto, is_relic, grading_company, grade, status
              )
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, 'available')
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14, $15, $16, $17, $18, $19, $20, $21, 'available')
           `,
         [
           sqlText(s.player_name),
@@ -362,6 +595,10 @@ export async function publishDraftCardsAction(ids: string[]): Promise<PublishDra
           backUrl,
           listed,
           market,
+          trendJson,
+          playerIndexUrl,
+          oracleProj,
+          oracleTrend,
           Boolean(s.is_rookie),
           Boolean(s.is_auto),
           Boolean(s.is_relic),
