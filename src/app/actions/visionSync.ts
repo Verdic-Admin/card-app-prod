@@ -3,9 +3,18 @@
 import { getOracleGatewayBaseUrl } from '@/lib/oracle-gateway-url';
 import { getShopOracleApiKey } from '@/lib/shop-oracle-credentials';
 
-export async function uploadImagesToScanner(formData: FormData) {
+export async function uploadImagesToScanner(
+  formData: FormData,
+  opts?: { chroma?: 'green' | 'blue'; shave_px?: number },
+) {
   const apiKey = await getShopOracleApiKey();
   const base = await getOracleGatewayBaseUrl();
+  if (opts?.chroma) {
+    formData.append('chroma', opts.chroma);
+  }
+  if (opts?.shave_px != null) {
+    formData.append('shave_px', String(opts.shave_px));
+  }
   const response = await fetch(`${base}/scan/upload`, {
     method: 'POST',
     headers: { 'X-API-Key': apiKey },

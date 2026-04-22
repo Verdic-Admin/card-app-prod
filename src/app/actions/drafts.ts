@@ -385,7 +385,10 @@ export async function applyStagingDraftImagePricingAction(
 }
 
 /** Submit one raw-pair staging row to the platform scanner (burns 1 credit on upload). */
-export async function submitStagingRowToScannerAction(rowId: string): Promise<{ job_id: string }> {
+export async function submitStagingRowToScannerAction(
+  rowId: string,
+  opts?: { chroma?: 'green' | 'blue' },
+): Promise<{ job_id: string }> {
   await checkAuth();
   const { rows } = await pool.query(
     `SELECT raw_front_url, raw_back_url, image_url FROM scan_staging WHERE id = $1`,
@@ -402,7 +405,7 @@ export async function submitStagingRowToScannerAction(rowId: string): Promise<{ 
   const fd = new FormData();
   fd.append('fronts', frontFile);
   fd.append('backs', backFile);
-  const job_id = await uploadImagesToScanner(fd);
+  const job_id = await uploadImagesToScanner(fd, opts);
   return { job_id };
 }
 

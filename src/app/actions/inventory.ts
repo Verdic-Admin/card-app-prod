@@ -28,9 +28,28 @@ interface VercelInventoryItem {
   };
 }
 
-interface EditCardPayload {
-  listed_price?: number;
-}
+/** Fields the admin inventory editor may persist (whitelist — ignores stale Oracle fields on the row). */
+const EDITABLE_INVENTORY_FIELDS = [
+  'player_name',
+  'team_name',
+  'card_set',
+  'card_number',
+  'print_run',
+  'insert_name',
+  'parallel_name',
+  'parallel_insert_type',
+  'cost_basis',
+  'accepts_offers',
+  'is_rookie',
+  'is_auto',
+  'is_relic',
+  'grading_company',
+  'grade',
+] as const;
+
+export type EditCardPayload = Partial<
+  Record<(typeof EDITABLE_INVENTORY_FIELDS)[number] | 'listed_price', unknown>
+>;
 
 export type EditCardActionResult = { success: true; patch: Record<string, unknown> };
 
@@ -397,11 +416,31 @@ export async function editCardAction(id: string, payload: EditCardPayload): Prom
   await checkAuth();
 
   const p = payload as Record<string, unknown>;
+  const patch: Record<string, unknown> = {};
+
+  const catalogUpdates: Record<string, unknown> = {};
+  for (const key of EDITABLE_INVENTORY_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(p, key)) {
+      catalogUpdates[key] = p[key];
+    }
+  }
+
+  if (Object.keys(catalogUpdates).length > 0) {
+    const cols = Object.keys(catalogUpdates);
+    const vals = Object.values(catalogUpdates);
+    const setSql = cols.map((c, i) => `${c} = $${i + 1}`).join(', ');
+    await pool.query(
+      `UPDATE inventory SET ${setSql} WHERE id = $${cols.length + 1}::uuid`,
+      [...vals, id],
+    );
+    Object.assign(patch, catalogUpdates);
+  }
+
   if (!('listed_price' in p)) {
     revalidatePath('/');
     revalidatePath('/admin');
     revalidatePath('/sold');
-    return { success: true, patch: {} };
+    return { success: true, patch };
   }
 
   const newListed = parseFloat(String(p.listed_price ?? ''));
@@ -409,7 +448,7 @@ export async function editCardAction(id: string, payload: EditCardPayload): Prom
     revalidatePath('/');
     revalidatePath('/admin');
     revalidatePath('/sold');
-    return { success: true, patch: {} };
+    return { success: true, patch };
   }
 
   const { rows } = await pool.query(
@@ -455,6 +494,7 @@ export async function editCardAction(id: string, payload: EditCardPayload): Prom
     return {
       success: true,
       patch: {
+        ...patch,
         listed_price: newListed,
         oracle_projection: null,
         market_price: null,
@@ -469,7 +509,7 @@ export async function editCardAction(id: string, payload: EditCardPayload): Prom
   revalidatePath('/');
   revalidatePath('/admin');
   revalidatePath('/sold');
-  return { success: true, patch: { listed_price: newListed } };
+  return { success: true, patch: { ...patch, listed_price: newListed } };
 }
 
 export type DuplicateInventoryItemResult =

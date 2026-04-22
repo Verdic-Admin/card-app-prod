@@ -145,17 +145,25 @@ export function InventoryTable({ initialItems, discountRate = 0, projectionTimef
   const [searchQuery, setSearchQuery] = useState('')
 
   const filteredItems = items.filter(item => {
-     if (!searchQuery) return true;
-     const q = searchQuery.toLowerCase();
-     return (
-        (item.player_name || '').toLowerCase().includes(q) ||
-        (item.team_name || '').toLowerCase().includes(q) ||
-        (item.card_set || '').toLowerCase().includes(q) ||
-        (item.card_number || '').toLowerCase().includes(q) ||
-        (item.insert_name || '').toLowerCase().includes(q) ||
-        (item.parallel_name || '').toLowerCase().includes(q) ||
-        (item.parallel_insert_type || '').toLowerCase().includes(q)
-     );
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase().trim();
+    const pr = item.print_run != null ? String(item.print_run) : '';
+    const prSlash = pr ? `/${pr}` : '';
+    const haystack = [
+      item.player_name,
+      item.team_name,
+      item.card_set,
+      item.card_number,
+      item.insert_name,
+      item.parallel_name,
+      item.parallel_insert_type,
+      pr,
+      prSlash,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    return haystack.includes(q);
   });
 
   const toggleSelectAll = () => {

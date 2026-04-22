@@ -136,6 +136,8 @@ export function BulkIngestionWizard() {
   // Wizard: 1 Upload → 2 Staging → 3 Crop (spinner) → 4 AI → 5 Review
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1)
   const [isSendingToScanner, setIsSendingToScanner] = useState(false)
+  /** HSV mat keying for OpenCV — use Green/Blue when your scan pad matches; improves crop detection vs gray Canny. */
+  const [scannerMat, setScannerMat] = useState<'none' | 'green' | 'blue'>('green')
 
   // Image zoom lightbox
   const [zoomedImg, setZoomedImg] = useState<string | null>(null)
@@ -240,7 +242,10 @@ export function BulkIngestionWizard() {
     try {
       for (const card of pending) {
         setScanProgress(`Uploading scan job…`)
-        const { job_id } = await submitStagingRowToScannerAction(card.id)
+        const { job_id } = await submitStagingRowToScannerAction(
+          card.id,
+          scannerMat === 'none' ? undefined : { chroma: scannerMat },
+        )
         setScanJobId(job_id)
         const cropped = await pollScannerUntilDone(job_id)
         const newRows = await finalizeStagingScanAction(
@@ -932,6 +937,32 @@ export function BulkIngestionWizard() {
               </div>
             )
             })}
+          </div>
+
+          {/* Scanner mat — drives chroma-key in vision worker */}
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface/80 px-4 py-3 text-sm">
+            <span className="font-bold text-foreground shrink-0">Scanner mat</span>
+            <span className="text-xs text-muted max-w-md">
+              Green or blue pad: pick the match so each card separates from the background. Use “None” only for neutral mats.
+            </span>
+            <div className="flex flex-wrap gap-3 ml-auto">
+              {([
+                { id: 'none' as const, label: 'None' },
+                { id: 'green' as const, label: 'Green' },
+                { id: 'blue' as const, label: 'Blue' },
+              ]).map(({ id, label }) => (
+                <label key={id} className="flex items-center gap-1.5 cursor-pointer font-semibold text-foreground text-xs">
+                  <input
+                    type="radio"
+                    name="scannerMat"
+                    checked={scannerMat === id}
+                    onChange={() => setScannerMat(id)}
+                    className="accent-brand"
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
           </div>
 
           {/* Action buttons */}
