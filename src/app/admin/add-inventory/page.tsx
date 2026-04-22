@@ -16,6 +16,10 @@ type StagedSingle = {
   backPreview: string | null;
   data: {
     player_name: string;
+    team_name: string;
+    team_name_source?: 'ocr_back' | 'ocr_with_db_conflict' | 'catalog_db' | 'none' | null;
+    team_name_confidence?: number | null;
+    team_name_verified?: boolean | null;
     target_percentage: number;
     year: string;
     brand: string;
@@ -48,6 +52,7 @@ function blankSingle(): StagedSingle {
     backPreview: null,
     data: {
       player_name: '',
+      team_name: '',
       target_percentage: 80,
       year: '',
       brand: '',
@@ -136,6 +141,10 @@ export default function AddInventoryPage() {
             data: {
               ...s.data,
               player_name: result.player_name || s.data.player_name,
+              team_name: result.team_name || s.data.team_name,
+              team_name_source: result.team_name_source,
+              team_name_confidence: result.team_name_confidence,
+              team_name_verified: result.team_name_verified,
               card_set: result.card_set || s.data.card_set,
               card_number: result.card_number || s.data.card_number,
               insert_name: result.insert_name || s.data.insert_name,
@@ -165,7 +174,7 @@ export default function AddInventoryPage() {
       formData.append('back_image', single.backFile);
       formData.append('data', JSON.stringify({
         player_name: single.data.player_name,
-        team_name: '',
+        team_name: single.data.team_name,
         card_set: single.data.card_set,
         insert_name: single.data.insert_name,
         parallel_name: single.data.parallel_name,
@@ -358,6 +367,29 @@ export default function AddInventoryPage() {
                         className="w-full bg-background border border-border rounded-lg p-3 font-semibold text-foreground focus:ring-1 focus:ring-brand focus:border-brand"
                         placeholder="e.g. LeBron James"
                       />
+                    </div>
+                    <div className="col-span-1 md:col-span-2">
+                      <label className="text-xs font-bold text-muted uppercase tracking-widest mb-1 block">Team Name</label>
+                      <input
+                        type="text"
+                        value={single.data.team_name}
+                        onChange={(e) => updateSingleField(single.id, 'team_name', e.target.value)}
+                        className="w-full bg-background border border-border rounded-lg p-3 font-semibold text-foreground focus:ring-1 focus:ring-brand focus:border-brand"
+                        placeholder="e.g. Los Angeles Dodgers"
+                      />
+                      {single.data.team_name_source && single.data.team_name_source !== 'none' && (
+                        <p className="mt-1 text-[11px] text-muted font-medium">
+                          Source: {single.data.team_name_source}
+                          {typeof single.data.team_name_confidence === 'number'
+                            ? ` · ${(single.data.team_name_confidence * 100).toFixed(0)}%`
+                            : ''}
+                          {typeof single.data.team_name_verified === 'boolean'
+                            ? single.data.team_name_verified
+                              ? ' · DB verified'
+                              : ' · OCR/DB conflict'
+                            : ''}
+                        </p>
+                      )}
                     </div>
                     <div>
                       <label className="text-xs font-bold text-muted uppercase tracking-widest mb-1 block">Card Set</label>

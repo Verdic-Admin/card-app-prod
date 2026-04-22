@@ -76,6 +76,17 @@ export async function requestPricingAction(imageUrl: string): Promise<{
   return response.json();
 }
 
+// Team-name provenance surfaced by the identifier's OCR-preferred resolver.
+// "ocr_back"             — OCR found it on the card back (DB agreed or silent)
+// "ocr_with_db_conflict" — OCR and DB disagreed; OCR kept as primary
+// "catalog_db"           — OCR missed it; DB catalog supplied it
+// "none"                 — neither OCR nor DB produced a team
+export type TeamNameSource =
+  | 'ocr_back'
+  | 'ocr_with_db_conflict'
+  | 'catalog_db'
+  | 'none';
+
 // Normalised flat shape returned by both identify helpers
 export interface IdentifyCardResult {
   status: string;
@@ -85,12 +96,37 @@ export interface IdentifyCardResult {
   card_number: string | null;
   insert_name: string | null;
   parallel_name: string | null; // mapped from card_details.parallel_type
-  team_name: string | null;     // catalog-hit only; null for vector/vision paths
+  team_name: string | null;     // OCR-first; DB catalog as verification/fallback
+  team_name_source: TeamNameSource | null;
+  team_name_confidence: number | null; // 0.0 - 1.0
+  team_name_verified: boolean | null;  // true when OCR agrees with DB
   print_run: number | null;
 }
 
 function normalizeIdentifyResponse(raw: any): IdentifyCardResult {
   const cd = raw?.card_details ?? {};
+  const source = cd.team_name_source;
+  const validSources: TeamNameSource[] = [
+    'ocr_back',
+    'ocr_with_db_conflict',
+    'catalog_db',
+    'none',
+  ];
+  const team_name_source: TeamNameSource | null =
+    typeof source === 'string' && (validSources as string[]).includes(source)
+      ? (source as TeamNameSource)
+      : null;
+
+  const rawConfidence = cd.team_name_confidence;
+  const team_name_confidence =
+    typeof rawConfidence === 'number' && Number.isFinite(rawConfidence)
+      ? rawConfidence
+      : null;
+
+  const rawVerified = cd.team_name_verified;
+  const team_name_verified =
+    typeof rawVerified === 'boolean' ? rawVerified : null;
+
   return {
     status:       raw?.status        ?? 'unknown',
     confidence:   raw?.confidence    ?? 0,
@@ -100,6 +136,9 @@ function normalizeIdentifyResponse(raw: any): IdentifyCardResult {
     insert_name:  cd.insert_name     ?? null,
     parallel_name: cd.parallel_type  ?? null,
     team_name:    cd.team_name       ?? null,
+    team_name_source,
+    team_name_confidence,
+    team_name_verified,
     print_run:    null, // always user-input; AI value intentionally ignored
   };
 }

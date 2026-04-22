@@ -15,6 +15,9 @@ export function Footer({ settings }: FooterProps) {
           <Link href="/" className="hover:text-foreground transition-colors">
             Home
           </Link>
+          <Link href="/admin" className="hover:text-foreground transition-colors">
+            Admin
+          </Link>
           <Link href="/faq" className="hover:text-foreground transition-colors">
             Shipping &amp; FAQ
           </Link>

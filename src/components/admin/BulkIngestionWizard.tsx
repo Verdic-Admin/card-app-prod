@@ -43,6 +43,9 @@ interface StagingCard {
   confidence?: number
   ai_status?: string
   repricing?: boolean
+  team_name_source?: 'ocr_back' | 'ocr_with_db_conflict' | 'catalog_db' | 'none' | null
+  team_name_confidence?: number | null
+  team_name_verified?: boolean | null
 }
 
 function isPendingScan(c: StagingCard): boolean {
@@ -417,15 +420,18 @@ export function BulkIngestionWizard() {
               // print_run is intentionally not applied from AI — user input only
               confidence,
               ai_status: aiStatus,
+              team_name_source: res.team_name_source,
+              team_name_confidence: res.team_name_confidence,
+              team_name_verified: res.team_name_verified,
             }
             const dbPayload: Record<string, unknown> = {
               player_name:   updates[idx].player_name,
+              team_name:     updates[idx].team_name,
               card_set:      updates[idx].card_set,
               card_number:   updates[idx].card_number,
               insert_name:   updates[idx].insert_name,
               parallel_name: updates[idx].parallel_name,
             }
-            if (aiTeam) dbPayload.team_name = aiTeam
             updateDraftCardAction(updates[idx].id, dbPayload).catch(() => {})
           }
         } catch (e: any) {
@@ -807,6 +813,17 @@ export function BulkIngestionWizard() {
                         placeholder="Team"
                         className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
                       />
+                      {card.team_name_source && card.team_name_source !== 'none' && (
+                        <div className="col-span-2 text-[10px] text-muted font-medium bg-surface-hover border border-border rounded-md px-2 py-1">
+                          Team source: {card.team_name_source}
+                          {typeof card.team_name_confidence === 'number' ? ` · ${(card.team_name_confidence * 100).toFixed(0)}%` : ''}
+                          {typeof card.team_name_verified === 'boolean'
+                            ? card.team_name_verified
+                              ? ' · DB verified'
+                              : ' · OCR/DB conflict'
+                            : ''}
+                        </div>
+                      )}
                       <input
                         value={card.card_set}
                         onChange={e => updateField(card.id, 'card_set', e.target.value)}
@@ -1083,6 +1100,17 @@ export function BulkIngestionWizard() {
                           />
                         ))}
                       </div>
+                      {card.team_name_source && card.team_name_source !== 'none' && (
+                        <div className="text-[10px] text-muted font-medium bg-surface-hover border border-border rounded-md px-2 py-1">
+                          Team source: {card.team_name_source}
+                          {typeof card.team_name_confidence === 'number' ? ` · ${(card.team_name_confidence * 100).toFixed(0)}%` : ''}
+                          {typeof card.team_name_verified === 'boolean'
+                            ? card.team_name_verified
+                              ? ' · DB verified'
+                              : ' · OCR/DB conflict'
+                            : ''}
+                        </div>
+                      )}
 
                       {/* Attribute flags */}
                       <div className="flex items-center gap-3 flex-wrap pt-0.5">
