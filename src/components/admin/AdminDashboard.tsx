@@ -123,8 +123,12 @@ export function AdminDashboard() {
       }
       data.append('data', JSON.stringify(payload))
       
-      await addCardAction(data)
-      
+      const addResult = await addCardAction(data)
+      if (!addResult.success) {
+        setError(addResult.error)
+        return
+      }
+
       // Reset
       setFile(null)
       setBackFile(null)

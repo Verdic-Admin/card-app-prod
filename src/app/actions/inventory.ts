@@ -67,33 +67,70 @@ export async function uploadAssetAction(formData: FormData) {
   return { url: blob.url };
 }
 
-export async function addCardAction(formData: FormData) {
-  await checkAuth();
+export type AddCardResult =
+  | { success: true }
+  | { success: false; error: string };
 
-  const file = formData.get('image') as File
-  const backFile = formData.get('back_image') as File | null
-  const payload = JSON.parse(formData.get('data') as string)
-
-  if (!file) throw new Error("Missing primary image file")
-  if (!backFile || backFile.size === 0) {
-    throw new Error('Back image is required — upload front and back for every card.')
+export async function addCardAction(formData: FormData): Promise<AddCardResult> {
+  function errMessage(e: unknown): string {
+    if (e instanceof Error) return e.message;
+    if (typeof e === 'object' && e != null && 'message' in e) {
+      return String((e as { message: unknown }).message);
+    }
+    return String(e);
   }
-  const name = payload?.player_name != null ? String(payload.player_name).trim() : ''
-  if (!name) throw new Error('Player name is required before saving to inventory')
 
-  const fileExt = file.name.split('.').pop() || 'jpg'
-  const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
+  function n(v: unknown, fallback = 0): number {
+    if (v == null || v === '') return fallback;
+    const x = typeof v === 'number' ? v : parseFloat(String(v).replace(/,/g, ''));
+    return Number.isFinite(x) ? x : fallback;
+  }
 
-  const blob = await put(`card-images/${fileName}`, file, {
-    access: 'public',
-  });
+  try {
+    await checkAuth();
 
-  const backExt = (backFile.name || '').split('.').pop() || 'jpg'
-  const backFileName = `back-${Date.now()}-${Math.random().toString(36).substring(7)}.${backExt}`
-  const backBlob = await put(`card-images/${backFileName}`, backFile, { access: 'public' })
-  const backImageUrl = backBlob.url
+    const file = formData.get('image') as File;
+    const backFile = formData.get('back_image') as File | null;
+    let payload: Record<string, unknown>;
+    try {
+      payload = JSON.parse(String(formData.get('data') ?? '{}')) as Record<string, unknown>;
+    } catch {
+      return { success: false, error: 'Invalid card data (could not parse JSON).' };
+    }
 
-  await pool.query(`
+    if (!file) return { success: false, error: 'Missing primary image file.' };
+    if (!backFile || backFile.size === 0) {
+      return {
+        success: false,
+        error: 'Back image is required — upload front and back for every card.',
+      };
+    }
+    const name = payload?.player_name != null ? String(payload.player_name).trim() : '';
+    if (!name) {
+      return { success: false, error: 'Player name is required before saving to inventory.' };
+    }
+
+    const teamRaw = payload.team_name;
+    const teamName =
+      teamRaw != null && String(teamRaw).trim() !== '' ? String(teamRaw).trim() : null;
+
+    const fileExt = file.name.split('.').pop() || 'jpg';
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+    const blob = await put(`card-images/${fileName}`, file, {
+      access: 'public',
+    });
+
+    const backExt = (backFile.name || '').split('.').pop() || 'jpg';
+    const backFileName = `back-${Date.now()}-${Math.random().toString(36).substring(7)}.${backExt}`;
+    const backBlob = await put(`card-images/${backFileName}`, backFile, { access: 'public' });
+    const backImageUrl = backBlob.url;
+
+    const avg = n(payload.avg_price);
+    const listed = n(payload.listed_price, avg);
+
+    await pool.query(
+      `
     INSERT INTO inventory (
       player_name, team_name, card_set, insert_name, parallel_name, card_number, 
       high_price, low_price, avg_price, listed_price, cost_basis, accepts_offers, 
@@ -108,11 +145,37 @@ export async function addCardAction(formData: FormData) {
       $15, $16, $17, $18, $19,
       'available'
     )
-  `, [name, payload.team_name, payload.card_set, payload.insert_name, payload.parallel_name, payload.card_number, payload.high_price, payload.low_price, payload.avg_price, payload.listed_price || payload.avg_price, payload.cost_basis || 0, payload.accepts_offers || false, blob.url, backImageUrl, payload.is_rookie || false, payload.is_auto || false, payload.is_relic || false, payload.grading_company || null, payload.grade || null]);
+  `,
+      [
+        name,
+        teamName,
+        payload.card_set,
+        payload.insert_name,
+        payload.parallel_name,
+        payload.card_number,
+        n(payload.high_price, avg),
+        n(payload.low_price, avg),
+        avg,
+        listed,
+        n(payload.cost_basis, 0),
+        Boolean(payload.accepts_offers),
+        blob.url,
+        backImageUrl,
+        Boolean(payload.is_rookie),
+        Boolean(payload.is_auto),
+        Boolean(payload.is_relic),
+        payload.grading_company != null ? String(payload.grading_company) : null,
+        payload.grade != null ? String(payload.grade) : null,
+      ],
+    );
 
-  revalidatePath('/')
-  revalidatePath('/admin')
-  return { success: true }
+    revalidatePath('/');
+    revalidatePath('/admin');
+    return { success: true };
+  } catch (e) {
+    console.error('[addCardAction]', e);
+    return { success: false, error: errMessage(e) };
+  }
 }
 
 export async function batchCommitAction(items: BulkInventoryItem[]) {

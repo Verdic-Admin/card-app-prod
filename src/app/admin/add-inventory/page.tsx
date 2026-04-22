@@ -181,7 +181,11 @@ export default function AddInventoryPage() {
         grading_company: single.data.grading_company || null,
         grade: single.data.grade || null,
       }));
-      await addCardAction(formData);
+      const result = await addCardAction(formData);
+      if (!result.success) {
+        alert('Save failed: ' + result.error);
+        return;
+      }
       setStagedSingles(prev => prev.map(s => s.id === id ? { ...s, saving: false, saved: true } : s));
     } catch (err: any) {
       alert(`Save failed: ${err.message}`);
