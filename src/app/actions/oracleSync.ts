@@ -27,6 +27,7 @@ export async function syncInventoryWithOracle() {
   console.log("-> Fetching active inventory from Vercel Postgres...");
   const { rows: inventory } = await pool.query(
     `SELECT id, player_name, card_set, card_number, insert_name, parallel_name,
+            parallel_insert_type,
             is_auto, is_relic, is_rookie, print_run
      FROM inventory WHERE status = 'available'`
   );
@@ -83,6 +84,7 @@ export async function syncInventoryWithOracle() {
         String(row.card_number || ''),
         String(row.insert_name || ''),
         String(row.parallel_name || ''),
+        String(row.parallel_insert_type || ''),
       ].filter(Boolean).join(' ');
       return {
         player_name: toTitleCase(String(row.player_name || '')),
@@ -91,6 +93,9 @@ export async function syncInventoryWithOracle() {
         print_run:   row.print_run ? Number(row.print_run) : undefined,
         attributes:  rawFuzzy,
         storefront_id: String(row.id),
+        is_auto:   Boolean(row.is_auto),
+        is_relic:  Boolean(row.is_relic),
+        is_rookie: Boolean(row.is_rookie),
       };
     });
 
@@ -375,6 +380,7 @@ export async function getBatchOraclePrices(cards: any[]) {
         c.card_number,
         c.insert_name,
         c.parallel_name,
+        c.parallel_insert_type,
         c.attributes
       ].filter(Boolean).join(" ");
       
@@ -384,7 +390,10 @@ export async function getBatchOraclePrices(cards: any[]) {
         card_number: String(c.card_number || ""),
         print_run: c.print_run ? Number(c.print_run) : undefined,
         attributes: String(rawFuzzyString),
-        storefront_id: String(c.storefront_id || c.db_id || "batch-item")
+        storefront_id: String(c.storefront_id || c.db_id || "batch-item"),
+        is_auto: Boolean(c.is_auto),
+        is_relic: Boolean(c.is_relic),
+        is_rookie: Boolean(c.is_rookie),
       };
     });
 
