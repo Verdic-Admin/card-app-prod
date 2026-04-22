@@ -1,11 +1,22 @@
 import { Pool } from 'pg';
 
-if (!process.env.DATABASE_URL) {
-  console.warn("WARNING: DATABASE_URL is not defined during build. Ensure it is injected at runtime.");
+const rawDatabaseUrl = (process.env.DATABASE_URL || '').trim();
+
+function hasResolvableHost(connectionString: string): boolean {
+  if (!connectionString) return false;
+  try {
+    const parsed = new URL(connectionString);
+    // Guard against placeholder values like "base" that fail DNS at build time.
+    return Boolean(parsed.hostname) && parsed.hostname !== 'base';
+  } catch {
+    return false;
+  }
 }
 
+export const hasUsableDatabaseUrl = hasResolvableHost(rawDatabaseUrl);
+
 export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || '',
+  connectionString: rawDatabaseUrl || '',
 });
 
 export default pool;

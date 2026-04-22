@@ -1418,9 +1418,9 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                     </div>
                   </div>
                 </>
-                      </>
                     );
                   })()}
+                </>
               )}
             </div>
           </div>

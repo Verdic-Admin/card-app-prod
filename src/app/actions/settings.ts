@@ -1,5 +1,5 @@
 "use server";
-import pool from '@/utils/db';
+import pool, { hasUsableDatabaseUrl } from '@/utils/db';
 
 import { revalidatePath } from 'next/cache';
 import { DEFAULT_STORE_SETTINGS, type StoreSettings } from '@/lib/store-settings';
@@ -50,6 +50,9 @@ function normalizeStoreRow(row: Record<string, unknown>): StoreSettings {
 }
 
 export async function getStoreSettings(): Promise<StoreSettings> {
+  if (!hasUsableDatabaseUrl) {
+    return { ...DEFAULT_STORE_SETTINGS };
+  }
   try {
     const { rows } = await pool.query(`SELECT * FROM store_settings WHERE id = 1`);
     const row = rows[0];
@@ -58,7 +61,10 @@ export async function getStoreSettings(): Promise<StoreSettings> {
     }
     return normalizeStoreRow(row as Record<string, unknown>);
   } catch (e) {
-    console.error('[getStoreSettings]', e);
+    const err = e as { code?: string; hostname?: string };
+    if (!(err?.code === 'ENOTFOUND' && err?.hostname === 'base')) {
+      console.error('[getStoreSettings]', e);
+    }
     return { ...DEFAULT_STORE_SETTINGS };
   }
 }
