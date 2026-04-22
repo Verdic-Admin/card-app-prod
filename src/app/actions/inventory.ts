@@ -561,6 +561,97 @@ export async function sendToAuctionBlock(ids: string[], formData?: FormData) {
   revalidatePath('/admin');
 }
 
+export interface AuctionStageItemInput {
+  id: string;
+  reservePrice?: number | null;
+  endTime?: string | null;
+  description?: string | null;
+}
+
+export interface AuctionStageGlobals {
+  endTime?: string | null;
+  description?: string | null;
+}
+
+export type StageAuctionItemsResult =
+  | { success: true; count: number }
+  | { success: false; error: string };
+
+/**
+ * Stage one or more cards into the auction block with per-item values and optional
+ * session-wide defaults. Per-item values always win over globals; missing values
+ * fall through to globals, then to whatever is already stored (via COALESCE).
+ */
+export async function stageAuctionItems(
+  items: AuctionStageItemInput[],
+  globals?: AuctionStageGlobals,
+): Promise<StageAuctionItemsResult> {
+  try {
+    await checkAuth();
+    if (!items || items.length === 0) return { success: true, count: 0 };
+
+    const globalEnd = globals?.endTime ? String(globals.endTime) : null;
+    const globalDesc = globals?.description ? String(globals.description) : null;
+
+    for (const raw of items) {
+      if (!raw || !raw.id) continue;
+
+      const { rows: itemRows } = await pool.query(
+        `SELECT is_lot, lot_id FROM inventory WHERE id = $1`,
+        [raw.id],
+      );
+      if (itemRows.length === 0) continue;
+      const item = itemRows[0];
+
+      if (item.lot_id) {
+        return {
+          success: false,
+          error: `Item ${raw.id} is part of an active bundle (Lot ID: ${item.lot_id}). Un-bundle it or auction the lot instead.`,
+        };
+      }
+
+      const reservePrice =
+        raw.reservePrice != null && !Number.isNaN(Number(raw.reservePrice))
+          ? Number(raw.reservePrice)
+          : null;
+      const endTime = raw.endTime ? String(raw.endTime) : globalEnd;
+      const description =
+        raw.description != null && raw.description !== ''
+          ? String(raw.description)
+          : globalDesc;
+
+      await pool.query(
+        `
+        UPDATE inventory
+        SET is_auction = true,
+            auction_status = 'pending',
+            auction_reserve_price = COALESCE($1, auction_reserve_price),
+            auction_end_time = COALESCE($2, auction_end_time),
+            auction_description = COALESCE($3, auction_description)
+        WHERE id = $4
+      `,
+        [reservePrice, endTime, description, raw.id],
+      );
+
+      if (item.is_lot) {
+        await pool.query(
+          `UPDATE inventory SET status = 'auction_staged' WHERE lot_id = $1`,
+          [raw.id],
+        );
+      }
+    }
+
+    revalidatePath('/admin');
+    revalidatePath('/admin/auction-studio');
+    revalidatePath('/auction');
+
+    return { success: true, count: items.length };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { success: false, error: msg };
+  }
+}
+
 export async function placeBidAction(itemId: string, bidderEmail: string, bidAmount: number) {
   // Using an atomic transaction ensures no race conditions on read/write of current_bid
   // Vercel Postgres does NOT have transaction blocks directly via `pool.query(`, we must use pooled client OR single raw query string with returning.

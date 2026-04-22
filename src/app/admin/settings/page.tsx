@@ -189,6 +189,40 @@ export default function SettingsPage() {
 
 
 
+        {/* Live Auction */}
+        <div>
+          <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+            <span className="bg-red-100 text-red-700 w-6 h-6 flex items-center justify-center rounded-full text-xs">3</span>
+            Live Auction
+          </h3>
+          <div className="space-y-4 p-5 bg-surface md:bg-surface-hover border border-border rounded-xl">
+            <div>
+              <label className="block text-xs font-bold text-foreground md:text-muted uppercase tracking-wider mb-2">
+                QR Code Target URL
+              </label>
+              <input
+                type="url"
+                value={settings.auction_qr_url || ''}
+                onChange={e => setSettings({ ...settings, auction_qr_url: e.target.value })}
+                className="w-full px-3 py-2 bg-surface border border-border md:border-muted/30 rounded-lg text-sm text-foreground focus:ring-2 focus:ring-brand outline-none shadow-sm placeholder:text-muted/40"
+                placeholder="Leave blank to auto-point at /bid → /auction"
+              />
+              <div className="text-[11px] text-muted mt-1.5 font-medium leading-relaxed space-y-1">
+                <p>
+                  The in-studio QR code encodes this URL. Leave blank and it falls back to{' '}
+                  <code className="text-foreground">/bid</code>, a stable short link on your own
+                  domain that redirects to the Live Auctions page — ideal for printed signage so
+                  you never have to reprint if the destination changes.
+                </p>
+                <p>
+                  Set it explicitly to anything (external bidding form, bit.ly link, Discord
+                  invite, etc.) to override where the QR code scans to.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Submit */}
         <div className="pt-6 border-t border-border flex items-center justify-between">
             <div>

@@ -26,11 +26,12 @@ export default async function AuctionStudioPage() {
   const inventory = (rows as Record<string, unknown>[]).map(normalizeInventoryMoneyFields);
 
   // Fetch Oracle discount percentage and stream settings
-  const { rows: storeRows } = await pool.query(`SELECT live_stream_url, projection_timeframe FROM store_settings WHERE id = 1`);
+  const { rows: storeRows } = await pool.query(`SELECT live_stream_url, projection_timeframe, auction_qr_url FROM store_settings WHERE id = 1`);
   const settings = storeRows[0] || {};
 
   const liveStreamUrl = settings?.live_stream_url || null
   const projectionTimeframe = settings?.projection_timeframe || '90-Day'
+  const auctionQrUrl = settings?.auction_qr_url || null
 
   return (
     <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -65,6 +66,7 @@ export default async function AuctionStudioPage() {
           initialItems={inventory || []} 
           initialStreamUrl={liveStreamUrl} 
           initialProjectionTimeframe={projectionTimeframe}
+          initialAuctionQrUrl={auctionQrUrl}
         />
       </div>
     </div>

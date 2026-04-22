@@ -49,6 +49,7 @@ ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS site_announcement_url TEXT;
 ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS oracle_discount_percentage NUMERIC(5, 2) DEFAULT 0.0;
 ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS live_stream_url TEXT;
 ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS projection_timeframe TEXT DEFAULT '90-Day';
+ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS auction_qr_url TEXT;
 
 -- shop_config: optional legacy columns (Oracle URL was mirrored here in older templates)
 ALTER TABLE shop_config ADD COLUMN IF NOT EXISTS playerindex_api_base_url TEXT;
@@ -258,7 +259,8 @@ async function init() {
       payment_zelle TEXT DEFAULT '',
       shipping_fee NUMERIC(10, 2) DEFAULT 4.00,
       free_shipping_threshold NUMERIC(10, 2) DEFAULT 25.00,
-      site_announcement_url TEXT
+      site_announcement_url TEXT,
+      auction_qr_url TEXT
     );
   `);
   await client.query(`INSERT INTO store_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;`);

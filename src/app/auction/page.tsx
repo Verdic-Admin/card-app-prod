@@ -44,7 +44,6 @@ export default async function LiveAuctionPage() {
           </span>
           Live Auctions
         </h1>
-        <p className="text-muted font-medium">Watch the stream and place your bids.</p>
       </div>
 
       <div className="mb-12">

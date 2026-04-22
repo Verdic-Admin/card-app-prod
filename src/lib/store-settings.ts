@@ -15,6 +15,7 @@ export interface StoreSettings {
   oracle_discount_percentage: number;
   projection_timeframe?: string;
   live_stream_url?: string | null;
+  auction_qr_url?: string | null;
   site_name: string;
   site_author: string | null;
   site_theme: string;

@@ -37,6 +37,7 @@ function normalizeStoreRow(row: Record<string, unknown>): StoreSettings {
     oracle_discount_percentage: num(row.oracle_discount_percentage, 0),
     projection_timeframe: row.projection_timeframe != null ? str(row.projection_timeframe) : undefined,
     live_stream_url: row.live_stream_url != null ? str(row.live_stream_url) : undefined,
+    auction_qr_url: row.auction_qr_url != null ? str(row.auction_qr_url) : null,
     site_name: str(row.site_name, DEFAULT_STORE_SETTINGS.site_name),
     site_author: row.site_author != null && String(row.site_author).length ? str(row.site_author) : null,
     site_theme: str(row.site_theme, 'dark'),
@@ -92,6 +93,7 @@ export async function updateStoreSettings(settings: StoreSettings) {
     settings.payment_cashapp,
     settings.payment_zelle,
     settings.site_announcement_url ?? null,
+    settings.auction_qr_url ?? null,
   ];
   try {
     await pool.query(
@@ -101,10 +103,10 @@ export async function updateStoreSettings(settings: StoreSettings) {
               social_instagram, social_twitter, social_facebook, social_discord, social_threads,
               oracle_discount_percentage, site_name, site_author, site_theme,
               payment_link, payment_instructions, payment_venmo, payment_paypal, payment_cashapp, payment_zelle,
-              site_announcement_url
+              site_announcement_url, auction_qr_url
             ) VALUES (
               1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-              $21
+              $21, $22
             )
             ON CONFLICT (id) DO UPDATE SET
               cart_minimum = EXCLUDED.cart_minimum,
@@ -127,7 +129,8 @@ export async function updateStoreSettings(settings: StoreSettings) {
               payment_paypal = EXCLUDED.payment_paypal,
               payment_cashapp = EXCLUDED.payment_cashapp,
               payment_zelle = EXCLUDED.payment_zelle,
-              site_announcement_url = EXCLUDED.site_announcement_url
+              site_announcement_url = EXCLUDED.site_announcement_url,
+              auction_qr_url = EXCLUDED.auction_qr_url
             `,
       v
     );
