@@ -1374,12 +1374,18 @@ export function InventoryTable({ initialItems, discountRate = 0, liveStreamUrl =
                         {item.status === 'available' ? 'Available' : 'Sold'}
                       </button>
                       {errorId === item.id && <div className="text-[10px] text-red-500 font-medium">Failed</div>}
-                      <div className="flex gap-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                      <div className="flex gap-1.5 opacity-100 transition-opacity flex-wrap justify-end">
                         <button onClick={() => startEditing(item)} className="text-indigo-600 hover:text-indigo-800 hover:bg-indigo-100 bg-indigo-50 h-7 w-7 rounded flex items-center justify-center transition-colors" title="Edit">
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
-                        <button onClick={() => handleSingleSync(item.id)} disabled={syncingId === item.id} className="text-purple-600 hover:text-purple-800 hover:bg-purple-100 bg-purple-50 h-7 w-7 rounded disabled:opacity-50 flex items-center justify-center transition-colors" title="Sync Pricing">
+                        <button
+                          onClick={() => handleSingleSync(item.id)}
+                          disabled={syncingId === item.id}
+                          className="text-purple-700 hover:text-purple-900 hover:bg-purple-100 bg-purple-50 h-7 px-2 rounded disabled:opacity-50 flex items-center justify-center gap-1.5 transition-colors text-[11px] font-bold"
+                          title="Sync Pricing"
+                        >
                           {syncingId === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                          <span>Sync Pricing</span>
                         </button>
                         <a
                           href={`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent([item.player_name, item.card_set, item.insert_name, item.parallel_name, item.parallel_insert_type, item.card_number].filter(v => v && v.toLowerCase() !== 'base').join(' '))}&LH_Sold=1&LH_Complete=1`}
