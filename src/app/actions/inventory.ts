@@ -729,11 +729,19 @@ export async function sendToAuctionBlock(ids: string[], formData?: FormData) {
          reservePrice = formData.get('reservePrice') ? Number(formData.get('reservePrice')) : null;
          endTime = formData.get('endTime') ? formData.get('endTime') as string : null;
          description = formData.get('description') ? formData.get('description') as string : null;
-         const file = formData.get('coinedImage') as File;
-         if (file && file.size > 0) {
-            const fileName = `auction-coin-${Date.now()}.${file.name.split('.').pop()}`;
-            const blob = await put(`card-images/${fileName}`, file, { access: 'public' });
-            coinedImageUrl = blob.url;
+         const file = formData.get('coinedImage');
+         if (file instanceof Blob && file.size > 0) {
+            const ext =
+              file instanceof File && file.name
+                ? file.name.split('.').pop()
+                : 'jpg';
+            const fileName = `auction-coin-${Date.now()}.${ext || 'jpg'}`;
+            const contentType =
+              file instanceof File && file.type
+                ? file.type
+                : 'image/jpeg';
+            const upload = await put(`card-images/${fileName}`, file, { access: 'public', contentType });
+            coinedImageUrl = upload.url;
          }
      }
 
@@ -1014,8 +1022,8 @@ export async function updateStagedAuction(
   const reservePrice = formData.get('reservePrice') as string;
   const endTime = formData.get('endTime') as string;
   const description = formData.get('description') as string;
-  const file = formData.get('coinedImage') as File | null;
-
+  // Next.js can supply File, Blob, or a string for empty file inputs; accept any Blob.
+  const file = formData.get('coinedImage');
   if (reservePrice) {
     await pool.query(`UPDATE inventory SET auction_reserve_price = $1 WHERE id = $2::uuid`, [
       Number(reservePrice),
@@ -1032,10 +1040,14 @@ export async function updateStagedAuction(
     ]);
   }
 
-  if (file && typeof (file as File).size === 'number' && (file as File).size > 0) {
-    const fileExt = (file as File).name.split('.').pop();
-    const fileName = `auction-coin-${Date.now()}.${fileExt}`;
-    const blob = await put(`card-images/${fileName}`, file as File, { access: 'public' });
+  if (file instanceof Blob && file.size > 0) {
+    const fileExt = file instanceof File && file.name ? file.name.split('.').pop() : 'jpg';
+    const fileName = `auction-coin-${Date.now()}.${fileExt || 'jpg'}`;
+    const contentType =
+      file instanceof File && file.type
+        ? file.type
+        : 'image/jpeg';
+    const blob = await put(`card-images/${fileName}`, file, { access: 'public', contentType });
     await pool.query(`UPDATE inventory SET coined_image_url = $1 WHERE id = $2::uuid`, [
       blob.url,
       itemId,

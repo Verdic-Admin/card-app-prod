@@ -26,11 +26,14 @@ export default async function AuctionStudioPage() {
   const inventory = (rows as Record<string, unknown>[]).map(normalizeInventoryMoneyFields);
 
   // Fetch auction studio settings
-  const { rows: storeRows } = await pool.query(`SELECT projection_timeframe, auction_qr_url FROM store_settings WHERE id = 1`);
+  const { rows: storeRows } = await pool.query(
+    `SELECT projection_timeframe, auction_qr_url, oracle_discount_percentage FROM store_settings WHERE id = 1`,
+  );
   const settings = storeRows[0] || {};
 
   const projectionTimeframe = settings?.projection_timeframe || '90-Day'
   const auctionQrUrl = settings?.auction_qr_url || null
+  const discountRate = Number(settings?.oracle_discount_percentage ?? 0) || 0
 
   return (
     <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -50,9 +53,9 @@ export default async function AuctionStudioPage() {
               <InstructionTrigger 
                  title="Live Auction Setup Guide"
                  steps={[
-                    { title: "Step 1: Stage the Block", content: "Select cards for your session and set reserve/end/description per card. This queues them in Pending without exposing them live yet." },
-                    { title: "Step 2: Share Your Own Stream", content: "Run your livestream wherever you want (Instagram, Whatnot, YouTube, TikTok, etc.) and share your own stream link on socials." },
-                    { title: "Step 3: Push Cards Live", content: "When you're ready, push selected pending cards to live status so bidders can place bids on the public auction page." }
+                    { title: "1. Add from inventory", content: "Search your inventory, check cards, set reserve and end time (optional session defaults), then Stage. Only one flow — no duplicate staging panels elsewhere." },
+                    { title: "2. Staging + coin photo", content: "Each row shows store and PI pricing. Save reserve, attach a coin verification photo (Save row), then GO LIVE." },
+                    { title: "3. Stream + bids", content: "Run your stream where you like. Bidders use your auction page; live items accept bids there." }
                  ]}
               />
           </h1>
@@ -61,10 +64,11 @@ export default async function AuctionStudioPage() {
       </div>
 
       <div className="flex flex-col space-y-10">
-        <LiveAuctionStudio 
-          initialItems={inventory || []} 
+        <LiveAuctionStudio
+          initialItems={inventory || []}
           initialProjectionTimeframe={projectionTimeframe}
           initialAuctionQrUrl={auctionQrUrl}
+          discountRate={discountRate}
         />
       </div>
     </div>

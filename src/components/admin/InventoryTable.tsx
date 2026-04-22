@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { Database } from '@/types/database.types'
-import { toggleCardStatus, editCardAction, deleteCardAction, bulkDeleteCardsAction, bulkUpdateMetricsAction, rotateCardImageAction, sendToAuctionBlock, removeFromAuctionBlock, setAuctionStatus, updateProjectionTimeframe, createLotAction, breakLotAction, updateLotChildren, duplicateInventoryItem } from '@/app/actions/inventory'
+import { toggleCardStatus, editCardAction, deleteCardAction, bulkDeleteCardsAction, bulkUpdateMetricsAction, rotateCardImageAction, removeFromAuctionBlock, updateProjectionTimeframe, createLotAction, breakLotAction, updateLotChildren, duplicateInventoryItem } from '@/app/actions/inventory'
 import { syncSingleItemWithOracle, syncInventoryWithOracle, applyOracleDiscount, applyOracleDiscountAll, applyCorrection, approvePriceOnly, denyCorrection } from '@/app/actions/oracleSync'
 import { Loader2, Trash2, Edit2, Check, X, Search, Download, RotateCw, RefreshCw, DollarSign, Save, AlertCircle, Gavel, Package, Share2, CopyPlus } from 'lucide-react'
 import { price } from '@/utils/math'
@@ -468,29 +469,11 @@ export function InventoryTable({ initialItems, discountRate = 0, projectionTimef
   // Auction Block Handlers
   const auctionItems = items.filter(i => (i as any).is_auction === true)
 
-  const handleAddToAuction = async (id: string) => {
-    setAuctionLoadingId(id)
-    try {
-      await sendToAuctionBlock([id])
-      setItems(prev => prev.map(i => i.id === id ? { ...i, is_auction: true, auction_status: 'pending' } as any : i))
-    } catch (e: any) { alert('Failed: ' + e.message) }
-    finally { setAuctionLoadingId(null) }
-  }
-
   const handleRemoveFromAuction = async (id: string) => {
     setAuctionLoadingId(id)
     try {
       await removeFromAuctionBlock(id)
       setItems(prev => prev.map(i => i.id === id ? { ...i, is_auction: false, auction_status: 'pending' } as any : i))
-    } catch (e: any) { alert('Failed: ' + e.message) }
-    finally { setAuctionLoadingId(null) }
-  }
-
-  const handleSetStatus = async (id: string, status: 'pending' | 'live' | 'ended') => {
-    setAuctionLoadingId(id)
-    try {
-      await setAuctionStatus(id, status)
-      setItems(prev => prev.map(i => i.id === id ? { ...i, auction_status: status } as any : i))
     } catch (e: any) { alert('Failed: ' + e.message) }
     finally { setAuctionLoadingId(null) }
   }
@@ -942,8 +925,12 @@ export function InventoryTable({ initialItems, discountRate = 0, projectionTimef
         </div>
 
         {auctionItems.length === 0 ? (
-          <div className="py-8 text-center text-zinc-600 text-sm font-medium">
-            No items on the auction block. Use the <Gavel className="inline w-3.5 h-3.5 mx-1" /> button on any card below to add it.
+          <div className="py-8 text-center text-zinc-600 text-sm font-medium max-w-md mx-auto px-4">
+            No items on the auction block. Use{' '}
+            <Link href="/admin/auction-studio#add-from-inventory" className="text-amber-400 font-bold hover:underline">
+              Auction staging
+            </Link>{' '}
+            to search inventory and stage cards in one place.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -953,7 +940,7 @@ export function InventoryTable({ initialItems, discountRate = 0, projectionTimef
                   <th className="px-4 py-2.5 font-bold text-zinc-500 uppercase tracking-widest text-[10px]">Card</th>
                   <th className="px-4 py-2.5 font-bold text-zinc-500 uppercase tracking-widest text-[10px]">Current Bid</th>
                   <th className="px-4 py-2.5 font-bold text-zinc-500 uppercase tracking-widest text-[10px]">Status</th>
-                  <th className="px-4 py-2.5 font-bold text-zinc-500 uppercase tracking-widest text-[10px] text-right">Controls</th>
+                  <th className="px-4 py-2.5 font-bold text-zinc-500 uppercase tracking-widest text-[10px] text-right">Studio</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/60">
@@ -995,17 +982,19 @@ export function InventoryTable({ initialItems, discountRate = 0, projectionTimef
                         }`}>{status}</span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {status !== 'live' && (
-                            <button onClick={() => handleSetStatus(item.id, 'live')} disabled={isLoading}
-                              className="bg-red-600 hover:bg-red-700 text-white text-[10px] font-black px-2.5 py-1 rounded transition-colors disabled:opacity-50">Go Live</button>
-                          )}
-                          {status === 'live' && (
-                            <button onClick={() => handleSetStatus(item.id, 'ended')} disabled={isLoading}
-                              className="bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-[10px] font-bold px-2.5 py-1 rounded transition-colors disabled:opacity-50">End</button>
-                          )}
-                          <button onClick={() => handleRemoveFromAuction(item.id)} disabled={isLoading}
-                            className="bg-zinc-800 hover:bg-red-900/50 text-zinc-400 hover:text-red-400 text-[10px] font-bold px-2 py-1 rounded border border-zinc-700 hover:border-red-800 transition-colors disabled:opacity-50">
+                        <div className="flex flex-col items-end gap-1.5">
+                          <Link
+                            href="/admin/auction-studio#auction-staging"
+                            className="text-[10px] font-black text-amber-400 hover:text-amber-300 uppercase tracking-tight"
+                          >
+                            Staging &amp; go live
+                          </Link>
+                          <button
+                            onClick={() => handleRemoveFromAuction(item.id)}
+                            disabled={isLoading}
+                            className="bg-zinc-800 hover:bg-red-900/50 text-zinc-400 hover:text-red-400 text-[10px] font-bold px-2 py-1 rounded border border-zinc-700 hover:border-red-800 transition-colors disabled:opacity-50"
+                            title="Remove from auction block"
+                          >
                             {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
                           </button>
                         </div>
@@ -1463,14 +1452,13 @@ export function InventoryTable({ initialItems, discountRate = 0, projectionTimef
                             {auctionLoadingId === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
                           </button>
                         ) : (
-                          <button
-                            onClick={() => handleAddToAuction(item.id)}
-                            disabled={auctionLoadingId === item.id}
-                            className="text-amber-600 hover:text-amber-800 hover:bg-amber-100 bg-amber-50 h-7 w-7 rounded disabled:opacity-50 flex items-center justify-center transition-colors"
-                            title="Add to Auction Block"
+                          <Link
+                            href="/admin/auction-studio#add-from-inventory"
+                            className="text-amber-600 hover:text-amber-800 hover:bg-amber-100 bg-amber-50 h-7 w-7 rounded flex items-center justify-center transition-colors"
+                            title="Open auction staging to add this card"
                           >
-                            {auctionLoadingId === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Gavel className="w-3.5 h-3.5" />}
-                          </button>
+                            <Gavel className="w-3.5 h-3.5" />
+                          </Link>
                         )}
                       </div>
 

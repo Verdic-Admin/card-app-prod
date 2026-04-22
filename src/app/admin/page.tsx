@@ -5,9 +5,8 @@ import { InventoryTable } from '@/components/admin/InventoryTable'
 import { LedgerDashboard } from '@/components/admin/LedgerDashboard'
 import { TradeLeadsCRM } from '@/components/admin/TradeLeadsCRM'
 import { CoinRequestsCRM } from '@/components/admin/CoinRequestsCRM'
-import { AuctionManager } from '@/components/admin/AuctionManager'
-
 import Link from 'next/link'
+import { Gavel } from 'lucide-react'
 import { InstructionTrigger } from '@/components/admin/DraggableGuide'
 import { price } from '@/utils/math'
 
@@ -63,6 +62,9 @@ export default async function AdminPage() {
   const projectionTimeframe = (settings?.projection_timeframe as string | undefined) || '90-Day'
 
   const soldItems = (inventory as any[] || []).filter(item => item.status === 'sold')
+  const auctionPendingCount = (inventory as any[]).filter(
+    (i) => i.is_auction && i.auction_status === 'pending',
+  ).length
 
   return (
     <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -71,7 +73,19 @@ export default async function AdminPage() {
           <h1 className="text-3xl font-extrabold tracking-tight text-foreground">Admin Platform</h1>
           <p className="text-muted mt-1 font-medium">Manage inventory, perform massive bulk scans, and track sales.</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 flex-wrap">
+          <Link
+            href="/admin/auction-studio"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-500 text-slate-950 font-black rounded-lg hover:bg-amber-400 transition-colors shadow-md border border-amber-400/50 text-sm uppercase tracking-wide"
+          >
+            <Gavel className="w-4 h-4" />
+            Auction staging
+            {auctionPendingCount > 0 && (
+              <span className="ml-0.5 bg-slate-900 text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-full">
+                {auctionPendingCount} pending
+              </span>
+            )}
+          </Link>
           <Link href="/admin/add-inventory" className="px-5 py-2 bg-brand text-background font-bold rounded-lg hover:bg-brand/90 transition-colors shadow-sm">
             + Add Inventory
           </Link>
@@ -135,10 +149,17 @@ export default async function AdminPage() {
         <div>
           <TradeLeadsCRM />
         </div>
-        <div>
-          <AuctionManager 
-            initialItems={inventory || []} 
-          />
+        <div className="bg-amber-950/20 border border-amber-700/40 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <p className="text-sm text-foreground font-medium">
+            <strong className="font-black text-amber-500">Auctions</strong> — stage cards, add coin photos, and go live in
+            one place. Use the <strong className="text-foreground">Auction staging</strong> button above.
+          </p>
+          <Link
+            href="/admin/auction-studio"
+            className="shrink-0 text-center sm:text-left px-4 py-2 bg-amber-500 text-slate-950 font-black rounded-lg text-sm hover:bg-amber-400"
+          >
+            Open auction studio →
+          </Link>
         </div>
         <div className="bg-surface rounded-xl shadow-sm border border-border p-6 mt-10">
           <h2 className="text-xl font-bold text-foreground mb-6 flex justify-between items-center">
