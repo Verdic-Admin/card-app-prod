@@ -40,6 +40,8 @@ export function LiveAuctionStudio({ initialItems, initialProjectionTimeframe, in
   const [liveCommitting, setLiveCommitting] = useState(false)
   const [liveError, setLiveError] = useState<string | null>(null)
   const [liveSuccess, setLiveSuccess] = useState<number | null>(null)
+  const [editingLiveId, setEditingLiveId] = useState<string | null>(null)
+  const [savingLiveId, setSavingLiveId] = useState<string | null>(null)
 
   const pendingItems = useMemo(
     () => items.filter(i => i.is_auction && i.auction_status === 'pending'),
@@ -153,6 +155,24 @@ export function LiveAuctionStudio({ initialItems, initialProjectionTimeframe, in
     if (ids.length > 0) {
       await import('@/app/actions/inventory').then(m => m.generateBatchCodes(ids))
       alert("Batch codes generated. Please refresh to view.")
+    }
+  }
+
+  const handleSaveLiveAuctionMeta = async (
+    itemId: string,
+    formData: FormData,
+  ) => {
+    setSavingLiveId(itemId)
+    try {
+      await import('@/app/actions/inventory').then(m =>
+        m.updateStagedAuction(itemId, formData),
+      )
+      alert('Live auction item updated.')
+      setEditingLiveId(null)
+    } catch (e: any) {
+      alert(`Failed to save: ${e?.message || 'Unknown error'}`)
+    } finally {
+      setSavingLiveId(null)
     }
   }
 
@@ -509,13 +529,75 @@ export function LiveAuctionStudio({ initialItems, initialProjectionTimeframe, in
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {liveItems.map(item => (
-             <div key={item.id} className="border border-red-100 bg-red-50/30 p-4 rounded-xl flex items-center gap-4">
-                <img src={item.image_url} alt="card" className="h-16 w-16 object-cover rounded shadow-sm bg-white p-0.5" />
-                <div>
-                  <div className="font-bold text-slate-900 line-clamp-1">{item.player_name}</div>
-                  <div className="text-xs text-slate-500 line-clamp-1 mb-1">{item.card_set}</div>
-                  <span className="bg-red-100 text-red-700 text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded shadow-sm border border-red-200">Bidding Open</span>
+             <div key={item.id} className="border border-red-100 bg-red-50/30 p-4 rounded-xl flex flex-col gap-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <img src={item.image_url} alt="card" className="h-16 w-16 object-cover rounded shadow-sm bg-white p-0.5" />
+                    <div>
+                      <div className="font-bold text-slate-900 line-clamp-1">{item.player_name}</div>
+                      <div className="text-xs text-slate-500 line-clamp-1 mb-1">{item.card_set}</div>
+                      <span className="bg-red-100 text-red-700 text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded shadow-sm border border-red-200">Bidding Open</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEditingLiveId(prev => (prev === item.id ? null : item.id))
+                    }
+                    className="text-xs font-bold px-3 py-1.5 rounded border border-red-200 bg-white text-red-700 hover:bg-red-50 transition-colors"
+                  >
+                    {editingLiveId === item.id ? 'Close Edit' : 'Edit Live Item'}
+                  </button>
                 </div>
+
+                {editingLiveId === item.id && (
+                  <form
+                    onSubmit={async e => {
+                      e.preventDefault()
+                      const fd = new FormData(e.currentTarget)
+                      await handleSaveLiveAuctionMeta(item.id, fd)
+                    }}
+                    className="bg-white border border-red-100 rounded-lg p-3 flex flex-col gap-2"
+                  >
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      <input
+                        type="number"
+                        step="0.01"
+                        name="reservePrice"
+                        defaultValue={item.auction_reserve_price || ''}
+                        placeholder="Reserve Price ($)"
+                        className="border border-slate-300 rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-red-500"
+                      />
+                      <input
+                        type="datetime-local"
+                        name="endTime"
+                        defaultValue={typeof item.auction_end_time === 'string' ? item.auction_end_time.substring(0, 16) : ''}
+                        className="border border-slate-300 rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-red-500"
+                      />
+                    </div>
+                    <input
+                      type="text"
+                      name="description"
+                      defaultValue={item.auction_description || ''}
+                      placeholder="Auction Description"
+                      className="border border-slate-300 rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-red-500"
+                    />
+                    <label className="flex items-center gap-2 cursor-pointer bg-slate-50 px-3 py-1.5 border border-slate-200 rounded text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors">
+                      <span>Attach / replace coined image</span>
+                      <input type="file" name="coinedImage" accept="image/*" className="hidden" />
+                    </label>
+                    <div className="flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={savingLiveId === item.id}
+                        className="bg-red-600 hover:bg-red-700 text-white rounded px-3 py-1.5 text-xs font-bold transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                      >
+                        {savingLiveId === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                        Save Live Item
+                      </button>
+                    </div>
+                  </form>
+                )}
              </div>
           ))}
           {liveItems.length === 0 && (
