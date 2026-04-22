@@ -18,6 +18,7 @@ import {
 } from '@/app/actions/drafts'
 import { deleteStagingCardsAction } from '@/app/actions/inventory'
 import { TaxonomySearch } from '@/components/admin/TaxonomySearch'
+import { normalizeCardNumberForPlayerIndex } from '@/lib/player-index-deeplink'
 import { InstructionTrigger } from '@/components/admin/DraggableGuide'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -415,15 +416,23 @@ export function BulkIngestionWizard() {
             // Prefer AI team when non-empty; never overwrite a user-typed team with null.
             const aiTeam = (res.team_name ?? '').trim()
             const mergedTeam = aiTeam || updates[idx].team_name
+            const mergedPrint =
+              res.print_run != null && Number.isFinite(Number(res.print_run))
+                ? String(res.print_run)
+                : updates[idx].print_run
+            const mergedCardNum =
+              normalizeCardNumberForPlayerIndex(
+                (res.card_number && String(res.card_number).trim()) ? res.card_number : updates[idx].card_number,
+              ) || updates[idx].card_number
             updates[idx] = {
               ...updates[idx],
               player_name:   res.player_name   || updates[idx].player_name,
               team_name:     mergedTeam,
               card_set:      res.card_set       || updates[idx].card_set,
-              card_number:   res.card_number    || updates[idx].card_number,
+              card_number:   mergedCardNum,
               insert_name:   res.insert_name    || updates[idx].insert_name,
               parallel_name: res.parallel_name  || updates[idx].parallel_name,
-              // print_run is intentionally not applied from AI — user input only
+              print_run:     mergedPrint,
               confidence,
               ai_status: aiStatus,
               team_name_source: res.team_name_source,
@@ -434,9 +443,13 @@ export function BulkIngestionWizard() {
               player_name:   updates[idx].player_name,
               team_name:     updates[idx].team_name,
               card_set:      updates[idx].card_set,
-              card_number:   updates[idx].card_number,
+              card_number:   mergedCardNum,
               insert_name:   updates[idx].insert_name,
               parallel_name: updates[idx].parallel_name,
+              print_run: (() => {
+                const n = parseInt(String(mergedPrint ?? '').replace(/\D/g, ''), 10)
+                return Number.isFinite(n) ? n : null
+              })(),
             }
             updateDraftCardAction(updates[idx].id, dbPayload).catch(() => {})
           }

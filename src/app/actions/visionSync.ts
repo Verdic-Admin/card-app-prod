@@ -136,6 +136,18 @@ function normalizeIdentifyResponse(raw: any): IdentifyCardResult {
   const team_name_verified =
     typeof rawVerified === 'boolean' ? rawVerified : null;
 
+  let print_run: number | null = null;
+  const rawPr = cd.print_run ?? raw?.print_run;
+  if (typeof rawPr === 'number' && Number.isFinite(rawPr)) {
+    print_run = Math.trunc(rawPr);
+  } else if (rawPr != null && String(rawPr).trim() !== '') {
+    const digits = String(rawPr).replace(/\D/g, '');
+    if (digits) {
+      const n = parseInt(digits, 10);
+      if (Number.isFinite(n)) print_run = n;
+    }
+  }
+
   return {
     status:       raw?.status        ?? 'unknown',
     confidence:   raw?.confidence    ?? 0,
@@ -148,7 +160,7 @@ function normalizeIdentifyResponse(raw: any): IdentifyCardResult {
     team_name_source,
     team_name_confidence,
     team_name_verified,
-    print_run:    null, // always user-input; AI value intentionally ignored
+    print_run,
   };
 }
 

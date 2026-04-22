@@ -6,6 +6,7 @@ import { put, del } from '@/utils/storage';
 import { hasShopOracleApiKey } from '@/lib/shop-oracle-credentials';
 import { calculatePricingAction } from '@/app/actions/oracleAPI';
 import { price } from '@/utils/math';
+import { normalizeCardNumberForPlayerIndex } from '@/lib/player-index-deeplink';
 
 interface BulkInventoryItem {
   player_name: string;
@@ -423,6 +424,11 @@ export async function editCardAction(id: string, payload: EditCardPayload): Prom
     if (Object.prototype.hasOwnProperty.call(p, key)) {
       catalogUpdates[key] = p[key];
     }
+  }
+
+  if (typeof catalogUpdates.card_number === 'string') {
+    const n = normalizeCardNumberForPlayerIndex(catalogUpdates.card_number as string);
+    catalogUpdates.card_number = n || null;
   }
 
   if (Object.keys(catalogUpdates).length > 0) {

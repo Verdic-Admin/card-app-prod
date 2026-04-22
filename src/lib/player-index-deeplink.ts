@@ -6,6 +6,14 @@
  * @see https://playerindexdata.com/?player=...&set=...
  */
 
+/** Strip leading # so Player Index `number` query matches catalog (e.g. #330 → 330). */
+export function normalizeCardNumberForPlayerIndex(cardNumber: string | null | undefined): string {
+  return String(cardNumber ?? '')
+    .trim()
+    .replace(/^#+\s*/, '')
+    .trim();
+}
+
 export type PlayerIndexDeeplinkItem = {
   player_name?: string | null;
   card_set?: string | null;
@@ -64,7 +72,7 @@ export function buildPlayerIndexForecasterUrl(
     u.searchParams.set('parallel', parallel);
   }
 
-  const cardNum = String(item.card_number ?? '').trim();
+  const cardNum = normalizeCardNumberForPlayerIndex(item.card_number);
   if (cardNum) {
     u.searchParams.set('number', cardNum);
   }

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { price } from '@/utils/math'
 import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
 import { buildPlayerIndexForecasterUrl } from '@/lib/player-index-deeplink'
+import { PlayerIndexForecastLink } from '@/components/PlayerIndexForecastLink'
 
 interface Item {
   id: string
@@ -86,6 +87,7 @@ export function LiveAuctionGrid({ initialItems }: { initialItems: Item[] }) {
           const idx = slideById[item.id] ?? 0
           const safeIdx = slides.length ? idx % slides.length : 0
           const current = slides[safeIdx]
+          const piUrl = buildPlayerIndexForecasterUrl(item)
 
           return (
             <div
@@ -155,10 +157,8 @@ export function LiveAuctionGrid({ initialItems }: { initialItems: Item[] }) {
 
                 {(item.oracle_projection != null && Number(item.oracle_projection) > 0) ||
                 item.oracle_trend_percentage != null ? (
-                  <a
-                    href={buildPlayerIndexForecasterUrl(item)}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <PlayerIndexForecastLink
+                    href={piUrl}
                     className="mt-2 mb-2 block rounded-lg border border-indigo-700/50 bg-indigo-950/50 px-2.5 py-2 hover:bg-indigo-900/50 transition-colors"
                   >
                     <div className="text-[10px] font-black uppercase tracking-widest text-indigo-200 mb-1 flex items-center justify-between gap-1">
@@ -182,7 +182,7 @@ export function LiveAuctionGrid({ initialItems }: { initialItems: Item[] }) {
                       Open on Player Index to see the live projected value and run the calculator with this
                       card&apos;s details.
                     </p>
-                  </a>
+                  </PlayerIndexForecastLink>
                 ) : null}
 
                 {(item.is_rookie || item.is_auto || item.is_relic || (item.grading_company && item.grade)) && (
@@ -219,15 +219,13 @@ export function LiveAuctionGrid({ initialItems }: { initialItems: Item[] }) {
                   )}
                 </div>
 
-                <a
-                  href={buildPlayerIndexForecasterUrl(item)}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <PlayerIndexForecastLink
+                  href={piUrl}
                   className="w-full mb-2 flex items-center justify-center gap-2 text-[11px] font-black uppercase tracking-widest py-2 rounded-lg border border-indigo-500/50 bg-indigo-950/50 text-indigo-100 hover:bg-indigo-900/60 transition-colors"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
                   Run on Player Index
-                </a>
+                </PlayerIndexForecastLink>
 
                 <div className="grid grid-cols-2 gap-2 mt-2">
                   <button

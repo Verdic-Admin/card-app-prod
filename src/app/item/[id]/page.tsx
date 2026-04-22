@@ -10,6 +10,7 @@ import { MarketSparkline } from '@/components/MarketSparkline'
 import { getStoreSettings } from '@/app/actions/settings'
 import { deriveDisplayPricing } from '@/utils/pricing'
 import { buildPlayerIndexForecasterUrl } from '@/lib/player-index-deeplink'
+import { PlayerIndexForecastLink } from '@/components/PlayerIndexForecastLink'
 
 type PageProps = { params: Promise<{ id: string }> }
 
@@ -211,14 +212,12 @@ export default async function ItemPage({ params }: PageProps) {
               {!isLiveAuction &&
                 pricing.hasProjection &&
                 pricing.percentBelowPlayerIndex > 0 && (
-                  <a
+                  <PlayerIndexForecastLink
                     href={playerIndexCalcUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
                     className="absolute top-3 left-3 z-20 bg-indigo-900/95 text-indigo-200 text-[11px] px-3 py-1.5 rounded-full border border-indigo-600 font-black shadow-lg hover:bg-indigo-800 transition-colors pointer-events-auto"
                   >
                     🔥 {pricing.percentBelowPlayerIndex.toFixed(0)}% Below Player Index
-                  </a>
+                  </PlayerIndexForecastLink>
                 )}
             </div>
           )}
@@ -309,15 +308,13 @@ export default async function ItemPage({ params }: PageProps) {
             ) : pricing.hasProjection ? (
               <div className="space-y-2">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <a
+                  <PlayerIndexForecastLink
                     href={playerIndexCalcUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
                     className="text-[11px] uppercase tracking-widest text-indigo-300 font-bold hover:text-indigo-200 underline-offset-2 hover:underline"
                   >
                     Player Index
                     <span className="line-through opacity-70 ml-1">${pricing.playerIndexPrice.toFixed(2)}</span>
-                  </a>
+                  </PlayerIndexForecastLink>
                   {pricing.discountPercent > 0 && (
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-950/70 text-indigo-200 border border-indigo-700/70">
                     {pricing.discountPercent.toFixed(0)}% below Player Index
