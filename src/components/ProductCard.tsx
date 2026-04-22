@@ -129,23 +129,23 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
 
           <div className="flex flex-col mt-auto gap-3">
             {pricing.hasProjection ? (
-              <div className="flex flex-col">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-[10px] uppercase tracking-widest font-bold text-indigo-400 flex items-center gap-1">
-                     🔮 Player Index Value: <span className="line-through opacity-60">${pricing.playerIndexPrice.toFixed(2)}</span>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] uppercase tracking-widest font-bold text-indigo-300">
+                    Player Index <span className="line-through opacity-70 ml-1">${pricing.playerIndexPrice.toFixed(2)}</span>
                   </span>
                   {pricing.discountPercent > 0 && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-950/70 text-indigo-300 border border-indigo-700">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-950/70 text-indigo-200 border border-indigo-700/70">
                       {pricing.discountPercent.toFixed(0)}% off
                     </span>
                   )}
                   {(item as any).oracle_trend_percentage != null && (
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${p((item as any).oracle_trend_percentage) >= 0 ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800' : 'bg-red-950/60 text-red-400 border border-red-800'}`}>
-                      {p((item as any).oracle_trend_percentage) >= 0 ? '↑' : '↓'} {Math.abs(p((item as any).oracle_trend_percentage)).toFixed(1)}%
+                    <span className={`text-[10px] font-semibold ${p((item as any).oracle_trend_percentage) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      Trend {p((item as any).oracle_trend_percentage) >= 0 ? '+' : '-'}{Math.abs(p((item as any).oracle_trend_percentage)).toFixed(1)}%
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-end gap-2">
                   <span className="font-black text-3xl text-white tracking-tighter">
                     ${pricing.effectiveStorePrice.toFixed(2)}
                   </span>

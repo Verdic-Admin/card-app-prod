@@ -6,6 +6,9 @@ import { getShopOracleApiKey } from '@/lib/shop-oracle-credentials';
 import { vercelBatchUpdatePrices } from '@/app/actions/inventory'
 import { calculatePricingAction } from '@/app/actions/oracleAPI'
 
+const BATCH_PRICING_SIZE = 50;
+const BATCH_CONCURRENCY  = 2;   // keep gateway fan-out bounded
+
 const ALLOWED_COLUMNS = [
   'player_name', 'card_set', 'card_number', 'insert_name', 
   'parallel_name', 'print_run', 'listed_price', 'market_price',
@@ -53,8 +56,10 @@ export async function syncInventoryWithOracle() {
     };
   }
 
-  // Keep throughput reasonable without overloading the remote pricing API.
-  const CONCURRENCY = 10;
+  // Route through the batch pricing endpoint so we do not fan out one eBay-
+  // adjacent request per card. Falls back to per-card calculate only for
+  // cards the batch endpoint could not price.
+  const baseUrl = await getOracleGatewayBaseUrl();
   const updates: Array<{
     id: string;
     listed_price: number;
@@ -66,50 +71,70 @@ export async function syncInventoryWithOracle() {
   }> = [];
   let pricedCount = 0;
 
-  for (let i = 0; i < inventory.length; i += CONCURRENCY) {
-    const chunk = inventory.slice(i, i + CONCURRENCY) as any[];
-    const chunkResults = await Promise.all(
-      chunk.map(async (row) => {
-        const res = await calculatePricingAction({
-          player_name: toTitleCase(String(row.player_name || "")),
-          card_set: String(row.card_set || ""),
-          card_number: String(row.card_number || ""),
-          insert_name: String(row.insert_name || "Base"),
-          parallel_name: String(row.parallel_name || "Base"),
-          is_auto: Boolean(row.is_auto || false),
-          is_relic: Boolean(row.is_relic || false),
-          is_rookie: Boolean(row.is_rookie || false),
-          print_run: row.print_run ? Number(row.print_run) : null,
-        });
+  const chunks: any[][] = [];
+  for (let i = 0; i < inventory.length; i += BATCH_PRICING_SIZE) {
+    chunks.push(inventory.slice(i, i + BATCH_PRICING_SIZE) as any[]);
+  }
 
-        if (!res || typeof res !== 'object' || !('success' in res) || !res.success) {
-          if (res && typeof res === 'object' && 'error' in res && res.error === 'credits_exhausted') {
-            throw new Error('credits_exhausted');
-          }
-          return null;
-        }
+  const callBatch = async (chunk: any[]) => {
+    const items = chunk.map((row) => {
+      const rawFuzzy = [
+        String(row.card_set || ''),
+        String(row.card_number || ''),
+        String(row.insert_name || ''),
+        String(row.parallel_name || ''),
+      ].filter(Boolean).join(' ');
+      return {
+        player_name: toTitleCase(String(row.player_name || '')),
+        card_set:    String(row.card_set || ''),
+        card_number: String(row.card_number || ''),
+        print_run:   row.print_run ? Number(row.print_run) : undefined,
+        attributes:  rawFuzzy,
+        storefront_id: String(row.id),
+      };
+    });
 
-        const data = (res as any).data || {};
-        const projection = Number(data.projected_target ?? data.target_price ?? 0);
-        if (!Number.isFinite(projection) || projection <= 0) return null;
+    const res = await fetch(`${baseUrl}/v1/b2b/calculate-batch`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
+      body:    JSON.stringify({ items }),
+    });
+
+    if (res.status === 402) throw new Error('credits_exhausted');
+    if (!res.ok) return chunk.map(() => null);
+
+    const data = await res.json();
+    const results = Array.isArray(data?.results) ? data.results : [];
+    return chunk.map((_row, idx) => results[idx] ?? null);
+  };
+
+  for (let c = 0; c < chunks.length; c += BATCH_CONCURRENCY) {
+    const parallel = chunks.slice(c, c + BATCH_CONCURRENCY);
+    const settled = await Promise.all(parallel.map((ch) => callBatch(ch).catch((e) => {
+      if (String(e?.message || '').includes('credits_exhausted')) throw e;
+      return ch.map(() => null);
+    })));
+    for (let pi = 0; pi < parallel.length; pi++) {
+      const chunk = parallel[pi];
+      const perItem = settled[pi] as any[];
+      for (let i = 0; i < chunk.length; i++) {
+        const row: any = chunk[i];
+        const r: any = perItem[i];
+        const projection = Number(r?.projected_target ?? r?.target_price ?? 0);
+        if (!Number.isFinite(projection) || projection <= 0) continue;
 
         const listed = projection * (1 - discountRate / 100);
-        return {
+        updates.push({
           id: String(row.id),
           listed_price: listed,
           market_price: projection,
-          trend_data: Array.isArray(data.trend_points) ? data.trend_points : [],
-          player_index_url: String(data.player_index_url || ''),
+          trend_data: Array.isArray(r?.trend_points) ? r.trend_points : [],
+          player_index_url: String(r?.player_index_url || ''),
           oracle_projection: projection,
-          oracle_trend_percentage: data.trend_percentage != null ? Number(data.trend_percentage) : null,
-        };
-      })
-    );
-
-    for (const result of chunkResults) {
-      if (!result) continue;
-      updates.push(result);
-      pricedCount++;
+          oracle_trend_percentage: r?.trend_percentage != null ? Number(r.trend_percentage) : null,
+        });
+        pricedCount++;
+      }
     }
   }
 
@@ -159,15 +184,12 @@ export async function syncInventoryWithOracle() {
     WHERE i.id = agg.parent_id AND agg.children_sum < agg.parent_listed_price;
   `);
 
-  return { success: true, count: pricedCount, total: inventory.length, batches: Math.ceil(inventory.length / CONCURRENCY) };
+  return { success: true, count: pricedCount, total: inventory.length, batches: chunks.length };
 }
 
 export async function syncSingleItemWithOracle(id: string) {
 
-
-  const oracle_api_key = await getShopOracleApiKey();
-
-  if (!oracle_api_key) {
+  if (!(await getShopOracleApiKey())) {
     throw new Error('API key not configured. Please complete store provisioning.');
   }
 
@@ -188,53 +210,51 @@ export async function syncSingleItemWithOracle(id: string) {
   }
 
   try {
-    const payload = {
+    const res = await calculatePricingAction({
       player_name: toTitleCase(String((item as any).player_name || "")),
       card_set: String((item as any).card_set || ""),
       card_number: String((item as any).card_number || ""),
       insert_name: String((item as any).insert_name || "Base"),
       parallel_name: String((item as any).parallel_name || "Base"),
-      attributes: [(item as any).insert_name, (item as any).parallel_name, (item as any).parallel_insert_type].filter(v => v && v.toLowerCase() !== 'base').join(' '),
       is_auto: Boolean((item as any).is_auto || false),
       is_relic: Boolean((item as any).is_relic || false),
       is_rookie: Boolean((item as any).is_rookie || false),
-      print_run: (item as any).print_run ? Number((item as any).print_run) : undefined,
-      discount_rate: discountRate,
-      skip_fuzzy: true
-    }
+      print_run: (item as any).print_run ? Number((item as any).print_run) : null,
+    });
 
-    const baseCalc = await getOracleGatewayBaseUrl();
-    const res = await fetch(`${baseCalc}/v1/calculate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': oracle_api_key
-      },
-      body: JSON.stringify(payload)
-    })
-
-    if (!res.ok) {
-      return { success: false, message: `Oracle API returned ${res.status} for item ${(item as any).id}` }
-    }
-
-    const data = await res.json()
-    
-    if (data.target_price && data.target_price > 0) {
-      const new_price = data.target_price * (1 - (discountRate / 100))
-
-      let updateError; try { await pool.query(`UPDATE inventory SET listed_price = $1, oracle_projection = $2, oracle_trend_percentage = $3 WHERE id = $4`, [new_price, data.target_price, data.trend_percentage || null, item.id]) } catch (err) { updateError = err }
-
-      if (!updateError) {
-        return { success: true, message: `Repriced to $${new_price.toFixed(2)}`, new_price }
-      } else {
-        return { success: false, message: `Failed to update price in Postgres database.` }
+    if (!res || typeof res !== 'object' || !('success' in res) || !res.success) {
+      if (res && typeof res === 'object' && 'error' in res && res.error === 'credits_exhausted') {
+        return { success: false, message: "API Credits exhausted. Please refill." };
       }
-    } else {
-      return { success: false, message: `Oracle returned invalid target_price.` }
+      return { success: false, message: `Oracle pricing failed for item ${(item as any).id}.` };
     }
 
+    const data = (res as any).data || {};
+    const projection = Number(data.projected_target ?? data.target_price ?? 0);
+    if (!Number.isFinite(projection) || projection <= 0) {
+      return { success: false, message: `Oracle returned invalid projected target for item ${(item as any).id}.` };
+    }
+
+    const new_price = projection * (1 - (discountRate / 100));
+    const trend = data.trend_percentage != null ? Number(data.trend_percentage) : null;
+    const trendPoints = Array.isArray(data.trend_points) ? data.trend_points : [];
+    const playerIndexUrl = String(data.player_index_url || '');
+
+    await pool.query(
+      `UPDATE inventory
+       SET listed_price = $1,
+           market_price = $2,
+           oracle_projection = $3,
+           oracle_trend_percentage = $4,
+           trend_data = $5::jsonb,
+           player_index_url = $6
+       WHERE id = $7`,
+      [new_price, projection, projection, trend, JSON.stringify(trendPoints), playerIndexUrl, item.id]
+    );
+
+    return { success: true, message: `Repriced to $${new_price.toFixed(2)}`, new_price };
   } catch (err: any) {
-    return { success: false, message: `Error processing item: ${err.message}` }
+    return { success: false, message: `Error processing item: ${err.message}` };
   }
 }
 

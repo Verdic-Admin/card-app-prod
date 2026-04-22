@@ -268,18 +268,23 @@ export default async function ItemPage({ params }: PageProps) {
           {/* Pricing */}
           <div className="border-t border-border pt-4">
             {pricing.hasProjection ? (
-              <div>
-                <p className="text-[11px] uppercase tracking-widest text-indigo-400 font-bold mb-1">
-                  🔮 Player Index Value:{' '}
-                  <span className="line-through opacity-60">
-                    ${pricing.playerIndexPrice.toFixed(2)}
-                  </span>
-                </p>
-                {pricing.discountPercent > 0 && (
-                  <p className="text-[11px] uppercase tracking-widest text-indigo-300 font-bold mb-2">
-                    {pricing.discountPercent.toFixed(0)}% below Player Index
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-[11px] uppercase tracking-widest text-indigo-300 font-bold">
+                    Player Index
+                    <span className="line-through opacity-70 ml-1">${pricing.playerIndexPrice.toFixed(2)}</span>
                   </p>
-                )}
+                  {pricing.discountPercent > 0 && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-950/70 text-indigo-200 border border-indigo-700/70">
+                    {pricing.discountPercent.toFixed(0)}% below Player Index
+                    </span>
+                  )}
+                  {(item as any).oracle_trend_percentage != null && (
+                    <span className={`text-[11px] font-semibold ${p((item as any).oracle_trend_percentage) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      Trend {p((item as any).oracle_trend_percentage) >= 0 ? '+' : '-'}{Math.abs(p((item as any).oracle_trend_percentage)).toFixed(1)}%
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-3">
                   <p className="text-5xl font-black text-white tracking-tighter">
                     ${pricing.effectiveStorePrice.toFixed(2)}

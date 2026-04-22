@@ -2,6 +2,10 @@
 
 import { getOracleGatewayBaseUrl } from '@/lib/oracle-gateway-url';
 import { getShopOracleApiKey } from '@/lib/shop-oracle-credentials';
+import { dedupeAndCache } from '@/lib/oracle-request-cache';
+
+const TAXONOMY_TTL_MS = 5 * 60_000;   // 5 min — taxonomy is near-static
+const PRICING_TTL_MS  = 60_000;       // 1 min — pricing moves slowly intraday
 
 export async function submitOracleRequest(url: string, options: RequestInit = {}) {
   const headers = new Headers(options.headers || {});
@@ -66,8 +70,20 @@ export async function submitOracleRequest(url: string, options: RequestInit = {}
 }
 
 export async function searchTaxonomyAction(query: string) {
+  const normalized = (query || '').trim().toLowerCase();
+  if (!normalized) {
+    return { success: true, data: { results: [] } };
+  }
   const base = await getOracleGatewayBaseUrl();
-  return await submitOracleRequest(`${base}/v1/taxonomy/search?q=${encodeURIComponent(query)}`);
+  const cacheKey = `taxonomy:${normalized}`;
+  return dedupeAndCache(
+    cacheKey,
+    () => submitOracleRequest(`${base}/v1/taxonomy/search?q=${encodeURIComponent(query)}`),
+    {
+      ttlMs: TAXONOMY_TTL_MS,
+      shouldCache: (v: any) => Boolean(v && v.success),
+    },
+  );
 }
 
 export async function calculatePricingAction(fields: {
@@ -83,32 +99,56 @@ export async function calculatePricingAction(fields: {
   grade?: string | null;
 }) {
   const base = await getOracleGatewayBaseUrl();
-  const raw = await submitOracleRequest(`${base}/v1/calculate`, {
-    method: 'POST',
-    body: JSON.stringify({
-      player_name: fields.player_name,
-      card_set: fields.card_set,
-      insert_name: fields.insert_name || 'Base',
-      parallel_name: fields.parallel_name || 'Base',
-      card_number: fields.card_number || '',
-      print_run: fields.print_run ?? null,
-      is_rookie: fields.is_rookie ?? false,
-      is_auto: fields.is_auto ?? false,
-      is_relic: fields.is_relic ?? false,
-      grade: fields.grade || null,
-      skip_fuzzy: false,
-    }),
-  });
-
-  if (!raw || typeof raw !== 'object' || !('success' in raw) || !raw.success) {
-    return raw;
-  }
-
-  const d = raw.data as Record<string, unknown>;
-  // Engine returns DerivativeResponse { target_price }; B2B uses projected_target.
-  const target = Number(d.target_price ?? d.projected_target ?? 0);
-  return {
-    success: true,
-    data: { ...d, projected_target: target, target_price: d.target_price ?? target },
+  const payload = {
+    player_name: fields.player_name,
+    card_set: fields.card_set,
+    insert_name: fields.insert_name || 'Base',
+    parallel_name: fields.parallel_name || 'Base',
+    card_number: fields.card_number || '',
+    print_run: fields.print_run ?? null,
+    is_rookie: fields.is_rookie ?? false,
+    is_auto: fields.is_auto ?? false,
+    is_relic: fields.is_relic ?? false,
+    grade: fields.grade || null,
+    skip_fuzzy: false,
   };
+
+  // Identity-based cache key so repeated clicks / concurrent tabs on the same
+  // card coalesce into a single upstream Oracle call. TTL is short so genuine
+  // intraday re-pricing still flows through.
+  const cacheKey = 'calc:' + [
+    (payload.player_name || '').toLowerCase(),
+    (payload.card_set || '').toLowerCase(),
+    (payload.card_number || '').toLowerCase(),
+    (payload.insert_name || '').toLowerCase(),
+    (payload.parallel_name || '').toLowerCase(),
+    payload.print_run ?? '',
+    payload.is_rookie ? '1' : '0',
+    payload.is_auto ? '1' : '0',
+    payload.is_relic ? '1' : '0',
+    payload.grade || '',
+  ].join('|');
+
+  return dedupeAndCache(
+    cacheKey,
+    async () => {
+      const raw = await submitOracleRequest(`${base}/v1/calculate`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      if (!raw || typeof raw !== 'object' || !('success' in raw) || !raw.success) {
+        return raw;
+      }
+      const d = raw.data as Record<string, unknown>;
+      const target = Number(d.target_price ?? d.projected_target ?? 0);
+      return {
+        success: true,
+        data: { ...d, projected_target: target, target_price: d.target_price ?? target },
+      };
+    },
+    {
+      ttlMs: PRICING_TTL_MS,
+      shouldCache: (v: any) => Boolean(v && v.success),
+    },
+  );
 }
