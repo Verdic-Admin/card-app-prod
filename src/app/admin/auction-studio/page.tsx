@@ -35,6 +35,31 @@ export default async function AuctionStudioPage() {
   const auctionQrUrl = settings?.auction_qr_url || null
   const discountRate = Number(settings?.oracle_discount_percentage ?? 0) || 0
 
+  let auctionLeadByItemId: Record<string, { bidder_email: string; bid_amount: number }> = {}
+  try {
+    const { rows: leadRows } = await pool.query<{
+      item_id: string
+      bidder_email: string
+      bid_amount: string | number
+    }>(
+      `SELECT DISTINCT ON (item_id)
+         item_id::text AS item_id,
+         bidder_email,
+         bid_amount
+       FROM auction_bids
+       WHERE item_id IN (SELECT id FROM inventory WHERE is_auction = true)
+       ORDER BY item_id, bid_amount::numeric DESC, created_at DESC`,
+    )
+    for (const r of leadRows) {
+      auctionLeadByItemId[String(r.item_id)] = {
+        bidder_email: r.bidder_email,
+        bid_amount: price(r.bid_amount),
+      }
+    }
+  } catch (e) {
+    console.warn('[auction-studio] auction_bids high-bidder map skipped:', e)
+  }
+
   return (
     <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <div className="flex justify-between items-center mb-10">
@@ -69,6 +94,7 @@ export default async function AuctionStudioPage() {
           initialProjectionTimeframe={projectionTimeframe}
           initialAuctionQrUrl={auctionQrUrl}
           discountRate={discountRate}
+          auctionLeadByItemId={auctionLeadByItemId}
         />
       </div>
     </div>

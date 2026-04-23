@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Database } from '@/types/database.types'
 import { toggleCardStatus, editCardAction, deleteCardAction, bulkDeleteCardsAction, bulkUpdateMetricsAction, rotateCardImageAction, removeFromAuctionBlock, updateProjectionTimeframe, createLotAction, breakLotAction, updateLotChildren, duplicateInventoryItem } from '@/app/actions/inventory'
+import { AuctionBidLogButton } from '@/components/admin/AuctionBidLogButton'
 import { syncSingleItemWithOracle, syncInventoryWithOracle, applyOracleDiscount, applyOracleDiscountAll, applyCorrection, approvePriceOnly, denyCorrection } from '@/app/actions/oracleSync'
 import { Loader2, Trash2, Edit2, Check, X, Search, Download, RotateCw, RefreshCw, DollarSign, Save, AlertCircle, Gavel, Package, Share2, CopyPlus } from 'lucide-react'
 import { price } from '@/utils/math'
@@ -11,7 +12,18 @@ import { deriveDisplayPricing } from '@/utils/pricing'
 
 type InventoryItem = Database['public']['Tables']['inventory']['Row']
 
-export function InventoryTable({ initialItems, discountRate = 0, projectionTimeframe: initialProjectionTimeframe = '90-Day' }: { initialItems: InventoryItem[], discountRate?: number, projectionTimeframe?: string }) {
+export function InventoryTable({
+  initialItems,
+  discountRate = 0,
+  projectionTimeframe: initialProjectionTimeframe = '90-Day',
+  auctionLeadByItemId = {},
+}: {
+  initialItems: InventoryItem[]
+  discountRate?: number
+  projectionTimeframe?: string
+  /** Highest winning-style row per item from `auction_bids` (email + amount). */
+  auctionLeadByItemId?: Record<string, { bidder_email: string; bid_amount: number }>
+}) {
   const [items, setItems] = useState(initialItems)
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [errorId, setErrorId] = useState<string | null>(null)
@@ -938,7 +950,13 @@ export function InventoryTable({ initialItems, discountRate = 0, projectionTimef
               <thead>
                 <tr className="border-b border-zinc-800">
                   <th className="px-4 py-2.5 font-bold text-zinc-500 uppercase tracking-widest text-[10px]">Card</th>
-                  <th className="px-4 py-2.5 font-bold text-zinc-500 uppercase tracking-widest text-[10px]">Current Bid</th>
+                  <th className="px-4 py-2.5 font-bold text-zinc-500 uppercase tracking-widest text-[10px]">Current bid</th>
+                  <th className="px-4 py-2.5 font-bold text-zinc-500 uppercase tracking-widest text-[10px] whitespace-nowrap">
+                    # Bids
+                  </th>
+                  <th className="px-4 py-2.5 font-bold text-zinc-500 uppercase tracking-widest text-[10px] min-w-[7rem]">
+                    High bidder
+                  </th>
                   <th className="px-4 py-2.5 font-bold text-zinc-500 uppercase tracking-widest text-[10px]">Status</th>
                   <th className="px-4 py-2.5 font-bold text-zinc-500 uppercase tracking-widest text-[10px] text-right">Studio</th>
                 </tr>
@@ -947,6 +965,7 @@ export function InventoryTable({ initialItems, discountRate = 0, projectionTimef
                 {auctionItems.map((item: any) => {
                   const isLoading = auctionLoadingId === item.id
                   const status = item.auction_status || 'pending'
+                  const lead = auctionLeadByItemId[item.id]
                   return (
                     <tr key={item.id} className="hover:bg-zinc-800/30 transition-colors">
                       <td className="px-4 py-3">
@@ -974,6 +993,18 @@ export function InventoryTable({ initialItems, discountRate = 0, projectionTimef
                       <td className="px-4 py-3 font-mono font-black text-cyan-400 text-sm">
                         ${price(item.current_bid || item.listed_price).toFixed(2)}
                       </td>
+                      <td className="px-4 py-3 font-mono text-zinc-300 text-sm tabular-nums">
+                        {Number(item.bidder_count ?? 0)}
+                      </td>
+                      <td className="px-4 py-3 max-w-[11rem]">
+                        {lead ? (
+                          <span className="text-[11px] text-zinc-200 break-all block leading-snug" title={lead.bidder_email}>
+                            {lead.bidder_email}
+                          </span>
+                        ) : (
+                          <span className="text-zinc-600 text-[11px]">—</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         <span className={`text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-wider ${
                           status === 'live' ? 'bg-red-900/60 text-red-400 border border-red-700/40' :
@@ -983,6 +1014,11 @@ export function InventoryTable({ initialItems, discountRate = 0, projectionTimef
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex flex-col items-end gap-1.5">
+                          <AuctionBidLogButton
+                            itemId={item.id}
+                            label={item.player_name}
+                            tone="dark"
+                          />
                           <Link
                             href="/admin/auction-studio#auction-staging"
                             className="text-[10px] font-black text-amber-400 hover:text-amber-300 uppercase tracking-tight"

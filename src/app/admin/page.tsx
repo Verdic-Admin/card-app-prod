@@ -61,6 +61,31 @@ export default async function AdminPage() {
   const discountRate = (settings?.oracle_discount_percentage as number | undefined) || 0
   const projectionTimeframe = (settings?.projection_timeframe as string | undefined) || '90-Day'
 
+  let auctionLeadByItemId: Record<string, { bidder_email: string; bid_amount: number }> = {}
+  try {
+    const { rows: leadRows } = await pool.query<{
+      item_id: string
+      bidder_email: string
+      bid_amount: string | number
+    }>(
+      `SELECT DISTINCT ON (item_id)
+         item_id::text AS item_id,
+         bidder_email,
+         bid_amount
+       FROM auction_bids
+       WHERE item_id IN (SELECT id FROM inventory WHERE is_auction = true)
+       ORDER BY item_id, bid_amount::numeric DESC, created_at DESC`,
+    )
+    for (const r of leadRows) {
+      auctionLeadByItemId[String(r.item_id)] = {
+        bidder_email: r.bidder_email,
+        bid_amount: price(r.bid_amount),
+      }
+    }
+  } catch (e) {
+    console.warn('[admin] auction_bids high-bidder map skipped:', e)
+  }
+
   const soldItems = (inventory as any[] || []).filter(item => item.status === 'sold')
   const auctionPendingCount = (inventory as any[]).filter(
     (i) => i.is_auction && i.auction_status === 'pending',
@@ -177,7 +202,12 @@ export default async function AdminPage() {
                + Add Inventory
              </Link>
           </h2>
-          <InventoryTable initialItems={(inventory as any[]) || []} discountRate={discountRate} projectionTimeframe={projectionTimeframe} />
+          <InventoryTable
+            initialItems={(inventory as any[]) || []}
+            discountRate={discountRate}
+            projectionTimeframe={projectionTimeframe}
+            auctionLeadByItemId={auctionLeadByItemId}
+          />
         </div>
       </div>
     </div>

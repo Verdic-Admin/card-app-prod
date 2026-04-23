@@ -1008,6 +1008,45 @@ export async function placeBidAction(itemId: string, bidderEmail: string, bidAmo
   return { success: true };
 }
 
+export type AuctionBidHistoryRow = {
+  id: string;
+  bidder_email: string;
+  bid_amount: number;
+  created_at: string;
+};
+
+/** Full bid log for an auction row (admin). Source: `auction_bids` written by `placeBidAction`. */
+export async function getAuctionBidHistoryForAdmin(
+  itemId: string,
+): Promise<{ success: true; bids: AuctionBidHistoryRow[] } | { success: false; error: string }> {
+  try {
+    await checkAuth();
+    const { rows } = await pool.query<{
+      id: string;
+      bidder_email: string;
+      bid_amount: string | number;
+      created_at: Date;
+    }>(
+      `SELECT id, bidder_email, bid_amount, created_at
+       FROM auction_bids
+       WHERE item_id = $1::uuid
+       ORDER BY created_at DESC
+       LIMIT 200`,
+      [itemId],
+    );
+    const bids: AuctionBidHistoryRow[] = rows.map((r) => ({
+      id: r.id,
+      bidder_email: r.bidder_email,
+      bid_amount: price(r.bid_amount),
+      created_at: r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at),
+    }));
+    return { success: true, bids };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { success: false, error: msg };
+  }
+}
+
 export type UpdateStagedAuctionResult = {
   success: true;
   coined_image_url: string | null;

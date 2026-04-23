@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AuctionQRCode } from './AuctionQRCode'
+import { AuctionBidLogButton } from '@/components/admin/AuctionBidLogButton'
 import {
   stageAuctionItems,
   updateStagedAuction,
@@ -18,6 +19,8 @@ interface LiveAuctionStudioProps {
   initialAuctionQrUrl?: string | null
   /** Store discount % for pricing line in staging (same as inventory / storefront). */
   discountRate?: number
+  /** Highest bid row per auction item (from server; `auction_bids`). */
+  auctionLeadByItemId?: Record<string, { bidder_email: string; bid_amount: number }>
 }
 
 interface ItemStagingDraft {
@@ -55,6 +58,7 @@ export function LiveAuctionStudio({
   initialProjectionTimeframe,
   initialAuctionQrUrl,
   discountRate = 0,
+  auctionLeadByItemId = {},
 }: LiveAuctionStudioProps) {
   const router = useRouter()
   const [items, setItems] = useState<any[]>(initialItems)
@@ -792,12 +796,31 @@ export function LiveAuctionStudio({
                     <span className="bg-red-100 text-red-700 text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded border border-red-200">
                       Bidding open
                     </span>
+                    <div className="mt-2 space-y-1 text-[11px] text-slate-700">
+                      <div className="font-mono">
+                        High:{' '}
+                        <strong className="text-slate-900">${priceNum(item.current_bid || item.listed_price || 0).toFixed(2)}</strong>
+                        {Number(item.bidder_count ?? 0) > 0 && (
+                          <span className="text-slate-500 font-sans font-medium">
+                            {' '}
+                            · {Number(item.bidder_count)} bid{Number(item.bidder_count) === 1 ? '' : 's'}
+                          </span>
+                        )}
+                      </div>
+                      {auctionLeadByItemId[item.id] && (
+                        <div className="break-all" title={auctionLeadByItemId[item.id].bidder_email}>
+                          <span className="text-slate-500 font-sans">Leading email: </span>
+                          <span className="font-medium text-slate-900">{auctionLeadByItemId[item.id].bidder_email}</span>
+                        </div>
+                      )}
+                      <AuctionBidLogButton itemId={item.id} label={item.player_name} tone="light" />
+                    </div>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setEditingLiveId(prev => (prev === item.id ? null : item.id))}
-                  className="text-xs font-bold px-2 py-1.5 rounded border border-red-200 bg-white text-red-700"
+                  className="text-xs font-bold px-2 py-1.5 rounded border border-red-200 bg-white text-red-700 shrink-0"
                 >
                   {editingLiveId === item.id ? 'Close' : 'Edit'}
                 </button>
