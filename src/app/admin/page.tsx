@@ -120,6 +120,9 @@ export default async function AdminPage() {
           <Link href="/admin/settings" className="px-4 py-2 bg-indigo-50 text-indigo-700 font-bold rounded-lg hover:bg-indigo-100 transition-colors">
             Store Operations
           </Link>
+          <a href="/docs/Operations-Guide.pdf" download="Operations-Guide.pdf" className="px-4 py-2 bg-slate-100 text-slate-700 border border-slate-300 font-bold rounded-lg hover:bg-slate-200 transition-colors">
+            Operations Guide
+          </a>
         </div>
       </div>
 
