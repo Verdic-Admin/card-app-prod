@@ -326,6 +326,17 @@ async function init() {
   `);
   console.log('- draft_cards table OK');
 
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS store_updates (
+      id INT PRIMARY KEY,
+      deploy_hook_url TEXT,
+      last_update_triggered_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  await client.query(`INSERT INTO store_updates (id) VALUES (1) ON CONFLICT (id) DO NOTHING;`);
+  console.log('- store_updates table OK');
+
   await runIdempotentAlters(client);
   console.log('- Column upgrades applied (IF NOT EXISTS)');
 
