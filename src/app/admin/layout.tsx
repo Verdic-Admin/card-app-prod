@@ -7,8 +7,8 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   let isUpdateAvailable = false;
   
   try {
-     const currentSha = process.env.RAILWAY_GIT_COMMIT_SHA;
-     // Only perform the update check if we are actually running inside the Railway container (SHA exists)
+     const currentSha = process.env.VERCEL_GIT_COMMIT_SHA;
+     // Only perform the update check if we are actually running inside a Vercel deployment (SHA exists)
      if (currentSha) {
          // Revalidate once an hour to prevent hitting the 60 requests/hr GitHub rate limit
          const res = await fetch('https://api.github.com/repos/Verdic-Admin/card-app-prod/commits/main', { next: { revalidate: 3600 }});
@@ -40,7 +40,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
                  Your store is running an older template version. Sync your codebase to get the latest features and security patches.
               </p>
               <a 
-                 href="https://railway.app/dashboard" 
+                 href="https://vercel.com/dashboard" 
                  target="_blank" 
                  rel="noopener noreferrer" 
                  className="bg-amber-950 text-amber-400 font-black px-5 py-2 rounded-full text-xs uppercase tracking-wider hover:bg-black transition whitespace-nowrap"

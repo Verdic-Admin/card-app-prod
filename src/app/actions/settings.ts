@@ -138,7 +138,7 @@ export async function updateStoreSettings(settings: StoreSettings) {
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     throw new Error(
-      'Could not save store_settings. Confirm Postgres is reachable and init_db.js has run (Railway redeploy). ' +
+      'Could not save store_settings. Confirm Postgres is reachable and the postbuild script has run (Vercel redeploy). ' +
         msg
     );
   }

@@ -498,7 +498,7 @@ export async function publishDraftCardsAction(ids: string[]): Promise<PublishDra
     return {
       success: false,
       error:
-        'Unauthorized: set PLAYERINDEX_API_KEY in Railway for this service so the store can write to the database.',
+        'Unauthorized: set PLAYERINDEX_API_KEY in your Vercel Environment Variables for this service so the store can write to the database.',
     };
   }
 

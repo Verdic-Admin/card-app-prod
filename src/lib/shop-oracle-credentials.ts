@@ -1,8 +1,8 @@
 /**
  * Server-only: API key used to call the Player Index gateway (fintech / identify / scan).
- * Prefer PLAYERINDEX_API_KEY on the host (Railway variables or /tmp/shop-oracle.env from init_db).
- * `shop_config.playerindex_api_key` is not written by provisioning anymore; a non-null value
- * is only read for legacy shops until migrated to host env.
+ * Prefer PLAYERINDEX_API_KEY set in the Vercel dashboard (Environment Variables panel).
+ * `shop_config.playerindex_api_key` is only read as a legacy fallback for older shops
+ * until they migrate to using the host env var.
  */
 import pool from '@/utils/db';
 

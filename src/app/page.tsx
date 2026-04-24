@@ -7,7 +7,7 @@ import { getStoreSettings } from "@/app/actions/settings";
 
 /**
  * Normalise an env var that may have been pasted with a leading ` =` prefix
- * (a common Railway copy-paste mistake).  Returns a valid HTTPS origin or ''.
+ * (a common copy-paste mistake). Returns a valid HTTPS origin or ''.
  */
 function sanitizeOrigin(raw: string | undefined): string {
   if (!raw) return '';
@@ -17,8 +17,8 @@ function sanitizeOrigin(raw: string | undefined): string {
 
 const BASE_URL =
   sanitizeOrigin(process.env.NEXT_PUBLIC_SITE_URL) ||
-  sanitizeOrigin(process.env.RAILWAY_PUBLIC_DOMAIN
-    ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+  sanitizeOrigin(process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
     : '') ||
   '';
 

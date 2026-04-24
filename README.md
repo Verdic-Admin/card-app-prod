@@ -1,16 +1,28 @@
-# ⚾ Welcome to Your Player Index Storefront!
+# Card App — Player Index White-Label Storefront
 
-Congratulations! You are just 60 seconds away from launching your very own zero-fee, fully-automated sports card storefront. 
+Because you host this storefront on **Vercel**, you maintain **100% ownership** over your data, your inventory, and your transactions. No platform fees. No revenue sharing.
 
-Because you've chosen to securely host your store on Railway, you maintain **100% ownership** over your data, your inventory, and your transactions. No platform fees. No revenue sharing. 
+## Quick Start (Vercel)
 
-### Instructions for Deployment:
+1. Click the **Deploy** button from [playerindexdata.com/claim](https://playerindexdata.com/claim) — this opens the Vercel "Clone Template" wizard.
+2. In the wizard, click **Add Vercel Postgres** and **Add Vercel Blob** when prompted by the Storage section.
+3. Set **`PLAYERINDEX_API_KEY`** to the key you copied from Player Index (`/claim` or `/developers`). The deploy URL pre-fills this for you.
+4. Click **Deploy**. Vercel builds your app, provisions Postgres, and sets up Blob storage automatically.
 
-1. Open **[Claim Your Store](https://playerindexdata.com/claim)** or **[Developers](https://playerindexdata.com/developers)** on Player Index and mint an API key (copy it once).
-2. In Railway **Variables**, set **`PLAYERINDEX_API_KEY`** to that key.
-3. Add a **Bucket** service to the same project and name it **`Bucket`** (exact name) so `railway.toml` can wire S3 credentials via `${{Bucket.*}}`. If you use a different name, update those references in `railway.toml` to match. Deploying this repo **without** any Bucket in the project will fail variable resolution until you add one or remove the `AWS_*` entries from `railway.toml`.
-4. Deploy (or redeploy). Optional: set **`FINTECH_API_URL`** / **`API_BASE_URL`** to `https://api.playerindexdata.com` if your template asks for them.
+Your storefront will be live on a free `[store-name].vercel.app` domain in ~2 minutes.
 
-### What Happens Next?
+## Custom Domain
 
-Railway builds your app, Postgres, and object storage. Use `/login` with your Player Index account to administer the storefront.
+To use your own domain (`mikescards.com`), add it in your Vercel project **Settings → Domains**. Vercel provisions the SSL certificate automatically.
+
+## Updates
+
+Your store auto-syncs with the latest template code every night via GitHub Actions. New features and security patches are applied while you sleep — no developer action required.
+
+## Environment Variables
+
+See `.env.example` for all supported environment variables. The Vercel wizard automatically injects `POSTGRES_URL` and `BLOB_READ_WRITE_TOKEN` when you add Storage. You only need to set `PLAYERINDEX_API_KEY` manually.
+
+## Admin Panel
+
+Log in at `/login` with your Player Index account to administer the storefront.

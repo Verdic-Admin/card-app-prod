@@ -11,7 +11,7 @@ export default function SetupPage() {
         </div>
         <h1 className="text-2xl font-black text-white mb-2">Finish linking your store</h1>
         <p className="text-muted mb-6 text-sm leading-relaxed">
-          Set <span className="font-mono text-foreground">PLAYERINDEX_API_KEY</span> in Railway to the key you
+          Set <span className="font-mono text-foreground">PLAYERINDEX_API_KEY</span> in your Vercel project&apos;s Environment Variables to the key you
           copied from Player Index (<span className="font-mono">/claim</span> or{' '}
           <span className="font-mono">/developers</span>), then redeploy.
         </p>

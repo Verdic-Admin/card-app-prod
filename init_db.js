@@ -1,12 +1,10 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 /**
- * Railway / template entrypoint: see `railway.toml` startCommand — runs `init_db.js`,
- * then sources `/tmp/shop-oracle.env` when present so `npm run start` sees mirrored env.
+ * Vercel postbuild entrypoint: runs after `next build` to initialize/migrate
+ * the Postgres schema. Safe to run on every deploy — all statements are
+ * idempotent (CREATE TABLE IF NOT EXISTS / ALTER TABLE ADD COLUMN IF NOT EXISTS).
  */
-const fs = require('fs');
 const { Client } = require('pg');
-
-const SHOP_ORACLE_ENV_FILE = '/tmp/shop-oracle.env';
 
 /** Run after CREATE TABLE IF NOT EXISTS — safe on existing DBs (PG 9.1+). */
 const IDEMPOTENT_ALTER = `
@@ -107,30 +105,17 @@ async function runIdempotentAlters(client) {
   }
 }
 
-/** POSIX single-quoted string for a line in a file sourced by `sh`. */
-function shSingleQuote(val) {
-  return `'${String(val).replace(/'/g, `'\"'\"'`)}'`;
-}
-
-function writeEphemeralOracleEnv(apiKey, apiBaseNorm) {
-  if (!apiKey || !apiBaseNorm) return;
-  const body =
-    `PLAYERINDEX_API_KEY=${shSingleQuote(apiKey)}\n` +
-    `FINTECH_API_URL=${shSingleQuote(apiBaseNorm)}\n` +
-    `API_BASE_URL=${shSingleQuote(apiBaseNorm)}\n`;
-  try {
-    fs.writeFileSync(SHOP_ORACLE_ENV_FILE, body, { encoding: 'utf8', mode: 0o600 });
-    console.log(`[init_db] Wrote ${SHOP_ORACLE_ENV_FILE} (sourced before npm run start).`);
-  } catch (e) {
-    console.warn('[init_db] Could not write ephemeral env file:', e.message || e);
-  }
-}
 
 async function init() {
-  const connectionString = process.env.DATABASE_URL;
+  // Vercel injects POSTGRES_URL; DATABASE_URL is the local dev fallback.
+  const connectionString = (
+    process.env.POSTGRES_URL ||
+    process.env.DATABASE_URL ||
+    ''
+  ).trim();
 
   if (!connectionString) {
-    console.warn('WARNING: DATABASE_URL is not defined. Skipping database initialization.');
+    console.warn('WARNING: POSTGRES_URL (or DATABASE_URL) is not defined. Skipping database initialization.');
     return;
   }
 
@@ -344,32 +329,13 @@ async function init() {
   await runIdempotentAlters(client);
   console.log('- Column upgrades applied (IF NOT EXISTS)');
 
-  const { rows: liveCfgRows } = await client.query(
-    'SELECT playerindex_api_key, playerindex_api_base_url FROM shop_config WHERE id = $1',
-    [configRow.id]
-  );
-  const liveCfg = liveCfgRows[0] || {};
-
-  if (!process.env.PLAYERINDEX_API_KEY && liveCfg.playerindex_api_key) {
-    const base =
-      String(liveCfg.playerindex_api_base_url || '')
-        .trim()
-        .replace(/\/+$/, '') ||
-      String(process.env.FINTECH_API_URL || process.env.API_BASE_URL || '')
-        .trim()
-        .replace(/\/+$/, '') ||
-      'https://api.playerindexdata.com';
-    writeEphemeralOracleEnv(liveCfg.playerindex_api_key, base);
-  }
-
-  if (process.env.PLAYERINDEX_API_KEY && liveCfg.playerindex_api_key) {
+  // If the API key is already set as a Vercel env var, clear the legacy DB copy.
+  if (process.env.PLAYERINDEX_API_KEY && configRow.playerindex_api_key) {
     await client.query(
       'UPDATE shop_config SET playerindex_api_key = NULL WHERE id = $1',
       [configRow.id]
     );
-    console.log(
-      '[init_db] Removed duplicate playerindex_api_key from shop_config (using PLAYERINDEX_API_KEY from the host).'
-    );
+    console.log('[init_db] Cleared legacy playerindex_api_key from shop_config (env var takes precedence).');
   }
 
   await client.end();

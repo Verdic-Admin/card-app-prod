@@ -1164,7 +1164,7 @@ export async function deleteStagingCardsAction(
       return {
         success: false,
         error:
-          'Unauthorized: set PLAYERINDEX_API_KEY in Railway for this service.',
+          'Unauthorized: set PLAYERINDEX_API_KEY in your Vercel Environment Variables for this service.',
       };
     }
     if (ids.length === 0) return { success: true };

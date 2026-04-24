@@ -1,7 +1,7 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { Client } from "pg";
+import pool from "@/utils/db";
 import { getShopOracleApiKey } from "@/lib/shop-oracle-credentials";
 
 export async function loginAction(prevState: any, formData: FormData) {
@@ -15,20 +15,15 @@ export async function loginAction(prevState: any, formData: FormData) {
     return { error: "Store is not linked to Player Index yet. Open your setup email and redeploy from the one-click link." };
   }
 
-  const client = new Client({ connectionString: process.env.DATABASE_URL });
   let siteName = 'White-Label Store';
-  
   try {
-    await client.connect();
-    const res = await client.query("SELECT site_name FROM store_settings LIMIT 1");
+    const res = await pool.query("SELECT site_name FROM store_settings LIMIT 1");
     if (res.rows.length > 0 && res.rows[0].site_name) {
       siteName = res.rows[0].site_name;
     }
   } catch(e) {
     // If we can't get the site name, we'll gracefully fall back
     console.error("Failed to read site_name:", e);
-  } finally {
-    await client.end();
   }
   
   try {

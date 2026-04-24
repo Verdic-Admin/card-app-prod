@@ -7,12 +7,7 @@ export function getAppOrigin(): string {
   const fromEnv = (process.env.NEXT_PUBLIC_SITE_URL || '').trim().replace(/\/$/, '');
   if (fromEnv) return fromEnv;
 
-  const railway = (process.env.RAILWAY_PUBLIC_DOMAIN || '').trim();
-  if (railway) {
-    const host = railway.replace(/^https?:\/\//, '').replace(/\/$/, '');
-    if (host) return `https://${host}`;
-  }
-
+  // Vercel injects VERCEL_URL (without https://) on every deployment.
   const vercel = (process.env.VERCEL_URL || '').trim();
   if (vercel) {
     const host = vercel.replace(/^https?:\/\//, '').replace(/\/$/, '');

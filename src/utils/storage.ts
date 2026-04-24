@@ -1,114 +1,36 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
-import { getAppOrigin } from '@/utils/app-origin';
+import { put as blobPut, del as blobDel } from '@vercel/blob';
 
-// Each var checks the custom S3_* name first, then Railway's native AWS_* name.
-// This means Railway's "Add to Service" bucket injection works automatically
-// without any manual variable renaming in the template or the Railway dashboard.
-const region   = process.env.AWS_REGION    || process.env.AWS_DEFAULT_REGION  || 'auto';
-const endpoint = process.env.S3_ENDPOINT   || process.env.AWS_ENDPOINT_URL;
-const bucket   = process.env.S3_BUCKET_NAME || process.env.AWS_S3_BUCKET_NAME || 'public-assets';
-const accessKeyId     = process.env.S3_ACCESS_KEY_ID     || process.env.AWS_ACCESS_KEY_ID;
-const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY;
-
-// S3_FORCE_PATH_STYLE defaults to false (Railway/Tigris uses virtual-host style).
-const forcePathStyle = process.env.S3_FORCE_PATH_STYLE === 'true';
-
-const s3Client = new S3Client({
-  region,
-  ...(endpoint && { endpoint }),
-  ...(accessKeyId && secretAccessKey && {
-    credentials: { accessKeyId, secretAccessKey },
-  }),
-  forcePathStyle,
-});
-
-/** Fail fast with a clear message instead of AWS SDK credential-chain noise (`tryNextLink`, etc.). */
-function assertS3CredentialsForUpload(): void {
-  if (accessKeyId && secretAccessKey) return;
-  throw new Error(
-    '[storage] S3 credentials missing. In Railway: Bucket → Add to Service → select this app so Railway injects ' +
-      'AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_ENDPOINT_URL, AWS_S3_BUCKET_NAME, and AWS_REGION.',
-  );
+export interface StoragePutOptions {
+  contentType?: string;
+  /** Accepted for backward compatibility — Vercel Blob is always public. */
+  access?: 'public';
 }
 
-// Build the public URL for a given storage key via the app's asset proxy.
-// Railway buckets are private, so all access goes through /api/assets/[...key].
-// NEXT_PUBLIC_SITE_URL must be set to the app's public origin (e.g. https://example.up.railway.app).
-function publicAssetUrl(key: string): string {
-  const base = getAppOrigin();
-  if (!base) {
-    console.warn(
-      '[storage] No public origin (NEXT_PUBLIC_SITE_URL, RAILWAY_PUBLIC_DOMAIN, or VERCEL_URL) — asset URLs will be relative and may break external API calls.'
-    );
-  }
-  const encodedKey = key.split('/').map(encodeURIComponent).join('/');
-  return `${base}/api/assets/${encodedKey}`;
-}
+/**
+ * Upload a file to Vercel Blob (public CDN).
+ * Returns the direct public URL — no proxy route needed.
+ */
+export async function put(
+  path: string,
+  file: File | Blob | Buffer,
+  options?: StoragePutOptions
+): Promise<{ url: string }> {
+  const contentType =
+    options?.contentType ??
+    (file instanceof File ? file.type : 'application/octet-stream');
 
-export async function put(path: string, file: File | Blob | Buffer, options?: any) {
-  assertS3CredentialsForUpload();
-
-  let body: Buffer | Uint8Array | Blob | string;
-
-  if (file instanceof File || file instanceof Blob) {
-    const arrayBuffer = await file.arrayBuffer();
-    body = Buffer.from(arrayBuffer);
-  } else {
-    body = file;
-  }
-
-  const contentType = (file instanceof File) ? file.type : (options?.contentType || 'application/octet-stream');
-
-  // ACL is intentionally omitted — Railway buckets are private.
-  // All public access is served via the /api/assets proxy, not direct S3 URLs.
-  const command = new PutObjectCommand({
-    Bucket: bucket,
-    Key: path,
-    Body: body,
-    ContentType: contentType,
+  const blob = await blobPut(path, file, {
+    access: 'public',
+    contentType,
   });
 
-  await s3Client.send(command);
-
-  return { url: publicAssetUrl(path) };
+  return { url: blob.url };
 }
 
-// Extract the S3 object key from a stored URL.
-// Handles two formats:
-//   1. Proxy URL:  https://host/api/assets/card-images/foo.jpg  → card-images/foo.jpg
-//   2. Legacy raw S3 URL: https://bucket.s3.region.amazonaws.com/card-images/foo.jpg  → card-images/foo.jpg
-function keyFromUrl(url: string): string {
-  try {
-    const { pathname } = new URL(url);
-    const decoded = decodeURIComponent(pathname);
-    // Proxy path: /api/assets/<key>
-    const proxyPrefix = '/api/assets/';
-    if (decoded.startsWith(proxyPrefix)) {
-      return decoded.slice(proxyPrefix.length);
-    }
-    // Legacy raw S3 path: /<bucket>/<key> or just /<key>
-    const withoutLeadingSlash = decoded.substring(1);
-    if (withoutLeadingSlash.startsWith(`${bucket}/`)) {
-      return withoutLeadingSlash.slice(bucket.length + 1);
-    }
-    return withoutLeadingSlash;
-  } catch {
-    // Not a valid URL — treat as a bare key
-    return url;
-  }
-}
-
-export async function del(urlOrUrls: string | string[]) {
-  assertS3CredentialsForUpload();
-
+/**
+ * Delete one or more files from Vercel Blob by their CDN URL(s).
+ */
+export async function del(urlOrUrls: string | string[]): Promise<void> {
   const urls = Array.isArray(urlOrUrls) ? urlOrUrls : [urlOrUrls];
-
-  for (const url of urls) {
-    try {
-      const key = keyFromUrl(url);
-      await s3Client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
-    } catch (e) {
-      console.warn(`[storage] Failed to delete: ${url}`, e);
-    }
-  }
+  await blobDel(urls);
 }
