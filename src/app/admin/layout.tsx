@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import { AdminApiCreditsStrip } from "@/components/admin/AdminApiCreditsStrip";
+import { ToastProvider } from "@/components/admin/ToastProvider";
 
 export const dynamic = 'force-dynamic';
 
@@ -54,7 +55,9 @@ export default async function AdminLayout({ children }: { children: ReactNode })
 
         {/* Render the specific admin subpage */}
         <div className="flex-grow">
-           {children}
+           <ToastProvider>
+             {children}
+           </ToastProvider>
         </div>
      </div>
   );

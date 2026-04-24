@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Database } from '@/types/database.types'
+import { useToastContext } from '@/components/admin/ToastProvider'
 import { toggleCardStatus, editCardAction, deleteCardAction, bulkDeleteCardsAction, bulkUpdateMetricsAction, rotateCardImageAction, removeFromAuctionBlock, updateProjectionTimeframe, createLotAction, breakLotAction, updateLotChildren, duplicateInventoryItem } from '@/app/actions/inventory'
 import { AuctionBidLogButton } from '@/components/admin/AuctionBidLogButton'
 import { syncSingleItemWithOracle, syncInventoryWithOracle, applyOracleDiscount, applyOracleDiscountAll, applyCorrection, approvePriceOnly, denyCorrection } from '@/app/actions/oracleSync'
-import { Loader2, Trash2, Edit2, Check, X, Search, Download, RotateCw, RefreshCw, DollarSign, Save, AlertCircle, Gavel, Package, Share2, CopyPlus } from 'lucide-react'
+import { Loader2, Trash2, Edit2, Check, X, Search, Download, RotateCw, RefreshCw, DollarSign, Save, AlertCircle, Gavel, Package, Share2, CopyPlus, MoreHorizontal } from 'lucide-react'
 import { price } from '@/utils/math'
 import { deriveDisplayPricing } from '@/utils/pricing'
 
@@ -27,6 +28,7 @@ export function InventoryTable({
   const [items, setItems] = useState(initialItems)
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [errorId, setErrorId] = useState<string | null>(null)
+  const { showToast, showConfirm } = useToastContext()
   
   const [editingId, setEditingId] = useState<string | null>(null)
   const [rotatingId, setRotatingId] = useState<string | null>(null)
@@ -76,10 +78,10 @@ export function InventoryTable({
      setIsSavingLot(true);
      try {
        await updateLotChildren(editingLotId, editingLotStagingItems);
-       alert("Lot updated successfully.");
+       showToast("Lot updated successfully.", 'success');
        window.location.reload(); 
      } catch (e: any) {
-       alert("Error updating lot: " + e.message);
+       showToast("Error updating lot: " + e.message, 'error');
      } finally {
        setIsSavingLot(false);
        setShowEditLotModal(false);
@@ -156,6 +158,7 @@ export function InventoryTable({
   
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [searchQuery, setSearchQuery] = useState('')
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
 
   const filteredItems = items.filter(item => {
     if (!searchQuery) return true;
@@ -196,51 +199,63 @@ export function InventoryTable({
 
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return;
-    if (!window.confirm(`Are you sure you want to permanently delete ${selectedIds.size} selected cards?`)) return;
     
-    setIsBulkDeleting(true)
-    setErrorId(null)
-    
-    try {
-      const itemsToDelete = items.filter(i => selectedIds.has(i.id)).map(i => ({ id: i.id, image_url: i.image_url }))
-      await bulkDeleteCardsAction(itemsToDelete)
-      setItems(items.filter(i => !selectedIds.has(i.id)))
-      setSelectedIds(new Set())
-    } catch (err: any) {
-      alert("Failed to bulk delete: " + err.message)
-    } finally {
-      setIsBulkDeleting(false)
-    }
+    showConfirm({
+      title: 'Delete Cards',
+      message: `Are you sure you want to permanently delete ${selectedIds.size} selected cards?`,
+      danger: true,
+      confirmText: 'Delete Forever',
+      onConfirm: async () => {
+        setIsBulkDeleting(true)
+        setErrorId(null)
+        try {
+          const itemsToDelete = items.filter(i => selectedIds.has(i.id)).map(i => ({ id: i.id, image_url: i.image_url }))
+          await bulkDeleteCardsAction(itemsToDelete)
+          setItems(items.filter(i => !selectedIds.has(i.id)))
+          setSelectedIds(new Set())
+          showToast(`Deleted ${itemsToDelete.length} items.`, 'success')
+        } catch (err: any) {
+          showToast("Failed to bulk delete: " + err.message, 'error')
+        } finally {
+          setIsBulkDeleting(false)
+        }
+      }
+    })
   }
 
   const handleBulkUpdateMetrics = async () => {
     if (selectedIds.size === 0) return
-    if (!window.confirm(`Update Cost Basis ($${bulkCostBasis}) and Accepts Offers (${bulkAcceptsOffers ? 'Yes' : 'No'}) for ${selectedIds.size} selected items?`)) return
-    
-    setIsBulkUpdating(true)
-    try {
-      const ids = Array.from(selectedIds)
-      await bulkUpdateMetricsAction(ids, parseFloat(bulkCostBasis) || 0, bulkAcceptsOffers)
+    showConfirm({
+      title: 'Update Metrics',
+      message: `Update Cost Basis ($${bulkCostBasis}) and Accepts Offers (${bulkAcceptsOffers ? 'Yes' : 'No'}) for ${selectedIds.size} selected items?`,
+      confirmText: 'Update',
+      onConfirm: async () => {
+        setIsBulkUpdating(true)
+        try {
+          const ids = Array.from(selectedIds)
+          await bulkUpdateMetricsAction(ids, parseFloat(bulkCostBasis) || 0, bulkAcceptsOffers)
 
-      setItems(prev => prev.map(item => 
-        selectedIds.has(item.id) 
-          ? { ...item, cost_basis: parseFloat(bulkCostBasis) || 0, accepts_offers: bulkAcceptsOffers }
-          : item
-      ))
-      
-      setSelectedIds(new Set())
-      alert(`Successfully updated ${ids.length} items.`)
-    } catch (e: any) {
-      alert("Bulk update failed: " + e.message)
-    } finally {
-      setIsBulkUpdating(false)
-    }
+          setItems(prev => prev.map(item => 
+            selectedIds.has(item.id) 
+              ? { ...item, cost_basis: parseFloat(bulkCostBasis) || 0, accepts_offers: bulkAcceptsOffers }
+              : item
+          ))
+          
+          setSelectedIds(new Set())
+          showToast(`Successfully updated ${ids.length} items.`, 'success')
+        } catch (e: any) {
+          showToast("Bulk update failed: " + e.message, 'error')
+        } finally {
+          setIsBulkUpdating(false)
+        }
+      }
+    })
   }
 
   // ── Lot handlers ──────────────────────────────────────────────────────────
   const handleCreateLot = async () => {
-    if (selectedIds.size < 2) { alert('Select at least 2 cards to create a lot.'); return }
-    if (!lotTitle.trim()) { alert('Please enter a title for the lot.'); return }
+    if (selectedIds.size < 2) { showToast('Select at least 2 cards to create a lot.', 'error'); return }
+    if (!lotTitle.trim()) { showToast('Please enter a title for the lot.', 'error'); return }
     const price = parseFloat(lotPrice) || 0
     setIsCreatingLot(true)
     try {
@@ -252,28 +267,36 @@ export function InventoryTable({
       setShowLotModal(false)
       setLotTitle('')
       setLotPrice('0.00')
-      alert(`Lot "${lotTitle}" created successfully! It's now live on the storefront.`)
+      showToast(`Lot "${lotTitle}" created successfully!`, 'success')
     } catch (e: any) {
-      alert('Failed to create lot: ' + e.message)
+      showToast('Failed to create lot: ' + e.message, 'error')
     } finally {
       setIsCreatingLot(false)
     }
   }
 
   const handleBreakLot = async (lotId: string) => {
-    if (!window.confirm('Break this lot? All child cards will be unlinked and the lot row will be deleted.')) return
-    setBreakingLotId(lotId)
-    try {
-      await breakLotAction(lotId)
-      setItems(prev => prev
-        .filter(i => i.id !== lotId)
-        .map(i => (i as any).lot_id === lotId ? { ...i, lot_id: null } as any : i)
-      )
-    } catch (e: any) {
-      alert('Failed to break lot: ' + e.message)
-    } finally {
-      setBreakingLotId(null)
-    }
+    showConfirm({
+      title: 'Break Lot',
+      message: 'Break this lot? All child cards will be unlinked and the lot row will be deleted.',
+      danger: true,
+      confirmText: 'Break Lot',
+      onConfirm: async () => {
+        setBreakingLotId(lotId)
+        try {
+          await breakLotAction(lotId)
+          setItems(prev => prev
+            .filter(i => i.id !== lotId)
+            .map(i => (i as any).lot_id === lotId ? { ...i, lot_id: null } as any : i)
+          )
+          showToast('Lot broken successfully', 'success')
+        } catch (e: any) {
+          showToast('Failed to break lot: ' + e.message, 'error')
+        } finally {
+          setBreakingLotId(null)
+        }
+      }
+    })
   }
 
   useEffect(() => setItems(initialItems), [initialItems])
@@ -333,30 +356,39 @@ export function InventoryTable({
     try {
       const result = await duplicateInventoryItem(item.id)
       if (!result.success) {
-        alert(result.error)
+        showToast(result.error || 'Failed to duplicate', 'error')
         return
       }
       setItems((prev) => [result.newItem as InventoryItem, ...prev])
+      showToast('Item duplicated successfully', 'success')
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : String(e))
+      showToast(e instanceof Error ? e.message : String(e), 'error')
     } finally {
       setDuplicatingId(null)
     }
   }
 
   const handleDelete = async (id: string, imageUrl: string | null) => {
-    if (!window.confirm("Are you sure you want to permanently delete this card?")) return;
-    
-    setIsDeleting(id)
-    setErrorId(null)
-    try {
-      await deleteCardAction(id, imageUrl)
-      setItems(items.filter(i => i.id !== id))
-    } catch (err: any) {
-      setErrorId(id)
-    } finally {
-      setIsDeleting(null)
-    }
+    showConfirm({
+      title: 'Delete Card',
+      message: 'Are you sure you want to permanently delete this card?',
+      danger: true,
+      confirmText: 'Delete',
+      onConfirm: async () => {
+        setIsDeleting(id)
+        setErrorId(null)
+        try {
+          await deleteCardAction(id, imageUrl)
+          setItems(items.filter(i => i.id !== id))
+          showToast('Card deleted successfully', 'success')
+        } catch (err: any) {
+          setErrorId(id)
+          showToast('Failed to delete card', 'error')
+        } finally {
+          setIsDeleting(null)
+        }
+      }
+    })
   }
 
   const handleSingleSync = async (id: string) => {
@@ -383,10 +415,10 @@ export function InventoryTable({
           ),
         )
       } else {
-        alert(result.message)
+        showToast(result.message, 'error')
       }
     } catch (e: any) {
-      alert("Sync failed: " + e.message)
+      showToast("Sync failed: " + e.message, 'error')
     } finally {
       setSyncingId(null)
     }
@@ -398,32 +430,39 @@ export function InventoryTable({
       const result: any = await applyOracleDiscount(item.id)
       if (result.success) {
         setItems(prev => prev.map(i => i.id === item.id ? { ...i, listed_price: result.new_price ?? null } : i))
+        showToast('Pricing updated successfully', 'success')
       } else {
-        alert(result.message)
+        showToast(result.message, 'error')
       }
     } catch (e: any) {
-      alert('Failed to apply Oracle pricing: ' + e.message)
+      showToast('Failed to apply Oracle pricing: ' + e.message, 'error')
     } finally {
       setApplyingId(null)
     }
   }
 
   const handleApplyAllOracle = async () => {
-    if (!window.confirm(`Apply Player Index pricing (${discountRate}% below Player Index) to ALL items with projections?`)) return
-    setIsApplyingAll(true)
-    try {
-      const result: any = await applyOracleDiscountAll()
-      if (result.success) {
-        alert(`Applied Oracle pricing to ${result.count} items at ${result.discount}% below market.`)
-        window.location.reload()
-      } else {
-        alert(result.message || 'Failed to apply Oracle pricing.')
+    showConfirm({
+      title: 'Apply All Oracle Pricing',
+      message: `Apply Player Index pricing (${discountRate}% below Player Index) to ALL items with projections?`,
+      confirmText: 'Apply All',
+      onConfirm: async () => {
+        setIsApplyingAll(true)
+        try {
+          const result: any = await applyOracleDiscountAll()
+          if (result.success) {
+            showToast(`Applied Oracle pricing to ${result.count} items at ${result.discount}% below market.`, 'success')
+            window.location.reload()
+          } else {
+            showToast(result.message || 'Failed to apply Oracle pricing.', 'error')
+          }
+        } catch (e: any) {
+          showToast('Failed: ' + e.message, 'error')
+        } finally {
+          setIsApplyingAll(false)
+        }
       }
-    } catch (e: any) {
-      alert('Failed: ' + e.message)
-    } finally {
-      setIsApplyingAll(false)
-    }
+    })
   }
 
   const handleMasterSync = async () => {
@@ -433,17 +472,16 @@ export function InventoryTable({
       if (result.pendingCorrections && result.pendingCorrections.length > 0) {
         setPendingCorrections(result.pendingCorrections)
         if (result.count > 0) {
-           alert(`Processed ${result.count} items perfectly. There are ${result.pendingCorrections.length} items needing review.`)
+           showToast(`Processed ${result.count} items perfectly. There are ${result.pendingCorrections.length} items needing review.`, 'info')
         }
       } else if (result.success) {
-        alert(`Master Sync Complete! Repriced ${result.count}/${(result as any).total} items across ${(result as any).batches} batches.`)
-        // The table items don't automatically refresh unless we reload page, but alert verifies it.
+        showToast(`Master Sync Complete! Repriced ${result.count}/${(result as any).total} items.`, 'success')
         window.location.reload()
       } else {
-        alert(result.message)
+        showToast(result.message, 'error')
       }
     } catch (e: any) {
-      alert("Sync failed: " + e.message)
+      showToast("Sync failed: " + e.message, 'error')
     } finally {
       setIsMasterSyncing(false)
     }
@@ -486,15 +524,14 @@ export function InventoryTable({
     try {
       await removeFromAuctionBlock(id)
       setItems(prev => prev.map(i => i.id === id ? { ...i, is_auction: false, auction_status: 'pending' } as any : i))
-    } catch (e: any) { alert('Failed: ' + e.message) }
+    } catch (e: any) { showToast('Failed: ' + e.message, 'error') }
     finally { setAuctionLoadingId(null) }
   }
-
   const handleSaveTimeframe = async (val: string) => {
     setProjectionTimeframe(val)
     setIsSavingTimeframe(true)
     try { await updateProjectionTimeframe(val) }
-    catch (e: any) { alert('Failed to save timeframe: ' + e.message) }
+    catch (e: any) { showToast('Failed to save timeframe: ' + e.message, 'error') }
     finally { setIsSavingTimeframe(false) }
   }
 
@@ -503,7 +540,7 @@ export function InventoryTable({
     try {
       await navigator.clipboard.writeText(shareUrl)
       window.open(shareUrl, '_blank', 'noopener,noreferrer')
-      alert('Item link copied and opened.')
+      showToast('Item link copied to clipboard', 'success')
     } catch {
       window.open(shareUrl, '_blank', 'noopener,noreferrer')
     }
@@ -519,7 +556,7 @@ export function InventoryTable({
       await applyCorrection(item.storefront_id, item);
       setPendingCorrections(prev => prev.filter(c => c.storefront_id !== item.storefront_id));
     } catch(e:any) {
-      alert("Error: " + e.message);
+      showToast("Error: " + e.message, 'error');
     } finally {
       setProcessingCorrectionId(null);
     }
@@ -531,7 +568,7 @@ export function InventoryTable({
       await approvePriceOnly(item.storefront_id, item);
       setPendingCorrections(prev => prev.filter(c => c.storefront_id !== item.storefront_id));
     } catch(e:any) {
-      alert("Error: " + e.message);
+      showToast("Error: " + e.message, 'error');
     } finally {
       setProcessingCorrectionId(null);
     }
@@ -543,44 +580,55 @@ export function InventoryTable({
       await denyCorrection(item.storefront_id);
       setPendingCorrections(prev => prev.filter(c => c.storefront_id !== item.storefront_id));
     } catch(e:any) {
-      alert("Error: " + e.message);
+      showToast("Error: " + e.message, 'error');
     } finally {
       setProcessingCorrectionId(null);
     }
   }
 
   const handleMasterApproveAll = async () => {
-    if (!window.confirm("Approve and update ALL pending items with their Oracle catalog matches?")) return;
-    setIsProcessingMaster(true);
-    try {
-      for (const item of pendingCorrections) {
-        await applyCorrection(item.storefront_id, item);
+    showConfirm({
+      title: 'Approve All',
+      message: 'Approve and update ALL pending items with their Oracle catalog matches?',
+      confirmText: 'Approve All',
+      onConfirm: async () => {
+        setIsProcessingMaster(true);
+        try {
+          for (const item of pendingCorrections) {
+            await applyCorrection(item.storefront_id, item);
+          }
+          setPendingCorrections([]);
+          showToast("Master approval complete.", 'success');
+        } catch (e: any) {
+          showToast("Error: " + e.message, 'error');
+        } finally {
+          setIsProcessingMaster(false);
+        }
       }
-      setPendingCorrections([]);
-      alert("Master approval complete.");
-      window.location.reload();
-    } catch (e:any) {
-      alert("Error: " + e.message);
-    } finally {
-      setIsProcessingMaster(false);
-    }
+    })
   }
 
   const handleMasterDenyAll = async () => {
-    if (!window.confirm("Deny ALL pending suggestions and force fallback math? This may take a minute.")) return;
-    setIsProcessingMaster(true);
-    try {
-      for (const item of pendingCorrections) {
-        await denyCorrection(item.storefront_id);
+    showConfirm({
+      title: 'Deny All',
+      message: 'Deny ALL pending suggestions and force fallback math? This may take a minute.',
+      danger: true,
+      confirmText: 'Deny All',
+      onConfirm: async () => {
+        setIsProcessingMaster(true);
+        try {
+          for (const item of pendingCorrections) {
+            await denyCorrection(item.storefront_id);
+          }
+          setPendingCorrections([]);
+          showToast("Master denial complete.", 'success');
+        } catch (e: any) {
+          showToast("Error: " + e.message, 'error');
+        } finally {
+          setIsProcessingMaster(false);
+        }
       }
-      setPendingCorrections([]);
-      alert("Master denial complete.");
-      window.location.reload();
-    } catch (e:any) {
-      alert("Error: " + e.message);
-    } finally {
-      setIsProcessingMaster(false);
-    }
+    })
   }
 
   return (
@@ -1078,8 +1126,8 @@ export function InventoryTable({
          </div>
       </div>
 
-      {/* Select all + bulk bar */}
-      <div className="flex items-center gap-3">
+      {/* Select all + contextual sticky bulk bar */}
+      <div className="flex items-center gap-3 mb-4">
         <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-slate-600">
           <input
             type="checkbox"
@@ -1089,40 +1137,44 @@ export function InventoryTable({
           />
           Select All
         </label>
-        {selectedIds.size > 0 && (
-          <div className="flex items-center gap-3 bg-indigo-50 border border-indigo-100 px-3 py-2 rounded-lg animate-in fade-in slide-in-from-top-2 shadow-sm">
-            <span className="text-sm font-bold text-indigo-900">{selectedIds.size} selected</span>
-            <div className="h-6 w-px bg-indigo-200 mx-1"></div>
-            <div className="flex items-center gap-2">
-                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Default Cost $</label>
-                 <input type="number" step="0.01" value={bulkCostBasis} onChange={e => setBulkCostBasis(e.target.value)} className="w-16 p-1 text-xs font-mono font-bold text-slate-900 bg-white border border-slate-300 rounded outline-none focus:ring-2 focus:ring-indigo-500 text-center" />
-            </div>
-            <label className="flex items-center gap-2 cursor-pointer">
-                 <input type="checkbox" checked={bulkAcceptsOffers} onChange={e => setBulkAcceptsOffers(e.target.checked)} className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500" />
-                 <span className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">Offers OBO</span>
-            </label>
-            <button onClick={handleBulkUpdateMetrics} disabled={isBulkUpdating} className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-50 shadow-sm ml-2">
-              {isBulkUpdating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              Apply
-            </button>
-            <div className="h-6 w-px bg-indigo-200 mx-1"></div>
-            <button
-              onClick={() => { setShowLotModal(true); setLotTitle(''); setLotPrice('0.00') }}
-              disabled={selectedIds.size < 2}
-              className="bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-1 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-50 shadow-sm"
-              title="Bundle selected cards into a Lot"
-            >
-              <Package className="w-4 h-4" />
-              Bundle Lot
-            </button>
-            <div className="h-6 w-px bg-indigo-200 mx-1"></div>
-            <button onClick={handleBulkDelete} disabled={isBulkDeleting} className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-50 shadow-sm">
-              {isBulkDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-              Delete
-            </button>
-          </div>
-        )}
       </div>
+
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-white border border-slate-200 p-3 rounded-2xl shadow-2xl animate-in slide-in-from-bottom-8 fade-in">
+          <span className="text-sm font-bold text-slate-800 bg-slate-100 px-3 py-1.5 rounded-lg">{selectedIds.size} selected</span>
+          <div className="h-8 w-px bg-slate-200 mx-1"></div>
+          <div className="flex items-center gap-2">
+               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Default Cost $</label>
+               <input type="number" step="0.01" value={bulkCostBasis} onChange={e => setBulkCostBasis(e.target.value)} className="w-16 p-1 text-xs font-mono font-bold text-slate-900 bg-slate-50 border border-slate-200 rounded outline-none focus:ring-2 focus:ring-indigo-500 text-center" />
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer ml-2">
+               <input type="checkbox" checked={bulkAcceptsOffers} onChange={e => setBulkAcceptsOffers(e.target.checked)} className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500" />
+               <span className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">Offers OBO</span>
+          </label>
+          <button onClick={handleBulkUpdateMetrics} disabled={isBulkUpdating} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-50 shadow-sm ml-2">
+            {isBulkUpdating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            Apply Update
+          </button>
+          <div className="h-8 w-px bg-slate-200 mx-1"></div>
+          <button
+            onClick={() => { setShowLotModal(true); setLotTitle(''); setLotPrice('0.00') }}
+            disabled={selectedIds.size < 2}
+            className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-50 shadow-sm"
+            title="Bundle selected cards into a Lot"
+          >
+            <Package className="w-4 h-4" />
+            Bundle Lot
+          </button>
+          <div className="h-8 w-px bg-slate-200 mx-1"></div>
+          <button onClick={handleBulkDelete} disabled={isBulkDeleting} className="bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-50 shadow-sm">
+            {isBulkDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+            Delete
+          </button>
+          <button onClick={() => setSelectedIds(new Set())} className="ml-2 text-slate-400 hover:text-slate-600 p-1">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      )}
 
       {/* Card Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -1432,69 +1484,47 @@ export function InventoryTable({
                         {item.status === 'available' ? 'Available' : 'Sold'}
                       </button>
                       {errorId === item.id && <div className="text-[10px] text-red-500 font-medium">Failed</div>}
-                      <div className="flex gap-1.5 opacity-100 transition-opacity flex-wrap justify-end">
-                        <button onClick={() => startEditing(item)} className="text-indigo-600 hover:text-indigo-800 hover:bg-indigo-100 bg-indigo-50 h-7 w-7 rounded flex items-center justify-center transition-colors" title="Edit">
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
+                      <div className="flex gap-1.5 opacity-100 transition-opacity flex-wrap justify-end relative">
                         <button
-                          onClick={() => handleSingleSync(item.id)}
-                          disabled={syncingId === item.id}
-                          className="text-purple-700 hover:text-purple-900 hover:bg-purple-100 bg-purple-50 h-7 px-2 rounded disabled:opacity-50 flex items-center justify-center gap-1.5 transition-colors text-[11px] font-bold"
-                          title="Sync Pricing"
+                          onClick={() => setOpenMenuId(openMenuId === item.id ? null : item.id)}
+                          className="text-slate-400 hover:text-slate-600 bg-slate-50 hover:bg-slate-100 h-7 w-7 rounded flex items-center justify-center transition-colors border border-slate-200"
                         >
-                          {syncingId === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                          <span>Sync Pricing</span>
+                          <MoreHorizontal className="w-4 h-4" />
                         </button>
-                        <a
-                          href={`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent([item.player_name, item.card_set, item.insert_name, item.parallel_name, item.parallel_insert_type, item.card_number].filter(v => v && v.toLowerCase() !== 'base').join(' '))}&LH_Sold=1&LH_Complete=1`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sky-600 hover:text-sky-800 hover:bg-sky-100 bg-sky-50 h-7 w-7 rounded flex items-center justify-center transition-colors"
-                          title="Check eBay Comps"
-                        >
-                          <Search className="w-3.5 h-3.5" />
-                        </a>
-                        <button
-                          onClick={() => handleShareItem(item.id)}
-                          className="text-cyan-600 hover:text-cyan-800 hover:bg-cyan-100 bg-cyan-50 h-7 w-7 rounded flex items-center justify-center transition-colors"
-                          title="Open & copy share link"
-                        >
-                          <Share2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDuplicate(item)}
-                          disabled={duplicatingId === item.id || Boolean((item as any).is_lot) || Boolean((item as any).lot_id)}
-                          className="text-violet-600 hover:text-violet-800 hover:bg-violet-100 bg-violet-50 h-7 w-7 rounded disabled:opacity-40 flex items-center justify-center transition-colors"
-                          title={
-                            (item as any).is_lot || (item as any).lot_id
-                              ? 'Duplicate is only for standalone cards (not bundles)'
-                              : 'Duplicate item'
-                          }
-                        >
-                          {duplicatingId === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CopyPlus className="w-3.5 h-3.5" />}
-                        </button>
-                        <button onClick={() => handleDelete(item.id, item.image_url)} disabled={isDeleting === item.id} className="text-red-600 hover:text-red-800 hover:bg-red-100 bg-red-50 h-7 w-7 rounded disabled:opacity-50 flex items-center justify-center transition-colors" title="Delete">
-                          {isDeleting === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                        </button>
-                        {/* Auction Block Toggle */}
-                        {(item as any).is_auction ? (
-                          <button
-                            onClick={() => handleRemoveFromAuction(item.id)}
-                            disabled={auctionLoadingId === item.id}
-                            className="text-red-500 hover:text-red-700 hover:bg-red-100 bg-red-50 h-7 w-7 rounded disabled:opacity-50 flex items-center justify-center transition-colors"
-                            title="Remove from Auction Block"
-                          >
-                            {auctionLoadingId === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
-                          </button>
-                        ) : (
-                          <Link
-                            href="/admin/auction-studio#add-from-inventory"
-                            className="text-amber-600 hover:text-amber-800 hover:bg-amber-100 bg-amber-50 h-7 w-7 rounded flex items-center justify-center transition-colors"
-                            title="Open auction staging to add this card"
-                          >
-                            <Gavel className="w-3.5 h-3.5" />
-                          </Link>
+                        
+                        {openMenuId === item.id && (
+                          <div className="absolute bottom-full right-0 mb-2 w-48 bg-white border border-slate-200 shadow-xl rounded-xl overflow-hidden z-20 flex flex-col py-1">
+                            <button onClick={() => { startEditing(item); setOpenMenuId(null); }} className="flex items-center gap-2 px-4 py-2.5 hover:bg-indigo-50 text-indigo-700 text-sm font-bold w-full text-left transition-colors">
+                              <Edit2 className="w-4 h-4" /> Edit Details
+                            </button>
+                            <button onClick={() => { handleSingleSync(item.id); setOpenMenuId(null); }} disabled={syncingId === item.id} className="flex items-center gap-2 px-4 py-2.5 hover:bg-purple-50 text-purple-700 text-sm font-bold w-full text-left transition-colors">
+                              {syncingId === item.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Sync Pricing
+                            </button>
+                            <a href={`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent([item.player_name, item.card_set, item.insert_name, item.parallel_name, item.parallel_insert_type, item.card_number].filter(v => v && v.toLowerCase() !== 'base').join(' '))}&LH_Sold=1&LH_Complete=1`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2.5 hover:bg-sky-50 text-sky-700 text-sm font-bold w-full text-left transition-colors" onClick={() => setOpenMenuId(null)}>
+                              <Search className="w-4 h-4" /> Check Comps
+                            </a>
+                            <button onClick={() => { handleShareItem(item.id); setOpenMenuId(null); }} className="flex items-center gap-2 px-4 py-2.5 hover:bg-cyan-50 text-cyan-700 text-sm font-bold w-full text-left transition-colors">
+                              <Share2 className="w-4 h-4" /> Copy Link
+                            </button>
+                            <button onClick={() => { handleDuplicate(item); setOpenMenuId(null); }} disabled={duplicatingId === item.id || Boolean((item as any).is_lot) || Boolean((item as any).lot_id)} className="flex items-center gap-2 px-4 py-2.5 hover:bg-violet-50 text-violet-700 text-sm font-bold w-full text-left transition-colors disabled:opacity-40" title={(item as any).is_lot || (item as any).lot_id ? 'Duplicate is only for standalone cards' : ''}>
+                              {duplicatingId === item.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CopyPlus className="w-4 h-4" />} Duplicate
+                            </button>
+                            
+                            {(item as any).is_auction ? (
+                              <button onClick={() => { handleRemoveFromAuction(item.id); setOpenMenuId(null); }} disabled={auctionLoadingId === item.id} className="flex items-center gap-2 px-4 py-2.5 hover:bg-red-50 text-red-600 text-sm font-bold w-full text-left transition-colors">
+                                {auctionLoadingId === item.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />} Remove from Auction
+                              </button>
+                            ) : (
+                              <Link href="/admin/auction-studio#add-from-inventory" className="flex items-center gap-2 px-4 py-2.5 hover:bg-amber-50 text-amber-700 text-sm font-bold w-full text-left transition-colors">
+                                <Gavel className="w-4 h-4" /> Stage for Auction
+                              </Link>
+                            )}
+
+                            <div className="h-px bg-slate-100 my-1 mx-2"></div>
+                            <button onClick={() => { handleDelete(item.id, item.image_url); setOpenMenuId(null); }} disabled={isDeleting === item.id} className="flex items-center gap-2 px-4 py-2.5 hover:bg-red-50 text-red-700 text-sm font-bold w-full text-left transition-colors">
+                              {isDeleting === item.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />} Delete Card
+                            </button>
+                          </div>
                         )}
                       </div>
 

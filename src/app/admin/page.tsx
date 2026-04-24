@@ -3,8 +3,7 @@ import { redirect } from 'next/navigation'
 import { BulkIngestionWizard } from '@/components/admin/BulkIngestionWizard'
 import { InventoryTable } from '@/components/admin/InventoryTable'
 import { LedgerDashboard } from '@/components/admin/LedgerDashboard'
-import { TradeLeadsCRM } from '@/components/admin/TradeLeadsCRM'
-import { CoinRequestsCRM } from '@/components/admin/CoinRequestsCRM'
+import { CollectorRequestsCRM } from '@/components/admin/CollectorRequestsCRM'
 import Link from 'next/link'
 import { Gavel } from 'lucide-react'
 import { InstructionTrigger } from '@/components/admin/DraggableGuide'
@@ -176,10 +175,7 @@ export default async function AdminPage() {
           <LedgerDashboard soldItems={soldItems} />
         </div>
         <div>
-          <CoinRequestsCRM />
-        </div>
-        <div>
-          <TradeLeadsCRM />
+          <CollectorRequestsCRM />
         </div>
         <div className="bg-amber-950/20 border border-amber-700/40 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <p className="text-sm text-foreground font-medium">

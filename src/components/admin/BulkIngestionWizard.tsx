@@ -20,6 +20,7 @@ import { deleteStagingCardsAction } from '@/app/actions/inventory'
 import { TaxonomySearch } from '@/components/admin/TaxonomySearch'
 import { normalizeCardNumberForPlayerIndex } from '@/lib/player-index-deeplink'
 import { InstructionTrigger } from '@/components/admin/DraggableGuide'
+import { useToastContext } from '@/components/admin/ToastProvider'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -143,6 +144,8 @@ export function BulkIngestionWizard() {
   // Image zoom lightbox
   const [zoomedImg, setZoomedImg] = useState<string | null>(null)
 
+  const { showToast, showConfirm } = useToastContext()
+
   const creditsExhausted = useCallback(() => {
     window.dispatchEvent(new CustomEvent('api-credits-exhausted'))
     window.location.href = '/admin/billing'
@@ -188,6 +191,91 @@ export function BulkIngestionWizard() {
 
   // ── Step 1: paired upload → staging (free, no scanner) ─────────────────────
 
+  const runSingleCardPipeline = async (card: StagingCard) => {
+    try {
+      setIsSendingToScanner(true)
+      setStep(3)
+      setScanProgress('Uploading scan job…')
+      const { job_id } = await submitStagingRowToScannerAction(
+        card.id,
+        scannerMat === 'none' ? undefined : { chroma: scannerMat }
+      )
+      setScanJobId(job_id)
+      const cropped = await pollScannerUntilDone(job_id)
+      const newRows = await finalizeStagingScanAction(
+        card.id,
+        cropped.map((c) => ({ side_a_url: c.side_a_url, side_b_url: c.side_b_url }))
+      )
+      const added = (newRows as Record<string, unknown>[]).map((r) => rowToStagingCard(r))
+      setStaging((prev) => {
+        const rest = prev.filter((r) => r.id !== card.id)
+        return [...added, ...rest]
+      })
+
+      setIsSendingToScanner(false)
+      setScanJobId(null)
+      setStep(4)
+      
+      const latestStaging = [...staging.filter(c => c.id !== card.id), ...added]
+      const updates = [...latestStaging]
+      for (let i = 0; i < added.length; i++) {
+        const c = added[i]
+        setIdentProgress(`Identifying card ${i + 1} of ${added.length}…`)
+        try {
+          const res = await identifyCardDirectAction(c.id, c.image_url!, c.back_image_url)
+          const confidence = res.confidence ?? 0
+          const aiStatus = confidence >= 0.85 ? 'High Confidence' : 'Manual Correction'
+          const idx = updates.findIndex(x => x.id === c.id)
+          if (idx !== -1) {
+            const aiTeam = (res.team_name ?? '').trim()
+            const mergedTeam = aiTeam || updates[idx].team_name
+            const mergedPrint = res.print_run != null && Number.isFinite(Number(res.print_run)) ? String(res.print_run) : updates[idx].print_run
+            const mergedCardNum = normalizeCardNumberForPlayerIndex((res.card_number && String(res.card_number).trim()) ? res.card_number : updates[idx].card_number) || updates[idx].card_number
+            updates[idx] = {
+              ...updates[idx],
+              player_name:   res.player_name   || updates[idx].player_name,
+              team_name:     mergedTeam,
+              card_set:      res.card_set       || updates[idx].card_set,
+              card_number:   mergedCardNum,
+              insert_name:   res.insert_name    || updates[idx].insert_name,
+              parallel_name: res.parallel_name  || updates[idx].parallel_name,
+              print_run:     mergedPrint,
+              confidence,
+              ai_status: aiStatus,
+              team_name_source: res.team_name_source,
+              team_name_confidence: res.team_name_confidence,
+              team_name_verified: res.team_name_verified,
+            }
+            updateDraftCardAction(updates[idx].id, {
+              player_name: updates[idx].player_name,
+              team_name: updates[idx].team_name,
+              card_set: updates[idx].card_set,
+              card_number: mergedCardNum,
+              insert_name: updates[idx].insert_name,
+              parallel_name: updates[idx].parallel_name,
+              print_run: (() => { const n = parseInt(String(mergedPrint ?? '').replace(/\D/g, ''), 10); return Number.isFinite(n) ? n : null })()
+            }).catch(() => {})
+          }
+        } catch (e: any) {
+          if (e.message === 'credits_exhausted') { creditsExhausted(); return }
+          const idx = updates.findIndex(x => x.id === c.id)
+          if (idx !== -1) updates[idx] = { ...updates[idx], ai_status: 'Failed', confidence: 0 }
+        }
+      }
+      setIdentProgress('')
+      setStaging(updates)
+      setReviewCards(updates)
+      setReviewSelected(new Set(updates.map(x => x.id)))
+      setActiveTab('ready')
+      setStep(5)
+    } catch (e: any) {
+      setIsSendingToScanner(false)
+      setScanJobId(null)
+      setStep(2)
+      showToast('Auto-advance failed: ' + e.message, 'error')
+    }
+  }
+
   const handleUpload = async () => {
     setIsUploading(true)
     try {
@@ -201,6 +289,9 @@ export function BulkIngestionWizard() {
         const card = rowToStagingCard(row as Record<string, unknown>)
         setStaging((prev) => [card, ...prev])
         setSelectedIds((prev) => new Set([...prev, card.id]))
+        setBatchFront(null)
+        setBatchBack(null)
+        setStep(2)
       } else {
         if (!singleFront || !singleBack) return
         const fd = new FormData()
@@ -211,15 +302,13 @@ export function BulkIngestionWizard() {
         const card = rowToStagingCard(row as Record<string, unknown>)
         setStaging((prev) => [card, ...prev])
         setSelectedIds((prev) => new Set([...prev, card.id]))
+        setSingleFront(null)
+        setSingleBack(null)
+        runSingleCardPipeline(card)
       }
-      setBatchFront(null)
-      setBatchBack(null)
-      setSingleFront(null)
-      setSingleBack(null)
-      setStep(2)
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
-      alert('Upload failed: ' + msg)
+      showToast('Upload failed: ' + msg, 'error')
     } finally {
       setIsUploading(false)
     }
@@ -230,12 +319,12 @@ export function BulkIngestionWizard() {
   const handleSendSelectedToScanner = async () => {
     const pending = staging.filter((c) => selectedIds.has(c.id) && isPendingScan(c))
     if (!pending.length) {
-      alert('Select one or more uncropped uploads (orange badge). Each sheet uses a paired front + back.')
+      showToast('Select one or more uncropped uploads (orange badge). Each sheet uses a paired front + back.', 'info')
       return
     }
     const missingBack = pending.filter((c) => !c.raw_back_url)
     if (missingBack.length) {
-      alert('Scanner requires a back image for each selected upload. Re-stage with front + back, or use "Use as-is" only when both raw sides exist.')
+      showToast('Scanner requires a back image for each selected upload. Re-stage with front + back, or use "Use as-is" only when both raw sides exist.', 'error')
       return
     }
     setIsSendingToScanner(true)
@@ -271,7 +360,7 @@ export function BulkIngestionWizard() {
         creditsExhausted()
         return
       }
-      alert('Scanner error: ' + msg)
+      showToast('Scanner error: ' + msg, 'error')
     } finally {
       setIsSendingToScanner(false)
       setScanJobId(null)
@@ -283,12 +372,12 @@ export function BulkIngestionWizard() {
   const handlePromoteRawAsCropped = async () => {
     const pending = staging.filter((c) => selectedIds.has(c.id) && isPendingScan(c))
     if (!pending.length) {
-      alert('Select uncropped uploads to promote.')
+      showToast('Select uncropped uploads to promote.', 'info')
       return
     }
     const missingBack = pending.filter((c) => !c.raw_back_url)
     if (missingBack.length) {
-      alert('Use as-is requires a back image for each row. Upload paired front + back, then promote.')
+      showToast('Use as-is requires a back image for each row. Upload paired front + back, then promote.', 'error')
       return
     }
     try {
@@ -309,7 +398,7 @@ export function BulkIngestionWizard() {
       )
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
-      alert('Could not promote images: ' + msg)
+      showToast('Could not promote images: ' + msg, 'error')
     }
   }
 
@@ -348,14 +437,14 @@ export function BulkIngestionWizard() {
       .filter((c) => selectedIds.has(c.id) && c.image_url)
       .map((c) => c.id)
     if (!ids.length) {
-      alert('Select cards that already have a front image (cropped or promoted).')
+      showToast('Select cards that already have a front image (cropped or promoted).', 'info')
       return
     }
     setIsPublishingAsIs(true)
     try {
       const pub = await publishDraftCardsAction(ids)
       if (!pub.success) {
-        alert('Publish failed: ' + pub.error)
+        showToast('Publish failed: ' + pub.error, 'error')
         return
       }
       const remaining = staging.filter(c => !selectedIds.has(c.id))
@@ -374,7 +463,7 @@ export function BulkIngestionWizard() {
     try {
       const del = await deleteStagingCardsAction(ids)
       if (!del.success) {
-        alert('Discard failed: ' + del.error)
+        showToast('Discard failed: ' + del.error, 'error')
         return
       }
       const remaining = staging.filter(c => !selectedIds.has(c.id))
@@ -396,8 +485,9 @@ export function BulkIngestionWizard() {
         (c.back_image_url || c.raw_back_url),
     )
     if (!selected.length) {
-      alert(
+      showToast(
         'Select cards that have both a front and a back (cropped image_url/back_image_url, or raw pair not yet promoted). Finish the scanner or use "Use as-is" first.',
+        'info'
       )
       return
     }
@@ -481,7 +571,7 @@ export function BulkIngestionWizard() {
           creditsExhausted()
           return
         }
-        alert('Re-price failed: ' + result.error)
+        showToast('Re-price failed: ' + result.error, 'error')
         setReviewCards(prev => prev.map(c => (c.id === id ? { ...c, repricing: false } : c)))
         return
       }
@@ -510,7 +600,7 @@ export function BulkIngestionWizard() {
         creditsExhausted()
         return
       }
-      alert('Re-price failed: ' + e.message)
+      showToast('Re-price failed: ' + e.message, 'error')
       setReviewCards(prev => prev.map(c => c.id === id ? { ...c, repricing: false } : c))
     }
   }
@@ -518,7 +608,7 @@ export function BulkIngestionWizard() {
   const handlePriceFromFields = async (id: string) => {
     const card = reviewCards.find(c => c.id === id)
     if (!card || !card.player_name) {
-      alert('Fill in at least Player Name and Card Set before pricing from fields.')
+      showToast('Fill in at least Player Name and Card Set before pricing from fields.', 'info')
       return
     }
     setReviewCards(prev => prev.map(c => c.id === id ? { ...c, repricing: true } : c))
@@ -537,7 +627,7 @@ export function BulkIngestionWizard() {
           : ''
       setReviewCards(prev => prev.map(c => (c.id === id ? { ...c, repricing: false, listed_price: newPrice } : c)))
     } catch (e: any) {
-      alert('Pricing failed: ' + e.message)
+      showToast('Pricing failed: ' + e.message, 'error')
       setReviewCards(prev => prev.map(c => c.id === id ? { ...c, repricing: false } : c))
     }
   }
@@ -549,7 +639,7 @@ export function BulkIngestionWizard() {
       activeTab === 'ready' ? (c.confidence ?? 0) > 0.85 : (c.confidence ?? 1) <= 0.85
     ).filter(c => c.player_name)
     if (!visibleCards.length) {
-      alert('No cards with a Player Name on this tab to price.')
+      showToast('No cards with a Player Name on this tab to price.', 'info')
       return
     }
     setIsPricingAll(true)
@@ -602,17 +692,14 @@ export function BulkIngestionWizard() {
     try {
       const pub = await publishDraftCardsAction(ids)
       if (!pub.success) {
-        alert('Publish failed: ' + pub.error)
+        showToast('Publish failed: ' + pub.error, 'error')
         return
       }
       const discard = reviewCards.filter(c => !reviewSelected.has(c.id)).map(c => c.id)
       if (discard.length) {
         const del = await deleteStagingCardsAction(discard)
         if (!del.success) {
-          alert(
-            'Cards were published to inventory, but removing the other drafts failed: ' +
-              del.error,
-          )
+          showToast('Cards were published to inventory, but removing the other drafts failed: ' + del.error, 'error')
         }
       }
       resetWizard()
