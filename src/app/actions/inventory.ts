@@ -306,8 +306,8 @@ export async function createLotAction(
   if (children.length > 0) {
      try {
         const sharp = (await import('sharp')).default;
-        const top4 = children.slice(0, 4).map(c => c.image_url).filter(u => u);
-        const buffers = await Promise.all(top4.map(async url => {
+        const top4 = children.slice(0, 4).map((c: any) => c.image_url).filter((u: any) => u);
+        const buffers = await Promise.all(top4.map(async (url: any) => {
            const res = await fetch(url);
            return res.arrayBuffer();
         }));
@@ -316,7 +316,7 @@ export async function createLotAction(
            // We will create a 400x400 collage and resize each into a 200x200 tile.
            const tileW = 200, tileH = 200;
            const composites: SharpComposite[] = [];
-           const resizePromises = buffers.map(async (buf, idx) => {
+           const resizePromises = buffers.map(async (buf: any, idx: number) => {
               const bgImg = await sharp(Buffer.from(buf)).resize(tileW, tileH, { fit: 'cover' }).toBuffer();
               const left = (idx % 2) * tileW;
               const top = Math.floor(idx / 2) * tileH;
@@ -972,7 +972,7 @@ export async function getAuctionBidHistoryForAdmin(
        LIMIT 200`,
       [itemId],
     );
-    const bids: AuctionBidHistoryRow[] = rows.map((r) => ({
+    const bids: AuctionBidHistoryRow[] = rows.map((r: any) => ({
       id: r.id,
       bidder_email: r.bidder_email,
       bid_amount: price(r.bid_amount),

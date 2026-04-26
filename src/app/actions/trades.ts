@@ -35,7 +35,7 @@ export async function submitTradeOffer(formData: FormData) {
     const { rows } = await pool.query(`SELECT id, listed_price, market_price FROM inventory WHERE id = ANY($1::uuid[])`, [itemIds]);
     target_items = target_items.map((t: any) => {
        const itemId = t.id || t;
-       const dbItem = rows.find(r => r.id === itemId);
+       const dbItem = rows.find((r: any) => r.id === itemId);
        if (dbItem) {
           return {
              ...(typeof t === 'object' ? t : { id: t }),

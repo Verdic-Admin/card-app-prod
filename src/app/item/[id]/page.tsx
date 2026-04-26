@@ -162,7 +162,7 @@ export default async function ItemPage({ params }: PageProps) {
         {children && children.length > 0 ? (
           <div className="relative">
             <div className="flex gap-6 overflow-x-auto pb-8 snap-x snap-mandatory hide-scrollbars" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-              {children.map(child => (
+              {children.map((child: any) => (
                 <div key={child.id} className="snap-start flex-shrink-0 w-[280px]">
                   <ProductCard item={child as any} discountRate={settings.oracle_discount_percentage} />
                 </div>
