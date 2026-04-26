@@ -9,7 +9,7 @@ import {
   updateStagedAuction,
   type AuctionStageItemInput,
 } from '@/app/actions/inventory'
-import { Loader2, CheckCircle2, X, AlertTriangle, Gavel, Search } from 'lucide-react'
+import { Loader2, CheckCircle2, X, AlertTriangle, Gavel, Search, Check } from 'lucide-react'
 import { deriveDisplayPricing } from '@/utils/pricing'
 import { price as priceNum } from '@/utils/math'
 
@@ -80,6 +80,12 @@ export function LiveAuctionStudio({
   const [editingLiveId, setEditingLiveId] = useState<string | null>(null)
   const [savingLiveId, setSavingLiveId] = useState<string | null>(null)
   const [goingLive, setGoingLive] = useState(false)
+  const [toastMsg, setToastMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  const showToast = (type: 'success' | 'error', text: string) => {
+    setToastMsg({ type, text })
+    setTimeout(() => setToastMsg(null), 4000)
+  }
 
   const pendingItems = useMemo(
     () => items.filter(i => i.is_auction && i.auction_status === 'pending'),
@@ -204,7 +210,8 @@ export function LiveAuctionStudio({
     const ids = pendingItems.map(i => i.id)
     if (ids.length > 0) {
       await import('@/app/actions/inventory').then(m => m.generateBatchCodes(ids))
-      alert('Batch codes generated. Please refresh to view.')
+      showToast('success', 'Batch codes generated. Refresh to view.')
+      router.refresh()
     }
   }
 
@@ -227,10 +234,10 @@ export function LiveAuctionStudio({
             : i,
         ),
       )
-      alert('Live auction item updated.')
+      showToast('success', 'Live auction item updated.')
       setEditingLiveId(null)
     } catch (e: any) {
-      alert(`Failed to save: ${e?.message || 'Unknown error'}`)
+      showToast('error', `Failed to save: ${e?.message || 'Unknown error'}`)
     } finally {
       setSavingLiveId(null)
     }
@@ -238,6 +245,16 @@ export function LiveAuctionStudio({
 
   return (
     <div className="space-y-8 relative">
+      {/* Inline toast */}
+      {toastMsg && (
+        <div className={`fixed top-4 right-4 z-[100] px-5 py-3 rounded-xl shadow-2xl border text-sm font-bold flex items-center gap-2 animate-slide-in ${
+          toastMsg.type === 'success' ? 'bg-emerald-950 border-emerald-700 text-emerald-300' : 'bg-red-950 border-red-700 text-red-300'
+        }`}>
+          {toastMsg.type === 'success' ? <Check className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
+          {toastMsg.text}
+          <button type="button" onClick={() => setToastMsg(null)} className="ml-2 opacity-50 hover:opacity-100"><X className="w-3.5 h-3.5" /></button>
+        </div>
+      )}
       <div
         className={`fixed bottom-8 right-8 z-50 transition-all ${showQR ? 'scale-100 opacity-100' : 'scale-95 opacity-0 pointer-events-none'}`}
       >
@@ -568,7 +585,7 @@ export function LiveAuctionStudio({
                 } else if (pendingItems.length > 0) {
                   ids = pendingItems.map(p => p.id)
                 } else {
-                  alert('No staged items.')
+                  showToast('error', 'No staged items.')
                   return
                 }
                 setGoingLive(true)
@@ -580,7 +597,7 @@ export function LiveAuctionStudio({
                   router.refresh()
                 } catch (e: unknown) {
                   const msg = e instanceof Error ? e.message : String(e)
-                  alert(`Could not go live: ${msg}`)
+                  showToast('error', `Could not go live: ${msg}`)
                 } finally {
                   setGoingLive(false)
                 }
@@ -694,10 +711,10 @@ export function LiveAuctionStudio({
                       )
                       setCoinFileLabel(prev => ({ ...prev, [item.id]: '' }))
                       router.refresh()
-                      alert('Saved.')
+                      showToast('success', 'Saved.')
                     } catch (err: unknown) {
                       const msg = err instanceof Error ? err.message : String(err)
-                      alert(`Could not save: ${msg}`)
+                      showToast('error', `Could not save: ${msg}`)
                     }
                   }}
                 >
@@ -809,8 +826,8 @@ export function LiveAuctionStudio({
                       </div>
                       {auctionLeadByItemId[item.id] && (
                         <div className="break-all" title={auctionLeadByItemId[item.id].bidder_email}>
-                          <span className="text-slate-500 font-sans">Leading email: </span>
-                          <span className="font-medium text-slate-900">{auctionLeadByItemId[item.id].bidder_email}</span>
+                          <span className="text-slate-500 font-sans">Leading handle: </span>
+                          <span className="font-medium text-slate-900">@{auctionLeadByItemId[item.id].bidder_email}</span>
                         </div>
                       )}
                       <AuctionBidLogButton itemId={item.id} label={item.player_name} tone="light" />

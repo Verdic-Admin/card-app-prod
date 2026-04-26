@@ -11,7 +11,6 @@ interface Item {
   image_url: string
   back_image_url?: string | null
   coined_image_url?: string | null
-  video_url?: string
   player_name: string
   card_set: string
   card_number?: string | null
@@ -42,6 +41,121 @@ function slidesForItem(item: Item): Slide[] {
   return out.length ? out : []
 }
 
+const HANDLE_STORAGE_KEY = 'pi_bidder_handle'
+
+function getSavedHandle(): string {
+  if (typeof window === 'undefined') return ''
+  return localStorage.getItem(HANDLE_STORAGE_KEY) || ''
+}
+
+function saveHandle(handle: string) {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(HANDLE_STORAGE_KEY, handle)
+  }
+}
+
+/** Zero-Auth bid input — caches handle in localStorage for frictionless rebids. */
+function BidInput({ itemId, currentBid, onBidPlaced }: { itemId: string; currentBid: number; onBidPlaced: () => void }) {
+  const [handle, setHandle] = useState('')
+  const [amount, setAmount] = useState('')
+  const [hasStoredHandle, setHasStoredHandle] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+
+  useEffect(() => {
+    const saved = getSavedHandle()
+    if (saved) {
+      setHandle(saved)
+      setHasStoredHandle(true)
+    }
+  }, [])
+
+  const submit = async () => {
+    const trimmed = handle.trim()
+    if (!trimmed) { setFeedback({ type: 'error', msg: 'Enter your handle first' }); return }
+    const numAmt = Number(amount)
+    if (!numAmt || numAmt <= currentBid) {
+      setFeedback({ type: 'error', msg: `Bid must be above $${currentBid.toFixed(2)}` })
+      return
+    }
+    setIsSubmitting(true)
+    setFeedback(null)
+    try {
+      const { placeBidAction } = await import('@/app/actions/inventory')
+      await placeBidAction(itemId, trimmed, numAmt)
+      saveHandle(trimmed)
+      setHasStoredHandle(true)
+      setAmount('')
+      setFeedback({ type: 'success', msg: 'Bid placed!' })
+      onBidPlaced()
+    } catch (e: unknown) {
+      setFeedback({ type: 'error', msg: e instanceof Error ? e.message : String(e) })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      {/* Handle row */}
+      {hasStoredHandle ? (
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-zinc-400">
+            Bidding as: <strong className="text-cyan-400">@{handle}</strong>
+          </span>
+          <button
+            type="button"
+            onClick={() => { setHasStoredHandle(false); setHandle('') }}
+            className="text-zinc-500 hover:text-zinc-300 font-bold transition-colors"
+          >
+            Change
+          </button>
+        </div>
+      ) : (
+        <input
+          type="text"
+          value={handle}
+          onChange={e => setHandle(e.target.value)}
+          placeholder="Your handle (@twitter, FB name, etc.)"
+          className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-500 focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none"
+        />
+      )}
+
+      {/* Bid amount + submit */}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-bold text-sm">$</span>
+          <input
+            type="number"
+            step="0.01"
+            min={currentBid + 0.01}
+            value={amount}
+            onChange={e => setAmount(e.target.value)}
+            placeholder={(currentBid + 1).toFixed(2)}
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg pl-7 pr-3 py-2.5 text-sm text-white font-mono placeholder-zinc-600 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+            onKeyDown={e => { if (e.key === 'Enter') submit() }}
+          />
+        </div>
+        <button
+          type="button"
+          onClick={submit}
+          disabled={isSubmitting}
+          className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black px-5 py-2.5 rounded-lg text-sm transition-colors shadow-lg whitespace-nowrap"
+        >
+          {isSubmitting ? '...' : 'BID'}
+        </button>
+      </div>
+
+      {/* Feedback */}
+      {feedback && (
+        <p className={`text-xs font-bold ${feedback.type === 'success' ? 'text-emerald-400' : 'text-red-400'}`}>
+          {feedback.msg}
+        </p>
+      )}
+    </div>
+  )
+}
+
 export function LiveAuctionGrid({ initialItems }: { initialItems: Item[] }) {
   const [items, setItems] = useState<Item[]>(initialItems)
   const [slideById, setSlideById] = useState<Record<string, number>>({})
@@ -53,7 +167,7 @@ export function LiveAuctionGrid({ initialItems }: { initialItems: Item[] }) {
     setSlideById(prev => ({ ...prev, [id]: idx }))
   }, [])
 
-  // Polling loop — merge bid fields only; keep imagery + oracle columns from initial payload
+  // 3-second polling for real-time bid updates
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
@@ -88,34 +202,22 @@ export function LiveAuctionGrid({ initialItems }: { initialItems: Item[] }) {
           const safeIdx = slides.length ? idx % slides.length : 0
           const current = slides[safeIdx]
           const piUrl = buildPlayerIndexForecasterUrl(item)
+          const currentBid = price(item.current_bid || item.listed_price)
 
           return (
             <div
               key={item.id}
               className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-xl transform hover:-translate-y-1 transition-all duration-300"
             >
+              {/* Image carousel */}
               <div className="relative aspect-[3/4] bg-zinc-950 flex items-center justify-center overflow-hidden group">
-                {item.video_url ? (
-                  <>
-                    <video
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      className="w-full h-full object-contain"
-                      src={String(item.video_url)}
-                    />
-                    <div className="absolute top-2 left-2 bg-zinc-950/80 backdrop-blur-md border border-emerald-500/30 text-emerald-400 text-[10px] font-black px-2 py-1 rounded shadow drop-shadow-md flex items-center gap-1 z-10">
-                      Surface Audit ✓
-                    </div>
-                  </>
-                ) : current ? (
+                {current ? (
                   <img src={current.url} alt={`${item.player_name} ${current.label}`} className="w-full h-full object-contain" />
                 ) : (
                   <span className="text-zinc-500 text-sm font-bold">No image</span>
                 )}
 
-                {!item.video_url && slides.length > 1 && (
+                {slides.length > 1 && (
                   <>
                     <button
                       type="button"
@@ -151,10 +253,12 @@ export function LiveAuctionGrid({ initialItems }: { initialItems: Item[] }) {
                 )}
               </div>
 
+              {/* Card info */}
               <div className="p-4">
                 <h3 className="font-bold text-lg text-white leading-tight">{item.player_name}</h3>
                 <p className="text-zinc-400 text-sm">{item.card_set}</p>
 
+                {/* Player Index forecast */}
                 {(item.oracle_projection != null && Number(item.oracle_projection) > 0) ||
                 item.oracle_trend_percentage != null ? (
                   <PlayerIndexForecastLink
@@ -167,7 +271,7 @@ export function LiveAuctionGrid({ initialItems }: { initialItems: Item[] }) {
                     </div>
                     {item.oracle_projection != null && Number(item.oracle_projection) > 0 && (
                       <div className="text-xs text-indigo-50 font-bold">
-                        Store fair marker: ${price(item.oracle_projection).toFixed(2)}
+                        Fair value: ${price(item.oracle_projection).toFixed(2)}
                       </div>
                     )}
                     {item.oracle_trend_percentage != null && (
@@ -178,29 +282,20 @@ export function LiveAuctionGrid({ initialItems }: { initialItems: Item[] }) {
                         {Math.abs(price(item.oracle_trend_percentage)).toFixed(1)}%
                       </div>
                     )}
-                    <p className="text-[10px] text-indigo-300/90 mt-1.5 leading-snug">
-                      Open on Player Index to see the live projected value and run the calculator with this
-                      card&apos;s details.
-                    </p>
                   </PlayerIndexForecastLink>
                 ) : null}
 
+                {/* Badges */}
                 {(item.is_rookie || item.is_auto || item.is_relic || (item.grading_company && item.grade)) && (
                   <div className="flex flex-wrap gap-1.5 mt-1 mb-2">
                     {item.is_rookie && (
-                      <span className="text-[9px] font-black bg-yellow-400/20 text-yellow-400 border border-yellow-400/40 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                        RC
-                      </span>
+                      <span className="text-[9px] font-black bg-yellow-400/20 text-yellow-400 border border-yellow-400/40 px-2 py-0.5 rounded-full uppercase tracking-wider">RC</span>
                     )}
                     {item.is_auto && (
-                      <span className="text-[9px] font-black bg-blue-400/20 text-blue-400 border border-blue-400/40 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                        Auto
-                      </span>
+                      <span className="text-[9px] font-black bg-blue-400/20 text-blue-400 border border-blue-400/40 px-2 py-0.5 rounded-full uppercase tracking-wider">Auto</span>
                     )}
                     {item.is_relic && (
-                      <span className="text-[9px] font-black bg-purple-400/20 text-purple-400 border border-purple-400/40 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                        Relic
-                      </span>
+                      <span className="text-[9px] font-black bg-purple-400/20 text-purple-400 border border-purple-400/40 px-2 py-0.5 rounded-full uppercase tracking-wider">Relic</span>
                     )}
                     {item.grading_company && item.grade && (
                       <span className="text-[9px] font-black bg-emerald-400/20 text-emerald-400 border border-emerald-400/40 px-2 py-0.5 rounded-full uppercase tracking-wider">
@@ -210,8 +305,9 @@ export function LiveAuctionGrid({ initialItems }: { initialItems: Item[] }) {
                   </div>
                 )}
 
-                <div className="text-center font-mono font-black text-3xl text-cyan-400 bg-zinc-950 py-3 rounded-lg mb-2 shadow-inner border border-zinc-800 relative">
-                  ${price(item.current_bid || item.listed_price).toFixed(2)}
+                {/* Current bid display */}
+                <div className="text-center font-mono font-black text-3xl text-cyan-400 bg-zinc-950 py-3 rounded-lg mb-3 shadow-inner border border-zinc-800 relative">
+                  ${currentBid.toFixed(2)}
                   {item.bidder_count > 0 && (
                     <span className="absolute -top-3 -right-2 bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full shadow border border-red-400">
                       {item.bidder_count} Bids
@@ -219,60 +315,34 @@ export function LiveAuctionGrid({ initialItems }: { initialItems: Item[] }) {
                   )}
                 </div>
 
-                <PlayerIndexForecastLink
-                  href={piUrl}
-                  className="w-full mb-2 flex items-center justify-center gap-2 text-[11px] font-black uppercase tracking-widest py-2 rounded-lg border border-indigo-500/50 bg-indigo-950/50 text-indigo-100 hover:bg-indigo-900/60 transition-colors"
+                {/* Zero-Auth bid input */}
+                <BidInput itemId={item.id} currentBid={currentBid} onBidPlaced={() => {}} />
+
+                {/* Trade offer button */}
+                <button
+                  onClick={async () => {
+                    const savedHandle = getSavedHandle()
+                    const handle = savedHandle || window.prompt('Your handle (@twitter, FB name):')
+                    if (!handle) return
+                    const offer = window.prompt('Describe your trade offer (card(s), cash, or combo):')
+                    if (!offer) return
+                    try {
+                      const { submitTradeOffer } = await import('@/app/actions/trades')
+                      const fd = new FormData()
+                      fd.append('name', handle)
+                      fd.append('email', handle)
+                      fd.append('offer', offer)
+                      fd.append('targetItems', JSON.stringify([item.id]))
+                      await submitTradeOffer(fd)
+                      if (!savedHandle) saveHandle(handle)
+                    } catch (e: unknown) {
+                      console.error('Trade submit failed', e)
+                    }
+                  }}
+                  className="w-full mt-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-2 rounded-lg text-sm transition-colors shadow-lg"
                 >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  Run on Player Index
-                </PlayerIndexForecastLink>
-
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  <button
-                    onClick={async () => {
-                      const amt = prompt('Enter bid amount:')
-                      if (!amt || isNaN(Number(amt))) return
-                      const email = prompt('Enter your email for confirmation:')
-                      if (!email) return
-
-                      try {
-                        const { placeBidAction } = await import('@/app/actions/inventory')
-                        await placeBidAction(item.id, email, Number(amt))
-                        alert('Bid placed! Poller will update price shortly.')
-                      } catch (e: unknown) {
-                        alert(e instanceof Error ? e.message : String(e))
-                      }
-                    }}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-2 rounded text-sm transition-colors shadow-lg"
-                  >
-                    Bid Cash
-                  </button>
-                  <button
-                    onClick={async () => {
-                      const name = prompt('Your name:')
-                      if (!name) return
-                      const email = prompt('Your email:')
-                      if (!email) return
-                      const offer = prompt('Describe your trade offer (card(s), cash, or combo):')
-                      if (!offer) return
-                      try {
-                        const { submitTradeOffer } = await import('@/app/actions/trades')
-                        const fd = new FormData()
-                        fd.append('name', name)
-                        fd.append('email', email)
-                        fd.append('offer', offer)
-                        fd.append('targetItems', JSON.stringify([item.id]))
-                        await submitTradeOffer(fd)
-                        alert('Trade offer submitted! The seller will reach out via email.')
-                      } catch (e: unknown) {
-                        alert(`Failed to submit trade: ${e instanceof Error ? e.message : String(e)}`)
-                      }
-                    }}
-                    className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-2 rounded text-sm transition-colors shadow-lg"
-                  >
-                    Offer Trade
-                  </button>
-                </div>
+                  Offer Trade
+                </button>
               </div>
             </div>
           )

@@ -857,125 +857,7 @@ export async function stageAuctionItems(
   }
 }
 
-export type LiveAuctionMacroResult =
-  | {
-      success: true;
-      text: string;
-      projection: number;
-      trend: number | null;
-      discountedFair: number;
-      currentBid: number;
-    }
-  | { success: false; error: string };
 
-/**
- * Fetches a fresh Player Index valuation for a live auction card and returns
- * copy-ready lines for stream / social broadcast (does not mutate inventory).
- */
-export async function getLiveAuctionBroadcastMacro(
-  itemId: string,
-): Promise<LiveAuctionMacroResult> {
-  try {
-    if (!(await hasShopOracleApiKey())) {
-      return { success: false, error: 'Store Oracle API is not provisioned.' };
-    }
-
-    const { rows: settingsRows } = await pool.query(
-      `SELECT oracle_discount_percentage FROM store_settings WHERE id = 1`,
-    );
-    const discountRate = Number(settingsRows[0]?.oracle_discount_percentage ?? 0);
-
-    const { rows } = await pool.query(`SELECT * FROM inventory WHERE id = $1`, [itemId]);
-    const item = rows[0];
-    if (!item) return { success: false, error: 'Item not found.' };
-    if (!item.is_auction || item.auction_status !== 'live') {
-      return { success: false, error: 'Item is not a live auction listing.' };
-    }
-
-    const gradeStr =
-      item.grading_company && item.grade
-        ? `${item.grading_company} ${item.grade}`
-        : undefined;
-
-    const res = await calculatePricingAction({
-      player_name: String(item.player_name || ''),
-      card_set: String(item.card_set || ''),
-      insert_name: String(item.insert_name || 'Base'),
-      parallel_name: String(item.parallel_name || 'Base'),
-      card_number: String(item.card_number || ''),
-      print_run: item.print_run != null ? Number(item.print_run) : null,
-      is_rookie: Boolean(item.is_rookie),
-      is_auto: Boolean(item.is_auto),
-      is_relic: Boolean(item.is_relic),
-      grade: gradeStr,
-    });
-
-    if (!res || typeof res !== 'object' || !('success' in res) || !res.success) {
-      const exhausted =
-        res && typeof res === 'object' && 'error' in res && (res as { error?: string }).error === 'credits_exhausted';
-      return {
-        success: false,
-        error: exhausted ? 'Player Index credits exhausted.' : 'Unable to fetch Player Index macro for this card.',
-      };
-    }
-
-    const data = (res as { data?: Record<string, unknown> }).data || {};
-    const projection = Number(data.projected_target ?? data.target_price ?? 0);
-    if (!Number.isFinite(projection) || projection <= 0) {
-      return {
-        success: false,
-        error: 'Player Index did not return a fair value for this card.',
-      };
-    }
-
-    const trendRaw = data.trend_percentage;
-    const trend =
-      trendRaw != null && Number.isFinite(Number(trendRaw)) ? Number(trendRaw) : null;
-    const discountedFair = projection * (1 - Math.max(0, discountRate) / 100);
-    const currentBid = price(item.current_bid, 0);
-    const delta = discountedFair - currentBid;
-    let verdict: string;
-    if (currentBid <= 0) {
-      verdict =
-        'No bids yet — opening is still below the configured Player Index discount target.';
-    } else if (delta > 0.02) {
-      verdict = `Bid is about $${delta.toFixed(2)} under the discount target vs catalog (reads undervalued vs fair).`;
-    } else if (delta < -0.02) {
-      verdict = `Bid is about $${Math.abs(delta).toFixed(2)} over the discount target vs catalog (heated / above fair marker).`;
-    } else {
-      verdict = 'Bid is roughly on the discount target vs catalog.';
-    }
-
-    const header = `${String(item.player_name || '').trim()} — ${String(item.card_set || 'Unknown set').trim()}${item.card_number ? ` #${item.card_number}` : ''}`.trim();
-
-    const lines = [
-      header,
-      `Player Index catalog fair: $${projection.toFixed(2)}`,
-      discountRate > 0
-        ? `Configured storefront discount (${discountRate}% off PI): $${discountedFair.toFixed(2)}`
-        : null,
-      trend != null
-        ? `Catalog trend vs prior window: ${trend >= 0 ? '+' : ''}${trend.toFixed(1)}%`
-        : null,
-      currentBid > 0 ? `Live high bid: $${currentBid.toFixed(2)}` : 'Live high bid: (none yet)',
-      verdict,
-      '',
-      'Tap the macro button again after bids move to refresh this blurb.',
-    ].filter((line): line is string => Boolean(line));
-
-    return {
-      success: true,
-      text: lines.join('\n'),
-      projection,
-      trend,
-      discountedFair,
-      currentBid,
-    };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return { success: false, error: msg };
-  }
-}
 
 export async function placeBidAction(itemId: string, bidderEmail: string, bidAmount: number) {
   // Using an atomic transaction ensures no race conditions on read/write of current_bid
@@ -1006,6 +888,62 @@ export async function placeBidAction(itemId: string, bidderEmail: string, bidAmo
 
   revalidatePath('/auction');
   return { success: true };
+}
+
+/** Fetch expired auctions awaiting admin approval (reserve met, timer expired). */
+export async function getExpiredAuctionsPendingApproval() {
+  await checkAuth();
+  const { rows } = await pool.query(`
+    SELECT i.id, i.player_name, i.card_set, i.card_number, i.image_url,
+           i.current_bid, i.bidder_count, i.auction_reserve_price, i.auction_end_time,
+           (SELECT bidder_email FROM auction_bids WHERE item_id = i.id ORDER BY bid_amount DESC, created_at DESC LIMIT 1) AS winner_handle
+    FROM inventory i
+    WHERE i.is_auction = true
+      AND i.auction_status = 'pending_approval'
+    ORDER BY i.auction_end_time DESC
+  `);
+  return rows;
+}
+
+/** Admin approves an auction winner — creates a trade_offers row for manual checkout. */
+export async function approveAuctionWinner(itemId: string) {
+  await checkAuth();
+
+  const { rows: items } = await pool.query(
+    `SELECT id, player_name, card_set, current_bid FROM inventory WHERE id = $1 AND auction_status = 'pending_approval'`,
+    [itemId],
+  );
+  if (!items.length) throw new Error('Item not found or not pending approval.');
+  const item = items[0];
+
+  const { rows: bids } = await pool.query(
+    `SELECT bidder_email, bid_amount FROM auction_bids WHERE item_id = $1 ORDER BY bid_amount DESC, created_at DESC LIMIT 1`,
+    [itemId],
+  );
+  if (!bids.length) throw new Error('No bids found for this auction item.');
+  const topBid = bids[0];
+
+  // Inject into trade_offers for manual checkout workflow
+  await pool.query(
+    `INSERT INTO trade_offers (name, email, offer, target_items, status)
+     VALUES ($1, $2, $3, $4, 'pending_payment')`,
+    [
+      topBid.bidder_email,
+      topBid.bidder_email,
+      `Auction winner — $${Number(topBid.bid_amount).toFixed(2)} for ${item.player_name} (${item.card_set || 'N/A'})`,
+      JSON.stringify([itemId]),
+    ],
+  );
+
+  // Mark auction as ended, item status stays available until payment confirmed
+  await pool.query(
+    `UPDATE inventory SET auction_status = 'ended', listed_price = $1 WHERE id = $2`,
+    [topBid.bid_amount, itemId],
+  );
+
+  revalidatePath('/admin');
+  revalidatePath('/auction');
+  return { success: true, winner: topBid.bidder_email, amount: Number(topBid.bid_amount) };
 }
 
 export type AuctionBidHistoryRow = {
@@ -1123,19 +1061,7 @@ export async function generateBatchCodes(ids: string[]) {
   revalidatePath('/admin')
 }
 
-export async function uploadVerifiedFlipUI(id: string, formData: FormData) {
-  await checkAuth();
-    
-  const file = formData.get('video') as File
-  if (!file) throw new Error("Missing video file")
-  
-  const fileExt = file.name.split('.').pop()
-  const fileName = `video-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
-  const blob = await put(`card-images/${fileName}`, file, { access: 'public' });
-  await pool.query(`UPDATE inventory SET video_url = $1, is_verified_flip = true WHERE id = $2`, [blob.url, id]);
-  revalidatePath('/admin')
-  revalidatePath('/auction')
-}
+
 
 export async function removeFromAuctionBlock(id: string) {
   await checkAuth();

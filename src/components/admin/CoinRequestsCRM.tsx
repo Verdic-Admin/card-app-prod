@@ -36,7 +36,7 @@ export function CoinRequestsCRM() {
       await fulfillCoinRequest(reqId, itemId, form)
       setRequests(prev => prev.filter(r => r.id !== reqId))
     } catch (err) {
-      alert("Failed to fulfill request.")
+      console.error("Failed to fulfill request:", err)
     } finally {
       setLoadingIds(prev => {
         const next = new Set(prev)

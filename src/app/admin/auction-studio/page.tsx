@@ -80,11 +80,11 @@ export default async function AuctionStudioPage() {
                  steps={[
                     { title: "1. Add from inventory", content: "Search your inventory, check cards, set reserve and end time (optional session defaults), then Stage. Only one flow — no duplicate staging panels elsewhere." },
                     { title: "2. Staging + coin photo", content: "Each row shows store and PI pricing. Save reserve, attach a coin verification photo (Save row), then GO LIVE." },
-                    { title: "3. Stream + bids", content: "Run your stream where you like. Bidders use your auction page; live items accept bids there." }
+                    { title: "3. Go live + bids", content: "Cards go live on the /auction page. Share the link on your social media streams (Facebook, Twitter, Instagram). Bidders use their social handles — no account required." }
                  ]}
               />
           </h1>
-          <p className="text-muted mt-1 font-medium">Stage inventory, control live status, and run your stream however you want.</p>
+          <p className="text-muted mt-1 font-medium">Stage inventory, control live status, and manage your auctions.</p>
         </div>
       </div>
 

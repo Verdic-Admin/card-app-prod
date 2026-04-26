@@ -26,7 +26,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, message: 'No expired auctions to process.' });
     }
 
-    let soldCount = 0;
+    let approvalCount = 0;
     let failedCount = 0;
 
     for (const item of expiredItems) {
@@ -34,17 +34,15 @@ export async function GET(request: Request) {
        const bid = price(item.current_bid);
 
        if (bid >= reserve) {
-          // Reserve met
+          // Reserve met — route to admin approval queue instead of auto-selling
           await pool.query(`
             UPDATE inventory 
-            SET status = 'sold',
-                listed_price = $1,
-                auction_status = 'ended'
-            WHERE id = $2
-          `, [bid, item.id]);
-          soldCount++;
+            SET auction_status = 'pending_approval'
+            WHERE id = $1
+          `, [item.id]);
+          approvalCount++;
        } else {
-          // Reserve not met
+          // Reserve not met — return to available inventory
           await pool.query(`
             UPDATE inventory 
             SET is_auction = false,
@@ -63,7 +61,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ 
       success: true, 
       processed: expiredItems.length,
-      sold: soldCount,
+      pending_approval: approvalCount,
       failed_reserve: failedCount 
     });
 

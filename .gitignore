@@ -80,8 +80,7 @@ public/sw.js.map
 public/workbox-*.js
 public/workbox-*.js.map
 
-# Lock file has platform-specific native binaries (lightningcss) - let Railway resolve for Linux
-package-lock.json
+# package-lock.json is required for Docker builds (npm ci)
 
 # Repo-local scratch / tooling (not part of Next.js app)
 tooling/

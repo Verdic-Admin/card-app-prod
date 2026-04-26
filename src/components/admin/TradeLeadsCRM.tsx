@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { getAllTradeOffers, deleteTradeOfferRecord, clearTradeImageStorage, approveManualPayment } from '@/app/actions/trades'
-import { Download, Trash2, ImageIcon, CheckSquare, Square, RefreshCcw, DollarSign, PackageCheck, Handshake } from 'lucide-react'
+import { Download, Trash2, ImageIcon, CheckSquare, Square, RefreshCcw, DollarSign, PackageCheck, Handshake, Check, AlertTriangle, X } from 'lucide-react'
 import { InstructionTrigger } from '@/components/admin/DraggableGuide'
 
 type TradeOffer = {
@@ -20,6 +20,12 @@ export function TradeLeadsCRM() {
   const [offers, setOffers] = useState<TradeOffer[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isLoading, setIsLoading] = useState(true)
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+  const [confirmAction, setConfirmAction] = useState<{ msg: string; onConfirm: () => void } | null>(null)
+
+  const showToast = (type: 'success' | 'error', msg: string) => {
+    setToast({ type, msg }); setTimeout(() => setToast(null), 4000)
+  }
 
   const loadData = async () => {
     setIsLoading(true)
@@ -38,7 +44,7 @@ export function TradeLeadsCRM() {
   }, [])
 
   const handleExportCSV = () => {
-    if (offers.length === 0) return alert("No records to export.");
+    if (offers.length === 0) { showToast('error', 'No records to export.'); return }
     const headers = ['Offer Date', 'Buyer Name', 'Email', 'Status', 'Offer Text', 'Target Items (JSON)', 'Attachment URL']
     const csvContent = [
         headers.join(','),
@@ -63,32 +69,46 @@ export function TradeLeadsCRM() {
 
   const handleMassDelete = async () => {
      if (selectedIds.size === 0) return;
-     if (!window.confirm(`Warning: This will permanently nuke ${selectedIds.size} records and their associated orphaned trade images. Proceed?`)) return;
-     
-     setIsLoading(true)
-     for (const id of selectedIds) {
-        const offer = offers.find(o => o.id === id)
-        if (offer) {
-           await deleteTradeOfferRecord(id, offer.attached_image_url)
-        }
-     }
-     setSelectedIds(new Set())
-     await loadData()
+     setConfirmAction({
+       msg: `Permanently nuke ${selectedIds.size} records and their orphaned trade images?`,
+       onConfirm: async () => {
+         setConfirmAction(null)
+         setIsLoading(true)
+         for (const id of selectedIds) {
+            const offer = offers.find(o => o.id === id)
+            if (offer) await deleteTradeOfferRecord(id, offer.attached_image_url)
+         }
+         setSelectedIds(new Set())
+         await loadData()
+         showToast('success', `Deleted ${selectedIds.size} records.`)
+       }
+     })
   }
 
   const handleClearImage = async (id: string, url: string) => {
-     if (!window.confirm("Delete this heavy image file from cloud storage? You will keep the contact lead and offer natively.")) return;
-     setIsLoading(true)
-     await clearTradeImageStorage(id, url)
-     await loadData()
+     setConfirmAction({
+       msg: 'Delete this image file from cloud storage? The contact lead and offer will be kept.',
+       onConfirm: async () => {
+         setConfirmAction(null)
+         setIsLoading(true)
+         await clearTradeImageStorage(id, url)
+         await loadData()
+         showToast('success', 'Image file deleted.')
+       }
+     })
   }
 
   const handleApprovePayment = async (offerId: string) => {
-     if (!window.confirm("Are you sure you have received the funds? This will definitively mark the inventory items as SOLD.")) return;
-     setIsLoading(true);
-     await approveManualPayment(offerId);
-     await loadData();
-     alert("Order Paid & Marked as Sold!");
+     setConfirmAction({
+       msg: 'Confirm you have received the funds? This will mark the inventory items as SOLD.',
+       onConfirm: async () => {
+         setConfirmAction(null)
+         setIsLoading(true)
+         await approveManualPayment(offerId)
+         await loadData()
+         showToast('success', 'Order paid & marked as sold!')
+       }
+     })
   }
 
   const toggleSelect = (id: string) => {
@@ -104,7 +124,27 @@ export function TradeLeadsCRM() {
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 overscroll-contain">
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 overscroll-contain relative">
+      {/* Inline toast */}
+      {toast && (
+        <div className={`fixed top-4 right-4 z-[100] px-5 py-3 rounded-xl shadow-2xl border text-sm font-bold flex items-center gap-2 ${toast.type === 'success' ? 'bg-emerald-950 border-emerald-700 text-emerald-300' : 'bg-red-950 border-red-700 text-red-300'}`}>
+          {toast.type === 'success' ? <Check className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
+          {toast.msg}
+          <button type="button" onClick={() => setToast(null)} className="ml-2 opacity-50 hover:opacity-100"><X className="w-3.5 h-3.5" /></button>
+        </div>
+      )}
+      {/* Confirm modal */}
+      {confirmAction && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md mx-4">
+            <p className="text-slate-900 font-bold mb-4">{confirmAction.msg}</p>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setConfirmAction(null)} className="px-4 py-2 text-sm font-bold text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200">Cancel</button>
+              <button onClick={confirmAction.onConfirm} className="px-4 py-2 text-sm font-bold text-white bg-red-600 rounded-lg hover:bg-red-700">Confirm</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
