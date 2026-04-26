@@ -17,6 +17,9 @@ RUN npm ci --omit=dev
 FROM node:20-alpine AS builder
 WORKDIR /app
 
+# libc6-compat is required for Tailwind v4 native binaries (lightningcss)
+RUN apk add --no-cache libc6-compat
+
 # Copy lockfile + package.json first for caching, then install ALL deps
 # (devDependencies like @tailwindcss/postcss are needed for `next build`)
 COPY package.json package-lock.json ./
