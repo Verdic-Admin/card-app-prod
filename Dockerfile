@@ -17,7 +17,11 @@ RUN npm ci --omit=dev
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-COPY --from=deps /app/node_modules ./node_modules
+# Copy lockfile + package.json first for caching, then install ALL deps
+# (devDependencies like @tailwindcss/postcss are needed for `next build`)
+COPY package.json package-lock.json ./
+RUN npm ci
+
 COPY . .
 
 # Bake the git SHA into the image for version tracking (Phase 5 update engine)
