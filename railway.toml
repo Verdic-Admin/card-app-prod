@@ -17,3 +17,7 @@ restartPolicyMaxRetries = 3
 
 [service]
 internalPort = 3000
+
+# Auto-generate a public *.up.railway.app domain for every deployment
+[[service.networking]]
+generateDomain = true
