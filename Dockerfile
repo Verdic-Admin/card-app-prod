@@ -23,7 +23,9 @@ RUN apk add --no-cache libc6-compat
 # Copy lockfile + package.json first for caching, then install ALL deps
 # (devDependencies like @tailwindcss/postcss are needed for `next build`)
 COPY package.json package-lock.json ./
-RUN npm ci && npm rebuild
+RUN npm ci \
+    && npm install --no-save lightningcss-linux-x64-musl \
+    && npm rebuild
 
 COPY . .
 
