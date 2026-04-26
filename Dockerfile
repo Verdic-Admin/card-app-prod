@@ -20,12 +20,12 @@ WORKDIR /app
 # libc6-compat is required for Tailwind v4 native binaries (lightningcss)
 RUN apk add --no-cache libc6-compat
 
-# Copy lockfile + package.json first for caching, then install ALL deps
-# (devDependencies like @tailwindcss/postcss are needed for `next build`)
+# Copy lockfile + package.json first for caching, then install ALL deps.
+# We use `npm install` instead of `npm ci` because the lockfile is generated
+# on Windows and lacks linux-musl optional deps (tailwindcss-oxide, lightningcss).
+# npm install resolves the correct platform-specific binaries for Alpine.
 COPY package.json package-lock.json ./
-RUN npm ci \
-    && npm install --no-save lightningcss-linux-x64-musl \
-    && npm rebuild
+RUN npm install
 
 COPY . .
 
