@@ -94,9 +94,9 @@ export default async function PrivacyPage() {
             we receive only a transaction confirmation.
           </li>
           <li>
-            <strong className="text-foreground">Hosting &amp; Database (Vercel):</strong> This
-            storefront is hosted on Vercel.com. Your order and account data are stored in a
-            Vercel-managed Postgres database under the shop owner&apos;s exclusive control.
+            <strong className="text-foreground">Hosting &amp; Database:</strong> This
+            storefront is hosted on a cloud platform selected by the shop owner. Your order
+            and account data are stored in a Postgres database under the shop owner&apos;s exclusive control.
           </li>
           <li>
             <strong className="text-foreground">Player Index (Data &amp; Forecasting API):</strong>{" "}

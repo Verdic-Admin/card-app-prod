@@ -18,7 +18,7 @@ interface BulkInventoryItem {
   side_b_url?: string | null;
 }
 
-interface VercelInventoryItem {
+interface InventoryItem {
   player_name: string;
   card_set: string | null;
   status: string;
@@ -228,7 +228,7 @@ export async function batchCommitAction(items: BulkInventoryItem[]) {
   return { success: true }
 }
 
-export async function vercelBatchInsertInventory(items: VercelInventoryItem[]) {
+export async function batchInsertInventory(items: InventoryItem[]) {
   // Directly insert finalized DB payload arrays
   for (const item of items) {
      const price = item.pricing?.listed_price || 0
@@ -247,7 +247,7 @@ export async function vercelBatchInsertInventory(items: VercelInventoryItem[]) {
   return { success: true }
 }
 
-export async function vercelBatchUpdatePrices(updates: { id: string, listed_price: number, market_price: number, trend_data?: number[], player_index_url?: string }[]) {
+export async function batchUpdatePrices(updates: { id: string, listed_price: number, market_price: number, trend_data?: number[], player_index_url?: string }[]) {
   if (updates.length === 0) return { success: true };
 
   const ids = updates.map(u => u.id);
@@ -613,7 +613,7 @@ export async function deleteCardAction(id: string, imageUrl?: string | null) {
     try {
       await del(imageUrl);
     } catch (e) {
-      console.warn("Failed to delete blob from vercel:", e)
+      console.warn("Failed to delete blob from storage:", e)
     }
   }
   await pool.query(`DELETE FROM inventory WHERE id = $1`, [id]);
@@ -627,7 +627,7 @@ export async function bulkDeleteCardsAction(items: {id: string, image_url: strin
   await checkAuth();
 
   
-  // 1. Delete all images from vercel blob
+  // 1. Delete all images from object storage
   const urls = items.filter(i => i.image_url).map(i => i.image_url!);
   if (urls.length > 0) {
     try { await del(urls); } catch {}
@@ -979,7 +979,7 @@ export async function getLiveAuctionBroadcastMacro(
 
 export async function placeBidAction(itemId: string, bidderEmail: string, bidAmount: number) {
   // Using an atomic transaction ensures no race conditions on read/write of current_bid
-  // Vercel Postgres does NOT have transaction blocks directly via `pool.query(`, we must use pooled client OR single raw query string with returning.
+  // Standard Postgres atomicity: UPDATE ... RETURNING handles single-row consistency.
   // Actually, standard UPDATE ... RETURNING handles atomicity for single rows.
 
   const { rows } = await pool.query(`
@@ -1164,7 +1164,7 @@ export async function deleteStagingCardsAction(
       return {
         success: false,
         error:
-          'Unauthorized: set PLAYERINDEX_API_KEY in your Vercel Environment Variables for this service.',
+          'Unauthorized: set PLAYERINDEX_API_KEY in your hosting Environment Variables for this service.',
       };
     }
     if (ids.length === 0) return { success: true };

@@ -11,13 +11,17 @@ export default function SetupPage() {
         </div>
         <h1 className="text-2xl font-black text-white mb-2">Finish linking your store</h1>
         <p className="text-muted mb-6 text-sm leading-relaxed">
-          Set <span className="font-mono text-foreground">PLAYERINDEX_API_KEY</span> in your Vercel project&apos;s Environment Variables to the key you
-          copied from Player Index (<span className="font-mono">/claim</span> or{' '}
-          <span className="font-mono">/developers</span>), then redeploy.
+          Your <span className="font-mono text-foreground">PLAYERINDEX_API_KEY</span> environment
+          variable is not configured. If you deployed via the Railway template and completed the
+          OAuth authorization, this variable should have been injected automatically.
+        </p>
+        <p className="text-muted mb-4 text-xs leading-relaxed">
+          If this was a manual deployment, add the key in your Railway service&apos;s
+          <span className="font-mono text-foreground"> Variables</span> panel, then redeploy.
         </p>
         <p className="text-muted mb-8 text-xs leading-relaxed">
-          Optional: <span className="font-mono text-foreground">FINTECH_API_URL</span> /{' '}
-          <span className="font-mono text-foreground">API_BASE_URL</span> default to the public gateway if unset.
+          Optional: <span className="font-mono text-foreground">API_BASE_URL</span> defaults
+          to the public gateway if unset.
         </p>
         <Link
           href="https://playerindexdata.com/claim"

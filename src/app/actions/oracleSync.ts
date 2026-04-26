@@ -3,7 +3,7 @@
 import pool from '@/utils/db';
 import { getOracleGatewayBaseUrl } from '@/lib/oracle-gateway-url';
 import { getShopOracleApiKey } from '@/lib/shop-oracle-credentials';
-import { vercelBatchUpdatePrices } from '@/app/actions/inventory'
+import { batchUpdatePrices } from '@/app/actions/inventory'
 import { calculatePricingAction } from '@/app/actions/oracleAPI'
 
 const BATCH_PRICING_SIZE = 50;
@@ -24,7 +24,7 @@ function toTitleCase(str: string) {
 }
 
 export async function syncInventoryWithOracle() {
-  console.log("-> Fetching active inventory from Vercel Postgres...");
+  console.log("-> Fetching active inventory from Postgres...");
   const { rows: inventory } = await pool.query(
     `SELECT id, player_name, card_set, card_number, insert_name, parallel_name,
             parallel_insert_type,
@@ -154,7 +154,7 @@ export async function syncInventoryWithOracle() {
 
   try {
     console.log(`-> Performing single atomic DB update for ${updates.length} items...`);
-    await vercelBatchUpdatePrices(updates.map(u => ({
+    await batchUpdatePrices(updates.map(u => ({
       id: u.id,
       listed_price: u.listed_price,
       market_price: u.market_price,

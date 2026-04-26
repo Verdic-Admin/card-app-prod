@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 /**
- * Vercel postbuild entrypoint: runs after `next build` to initialize/migrate
- * the Postgres schema. Safe to run on every deploy — all statements are
- * idempotent (CREATE TABLE IF NOT EXISTS / ALTER TABLE ADD COLUMN IF NOT EXISTS).
+ * Docker entrypoint / postbuild: initializes and migrates the Postgres schema.
+ * Safe to run on every deploy — all statements are idempotent
+ * (CREATE TABLE IF NOT EXISTS / ALTER TABLE ADD COLUMN IF NOT EXISTS).
  */
 const { Client } = require('pg');
 
@@ -107,15 +107,15 @@ async function runIdempotentAlters(client) {
 
 
 async function init() {
-  // Vercel injects POSTGRES_URL; DATABASE_URL is the local dev fallback.
+  // DATABASE_URL is injected by Railway Postgres plugin.
   const connectionString = (
-    process.env.POSTGRES_URL ||
     process.env.DATABASE_URL ||
+    process.env.POSTGRES_URL ||
     ''
   ).trim();
 
   if (!connectionString) {
-    console.warn('WARNING: POSTGRES_URL (or DATABASE_URL) is not defined. Skipping database initialization.');
+    console.warn('WARNING: DATABASE_URL is not defined. Skipping database initialization.');
     return;
   }
 
@@ -340,7 +340,7 @@ async function init() {
   await runIdempotentAlters(client);
   console.log('- Column upgrades applied (IF NOT EXISTS)');
 
-  // If the API key is already set as a Vercel env var, clear the legacy DB copy.
+  // If the API key is set as an env var, clear the legacy DB copy.
   if (process.env.PLAYERINDEX_API_KEY && configRow.playerindex_api_key) {
     await client.query(
       'UPDATE shop_config SET playerindex_api_key = NULL WHERE id = $1',

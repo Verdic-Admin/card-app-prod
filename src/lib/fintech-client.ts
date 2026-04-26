@@ -27,12 +27,12 @@ export class FintechAuthError extends Error {
   }
 }
 
-/** Load the shop gateway API key (server-only). Requires PLAYERINDEX_API_KEY set in Vercel Environment Variables. */
+/** Load the shop gateway API key (server-only). Requires PLAYERINDEX_API_KEY set in Environment Variables. */
 export async function getFintechApiKey(): Promise<string> {
   const key = await getShopOracleApiKey();
   if (!key) {
     throw new FintechAuthError(
-      'Missing PLAYERINDEX_API_KEY. Add it in your Vercel project Environment Variables (from playerindexdata.com/claim or /developers).',
+      'Missing PLAYERINDEX_API_KEY. Add it in your hosting dashboard Environment Variables (from playerindexdata.com/claim or /developers).',
     );
   }
   return key;

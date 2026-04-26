@@ -64,14 +64,14 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
-# vercel
+# platform artifacts
 .vercel
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
 
-.vercel
+
 .vscode/
 
 # Serwist generated service worker (built at deploy time)

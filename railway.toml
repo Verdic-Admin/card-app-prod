@@ -1,0 +1,19 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Railway Configuration — card-app-prod
+# This file configures the Railway deployment when using the 1-click template.
+# ──────────────────────────────────────────────────────────────────────────────
+
+[build]
+# No build step — we pull a pre-built Docker image from GHCR
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# Health check endpoint (fast, no DB)
+healthcheckPath = "/api/health"
+healthcheckTimeout = 30
+# Graceful shutdown
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+
+[service]
+internalPort = 3000

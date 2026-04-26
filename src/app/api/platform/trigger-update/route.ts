@@ -5,8 +5,8 @@ import pool from '@/utils/db';
  * POST /api/platform/trigger-update
  *
  * Called when the shop admin clicks "Update Now" in the dashboard.
- * Reads the stored Vercel Deploy Hook URL from store_updates table
- * and fires it to trigger a fresh deployment (which runs update_from_upstream.js).
+ * Sends a request to the Master Server using PLAYERINDEX_API_KEY to 
+ * trigger a fresh redeployment.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -16,26 +16,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Read the deploy hook URL from the database
-    const { rows } = await pool.query(
-      `SELECT deploy_hook_url FROM store_updates WHERE id = 1`
-    );
-
-    const hookUrl = rows[0]?.deploy_hook_url;
-
-    if (!hookUrl) {
+    const apiKey = process.env.PLAYERINDEX_API_KEY;
+    if (!apiKey) {
       return NextResponse.json({
-        error: 'No deploy hook configured. Go to Settings → Platform Updates to paste your Vercel Deploy Hook URL.',
+        error: 'PLAYERINDEX_API_KEY is missing from environment variables. Cannot trigger update.',
       }, { status: 400 });
     }
 
-    // Fire the Vercel Deploy Hook (POST request to their webhook URL)
-    const hookRes = await fetch(hookUrl, { method: 'POST' });
+    const masterUrl = process.env.API_BASE_URL || 'https://api.playerindexdata.com';
+    const triggerRes = await fetch(`${masterUrl}/api/store/trigger-update`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+    });
 
-    if (!hookRes.ok) {
-      const body = await hookRes.text().catch(() => hookRes.statusText);
+    if (!triggerRes.ok) {
+      const body = await triggerRes.text().catch(() => triggerRes.statusText);
       return NextResponse.json({
-        error: `Deploy hook failed: ${body}`,
+        error: `Master server update failed: ${body}`,
       }, { status: 502 });
     }
 
