@@ -1,9 +1,9 @@
 /**
- * Object Storage — S3-compatible (Railway Tigris / t3.storageapi.dev / AWS S3).
+ * Object Storage — S3-compatible (Railway Bucket / Tigris / AWS S3).
  *
- * Supports both Railway's auto-injected variable names AND custom S3_* overrides:
- *   Railway Tigris:  AWS_ENDPOINT_URL_S3, BUCKET_NAME, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
- *   Custom/legacy:   S3_ENDPOINT,         S3_BUCKET_NAME, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY
+ * IMPORTANT: All environment variable reads are deferred to request-time
+ * to prevent Next.js standalone builds from baking empty strings into
+ * the compiled server chunks during `next build` inside Docker.
  */
 import {
   S3Client,
@@ -12,38 +12,50 @@ import {
   type PutObjectCommandInput,
 } from '@aws-sdk/client-s3';
 
-// Resolve from Railway bucket variable names first, then S3_* fallbacks
-const getEnv = (key: string) => process.env[key] || '';
+/** Read an env var at runtime (never at build time). */
+function env(key: string): string {
+  return process.env[key] ?? '';
+}
 
-const S3_ENDPOINT   = (getEnv('AWS_ENDPOINT_URL_S3') || getEnv('AWS_ENDPOINT_URL') || getEnv('S3_ENDPOINT')).replace(/\/$/, '').trim();
-const S3_BUCKET     = (getEnv('BUCKET_NAME') || getEnv('AWS_S3_BUCKET_NAME') || getEnv('S3_BUCKET_NAME')).trim();
-const S3_ACCESS_KEY = (getEnv('AWS_ACCESS_KEY_ID') || getEnv('S3_ACCESS_KEY_ID')).trim();
-const S3_SECRET_KEY = (getEnv('AWS_SECRET_ACCESS_KEY') || getEnv('S3_SECRET_ACCESS_KEY')).trim();
-const S3_REGION     = (getEnv('AWS_REGION') || getEnv('AWS_DEFAULT_REGION') || getEnv('S3_REGION') || 'auto').trim();
+/** Resolve S3 configuration lazily from the live environment. */
+function getConfig() {
+  const endpoint   = (env('AWS_ENDPOINT_URL_S3') || env('AWS_ENDPOINT_URL') || env('S3_ENDPOINT')).replace(/\/$/, '').trim();
+  const bucket     = (env('BUCKET_NAME') || env('AWS_S3_BUCKET_NAME') || env('S3_BUCKET_NAME')).trim();
+  const accessKey  = (env('AWS_ACCESS_KEY_ID') || env('S3_ACCESS_KEY_ID')).trim();
+  const secretKey  = (env('AWS_SECRET_ACCESS_KEY') || env('S3_SECRET_ACCESS_KEY')).trim();
+  const region     = (env('AWS_REGION') || env('AWS_DEFAULT_REGION') || env('S3_REGION') || 'auto').trim();
+  return { endpoint, bucket, accessKey, secretKey, region };
+}
 
-let s3: S3Client | null = null;
+let _s3: S3Client | null = null;
+let _configHash = '';
 
 function getS3Client(): S3Client {
-  if (!s3) {
-    s3 = new S3Client({
-      endpoint: S3_ENDPOINT || undefined,
-      region: S3_REGION,
+  const cfg = getConfig();
+  const hash = `${cfg.endpoint}|${cfg.bucket}|${cfg.accessKey}`;
+
+  // Rebuild client if config changed (first call, or env vars rotated)
+  if (!_s3 || _configHash !== hash) {
+    _s3 = new S3Client({
+      endpoint: cfg.endpoint || undefined,
+      region: cfg.region,
       credentials: {
-        accessKeyId:     S3_ACCESS_KEY,
-        secretAccessKey: S3_SECRET_KEY,
+        accessKeyId: cfg.accessKey,
+        secretAccessKey: cfg.secretKey,
       },
-      forcePathStyle: false, // virtual-hosted-style: https://<bucket>.<endpoint>/<key>
+      forcePathStyle: false,
     });
+    _configHash = hash;
   }
-  return s3;
+  return _s3;
 }
 
 /** Public URL for a stored object — virtual-hosted style. */
 function publicUrl(key: string): string {
-  const host = S3_ENDPOINT.replace(/^https?:\/\//, '');
-  return `https://${S3_BUCKET}.${host}/${key}`;
+  const cfg = getConfig();
+  const host = cfg.endpoint.replace(/^https?:\/\//, '');
+  return `https://${cfg.bucket}.${host}/${key}`;
 }
-
 
 export interface StoragePutOptions {
   contentType?: string;
@@ -60,12 +72,16 @@ export async function put(
   file: File | Blob | Buffer,
   options?: StoragePutOptions,
 ): Promise<{ url: string }> {
-  if (!S3_ENDPOINT || !S3_BUCKET || !S3_ACCESS_KEY || !S3_SECRET_KEY) {
-    const liveKeys = Object.keys(process.env).filter(k => k.includes('S3') || k.includes('AWS') || k.includes('BUCKET') || k.includes('TIGRIS')).join(', ');
+  const cfg = getConfig();
+
+  if (!cfg.endpoint || !cfg.bucket || !cfg.accessKey || !cfg.secretKey) {
+    const liveKeys = Object.keys(process.env)
+      .filter(k => /S3|AWS|BUCKET|TIGRIS/i.test(k))
+      .join(', ');
     throw new Error(
-      `Object storage is not configured. Detected vars — ENDPOINT: "${S3_ENDPOINT || 'missing'}", BUCKET: "${S3_BUCKET || 'missing'}", KEY: "${S3_ACCESS_KEY ? 'set' : 'missing'}". ` +
-      `LIVE S3 VARIABLES IN CONTAINER: [${liveKeys || 'NONE FOUND'}]. ` +
-      `If 'NONE FOUND', your Railway variables are missing from the mycardshop service. Please check your Template Builder variable references.`
+      `Object storage is not configured. ` +
+      `ENDPOINT: "${cfg.endpoint || 'missing'}", BUCKET: "${cfg.bucket || 'missing'}", KEY: "${cfg.accessKey ? 'set' : 'missing'}". ` +
+      `Live env keys: [${liveKeys || 'NONE'}].`,
     );
   }
 
@@ -81,12 +97,10 @@ export async function put(
   }
 
   const params: PutObjectCommandInput = {
-    Bucket: S3_BUCKET,
+    Bucket: cfg.bucket,
     Key: path,
     Body: body,
     ContentType: contentType,
-    // Note: ACL is intentionally omitted — Railway Tigris and most S3-compatible
-    // providers manage bucket-level access policies, not per-object ACLs.
   };
 
   await getS3Client().send(new PutObjectCommand(params));
@@ -97,14 +111,14 @@ export async function put(
  * Delete one or more files from S3 by their public URLs.
  */
 export async function del(urlOrUrls: string | string[]): Promise<void> {
+  const cfg = getConfig();
   const urls = Array.isArray(urlOrUrls) ? urlOrUrls : [urlOrUrls];
   const client = getS3Client();
   for (const url of urls) {
     try {
-      // Extract the key: everything after the bucket subdomain + host
       const u = new URL(url);
       const key = u.pathname.startsWith('/') ? u.pathname.slice(1) : u.pathname;
-      if (key) await client.send(new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: key }));
+      if (key) await client.send(new DeleteObjectCommand({ Bucket: cfg.bucket, Key: key }));
     } catch (e) {
       console.warn('[storage] Failed to delete object:', url, e);
     }
