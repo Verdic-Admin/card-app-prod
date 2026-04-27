@@ -57,13 +57,4 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Image digest
-        run: echo "Published image digest ${{ steps.meta.outputs.digest }}"
-
-      - name: Trigger fleet redeploy
-        if: github.ref == 'refs/heads/main'
-        run: |
-          curl -s -X POST \
-            -H "Authorization: Bearer ${{ secrets.FLEET_SECRET }}" \
-            -H "Content-Type: application/json" \
-            "https://api.playerindexdata.com/api/fleet/redeploy" \
-            -o /dev/null -w "Fleet redeploy response: %{http_code}\n"
+        run: echo "Published ${{ steps.meta.outputs.digest }}"

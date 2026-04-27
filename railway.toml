@@ -1,14 +1,11 @@
 # ──────────────────────────────────────────────────────────────────────────────
 # Railway Configuration — card-app-prod
-# This file configures the Railway deployment when using the 1-click template.
+# Deployment source: ghcr.io/verdic-admin/card-app-prod:latest
+# Railway pulls the pre-built Docker image from GHCR — no build step needed.
+# Image Auto Updates must be enabled on the service for zero-touch fleet updates.
 # ──────────────────────────────────────────────────────────────────────────────
 
-[build]
-# No build step — we pull a pre-built Docker image from GHCR
-dockerfilePath = "Dockerfile"
-
 [deploy]
-# Graceful shutdown
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
 
