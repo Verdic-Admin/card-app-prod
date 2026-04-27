@@ -64,7 +64,8 @@ export function LiveAuctionStudio({
   const [items, setItems] = useState<any[]>(initialItems)
   const [timeframe, setTimeframe] = useState(initialProjectionTimeframe || '90-Day')
   const [isSavingTimeframe, setIsSavingTimeframe] = useState(false)
-  const [showQR, setShowQR] = useState(true)
+  const [showQR, setShowQR] = useState(false)
+  const [liveQrUrl, setLiveQrUrl] = useState(initialAuctionQrUrl || '')
 
   const [inventoryQuery, setInventoryQuery] = useState('')
   const [stageSelection, setStageSelection] = useState<Set<string>>(new Set())
@@ -255,47 +256,85 @@ export function LiveAuctionStudio({
           <button type="button" onClick={() => setToastMsg(null)} className="ml-2 opacity-50 hover:opacity-100"><X className="w-3.5 h-3.5" /></button>
         </div>
       )}
-      <div
-        className={`fixed bottom-8 right-8 z-50 transition-all ${showQR ? 'scale-100 opacity-100' : 'scale-95 opacity-0 pointer-events-none'}`}
-      >
-        <AuctionQRCode
-          isVisible
-          toggleVisibility={() => setShowQR(false)}
-          url={initialAuctionQrUrl ?? undefined}
-        />
-      </div>
-
       <div className="bg-white text-slate-900 p-6 rounded-xl shadow-sm border border-slate-200">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold">Auction studio controls</h2>
-          <button
-            type="button"
-            onClick={() => setShowQR(!showQR)}
-            className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow-sm transition-colors"
-          >
-            Toggle live QR
-          </button>
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-xl font-bold">Auction Studio Controls</h2>
         </div>
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-4">
-            <label className="text-sm font-bold text-slate-700 whitespace-nowrap">Projection timeframe</label>
-            <select
-              value={timeframe}
-              onChange={e => handleSaveTimeframe(e.target.value)}
-              disabled={isSavingTimeframe}
-              className="border border-slate-300 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800 bg-white focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-60 shadow-sm"
-            >
-              {['30-Day', '90-Day', '6-Month', 'End of Season'].map(opt => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </select>
-            {isSavingTimeframe && <span className="text-xs text-slate-400 animate-pulse">Saving...</span>}
-            {!isSavingTimeframe && (
-              <span className="text-xs text-emerald-600 font-semibold">Active: {timeframe}</span>
-            )}
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Left: settings */}
+          <div className="flex flex-col gap-5 flex-1">
+            {/* Projection timeframe */}
+            <div className="flex items-center gap-4">
+              <label className="text-sm font-bold text-slate-700 whitespace-nowrap">Projection timeframe</label>
+              <select
+                value={timeframe}
+                onChange={e => handleSaveTimeframe(e.target.value)}
+                disabled={isSavingTimeframe}
+                className="border border-slate-300 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800 bg-white focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-60 shadow-sm"
+              >
+                {['30-Day', '90-Day', '6-Month', 'End of Season'].map(opt => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+              {isSavingTimeframe && <span className="text-xs text-slate-400 animate-pulse">Saving...</span>}
+              {!isSavingTimeframe && (
+                <span className="text-xs text-emerald-600 font-semibold">Active: {timeframe}</span>
+              )}
+            </div>
+
+            {/* QR toggle + URL */}
+            <div className="border border-slate-200 rounded-xl p-4 bg-slate-50 flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-bold text-slate-800">Live Bidding QR Code</p>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">
+                    Show a QR code on screen during your stream so viewers can scan to place bids.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={showQR}
+                  onClick={() => setShowQR(v => !v)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
+                    showQR ? 'bg-indigo-600' : 'bg-slate-200'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-md transform transition-transform duration-200 ${
+                      showQR ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+              {showQR && (
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    Bidding Page URL
+                  </label>
+                  <input
+                    type="url"
+                    value={liveQrUrl}
+                    onChange={e => setLiveQrUrl(e.target.value)}
+                    placeholder="https://yourstore.com/auction"
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">Paste the full URL to your live auctions page — this is what the QR code will scan to.</p>
+                </div>
+              )}
+            </div>
           </div>
+
+          {/* Right: live QR preview */}
+          {showQR && (
+            <div className="flex items-center justify-center lg:w-56 shrink-0">
+              <AuctionQRCode
+                isVisible
+                toggleVisibility={() => setShowQR(false)}
+                url={liveQrUrl || null}
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -310,9 +349,9 @@ export function LiveAuctionStudio({
               <Gavel className="w-5 h-5 text-indigo-600" /> 1. Add cards from inventory
             </h2>
             <p className="text-sm text-slate-500 mt-1">
-              Search, check the cards to run on your stream, set reserve and timing (or use session defaults), then
-              <strong className="text-slate-700"> Stage</strong> to move them into the pending area below. Bundle child
-              rows (linked to a lot) are hidden here — un-bundle in inventory first.
+              Search and check the cards you want to run on your stream, set a reserve price and end time, then click
+              "Stage to auction" to move them into the queue below. Bundled lot cards won't appear here — break them
+              apart in your inventory first.
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
