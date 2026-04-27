@@ -8,9 +8,6 @@
 dockerfilePath = "Dockerfile"
 
 [deploy]
-# Health check endpoint (fast, no DB)
-healthcheckPath = "/api/health"
-healthcheckTimeout = 120
 # Graceful shutdown
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
