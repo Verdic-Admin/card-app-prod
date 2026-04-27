@@ -152,8 +152,8 @@ export function TradeLeadsCRM() {
               <InstructionTrigger 
                  title="Trade & Order Inbox Rules"
                  steps={[
-                    { title: "Pending Offers", content: "Buyers submit counter-offer trajectories across your storefront. Acceptances strictly lock the new price temporarily for *their* specific email address to avoid marketplace collisions." },
-                    { title: "Manual Verification", content: "Rejecting an offer permanently deletes the attempt. Make sure your email notifications are live so you don't miss 24-hour expiry timers on inbound hits." }
+                    { title: "Reviewing Offers", content: "Buyers will send you trade requests or cash offers here. If you accept an offer, it temporarily locks that price just for them so no one else can steal it." },
+                    { title: "Managing Your Inbox", content: "Offers expire automatically after 24 hours. Keep an eye on your email notifications so you don't miss out on a deal! If you reject an offer, it deletes it from the system entirely." }
                  ]}
               />
            </h2>

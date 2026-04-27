@@ -5,7 +5,6 @@ import { PLAYER_INDEX_BILLING_URL } from '@/lib/player-index-urls';
 import { getOracleGatewayBaseUrl } from '@/lib/oracle-gateway-url';
 
 async function CreditsInner() {
-  let exempt = false;
   let balance: number | null = null;
   let showUnavailable = true;
 
@@ -13,14 +12,12 @@ async function CreditsInner() {
     const base = await getOracleGatewayBaseUrl();
     const res = await submitOracleRequest(`${base}/account/balance`);
     const data = res.success && res.data ? (res.data as Record<string, unknown>) : null;
-    exempt = data?.billing_exempt === true;
     balance =
-      res.success && data != null && !exempt ? Number(data.token_balance ?? 0) : null;
-    showUnavailable = !res.success || data == null || (!exempt && balance === null);
+      res.success && data != null && data.token_balance != null ? Number(data.token_balance) : null;
+    showUnavailable = !res.success || data == null || balance === null;
   } catch (error) {
     // Never let this status banner break /admin route rendering.
     console.error('[AdminApiCreditsStrip] failed to render credits:', error);
-    exempt = false;
     balance = null;
     showUnavailable = true;
   }
@@ -30,12 +27,8 @@ async function CreditsInner() {
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex flex-wrap items-center justify-between gap-3 text-sm">
         <div className="flex items-center gap-2 min-w-0">
           <Coins className="w-4 h-4 text-brand shrink-0" aria-hidden />
-          <span className="font-bold text-muted shrink-0">API tokens</span>
-          {exempt ? (
-            <span className="font-black text-emerald-600 dark:text-emerald-400 truncate">
-              Unlimited
-            </span>
-          ) : showUnavailable ? (
+          <span className="font-bold text-muted shrink-0">Player Index Tokens</span>
+          {showUnavailable ? (
             <span className="text-muted font-medium truncate">Balance unavailable</span>
           ) : (
             <span className="font-black text-foreground tabular-nums">

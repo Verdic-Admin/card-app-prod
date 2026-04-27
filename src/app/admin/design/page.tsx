@@ -70,8 +70,8 @@ export default function DesignPage() {
                   <InstructionTrigger 
                      title="Theming Engine Rules"
                      steps={[
-                        { title: "CSS Variable Architecture", content: "The Edge storefront uses highly optimized CSS variables. Toggling active themes executes live swapping without requiring a hard server rebuild." },
-                        { title: "Image Visibility", content: "Make sure all uploaded logos are transparent PNGs or WebP formats, as hard-coded white backgrounds clash aggressively with Dark Mode." }
+                        { title: "Store Themes", content: "Changing your theme here updates your entire website instantly for your buyers. Play around and see what looks best!" },
+                        { title: "Logo Tips", content: "Make sure any logos you upload have a transparent background (like a .PNG file). If your logo has a solid white background, it will look like a white box if you switch to Dark Mode." }
                      ]}
                   />
                </div>

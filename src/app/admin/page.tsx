@@ -92,6 +92,22 @@ export default async function AdminPage() {
     (i) => i.is_auction && i.auction_status === 'pending',
   ).length
 
+  let pendingPaymentsCount = 0;
+  let pendingAuctionsCount = 0;
+  let draftCardsCount = 0;
+  try {
+    const { rows: paymentRows } = await pool.query(`SELECT COUNT(*) FROM trade_offers WHERE status = 'pending_payment'`);
+    pendingPaymentsCount = parseInt(paymentRows[0].count, 10);
+
+    const { rows: auctionRows } = await pool.query(`SELECT COUNT(*) FROM inventory WHERE is_auction = true AND auction_status = 'pending_approval'`);
+    pendingAuctionsCount = parseInt(auctionRows[0].count, 10);
+
+    const { rows: draftRows } = await pool.query(`SELECT COUNT(*) FROM scan_staging`);
+    draftCardsCount = parseInt(draftRows[0].count, 10);
+  } catch (e) {
+    console.error('[admin] failed to fetch command center metrics:', e);
+  }
+
   return (
     <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <div className="mb-4">
@@ -127,6 +143,39 @@ export default async function AdminPage() {
           <a href="/docs/Operations-Guide.pdf" download="Operations-Guide.pdf" className="px-4 py-2 bg-slate-100 text-slate-700 border border-slate-300 font-bold rounded-lg hover:bg-slate-200 transition-colors">
             Operations Guide
           </a>
+        </div>
+      </div>
+
+      <div className="mb-10">
+        <h2 className="text-lg font-bold text-foreground mb-4">Command Center</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-surface border border-border p-5 rounded-xl shadow-sm flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-muted uppercase tracking-wider mb-1">Orders Pending Payment</h3>
+              <p className="text-3xl font-black text-amber-500">{pendingPaymentsCount}</p>
+            </div>
+            <div className="w-12 h-12 bg-amber-500/10 flex items-center justify-center rounded-full">
+              <span className="text-2xl" aria-hidden="true">⏳</span>
+            </div>
+          </div>
+          <div className="bg-surface border border-border p-5 rounded-xl shadow-sm flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-muted uppercase tracking-wider mb-1">Pending Auctions</h3>
+              <p className="text-3xl font-black text-indigo-500">{pendingAuctionsCount}</p>
+            </div>
+            <div className="w-12 h-12 bg-indigo-500/10 flex items-center justify-center rounded-full">
+              <span className="text-2xl" aria-hidden="true">🔨</span>
+            </div>
+          </div>
+          <div className="bg-surface border border-border p-5 rounded-xl shadow-sm flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-muted uppercase tracking-wider mb-1">Draft Cards Awaiting</h3>
+              <p className="text-3xl font-black text-emerald-500">{draftCardsCount}</p>
+            </div>
+            <div className="w-12 h-12 bg-emerald-500/10 flex items-center justify-center rounded-full">
+              <span className="text-2xl" aria-hidden="true">📝</span>
+            </div>
+          </div>
         </div>
       </div>
 

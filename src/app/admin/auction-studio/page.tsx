@@ -78,9 +78,9 @@ export default async function AuctionStudioPage() {
               <InstructionTrigger 
                  title="Live Auction Setup Guide"
                  steps={[
-                    { title: "1. Add from inventory", content: "Search your inventory, check cards, set reserve and end time (optional session defaults), then Stage. Only one flow — no duplicate staging panels elsewhere." },
-                    { title: "2. Staging + coin photo", content: "Each row shows store and PI pricing. Save reserve, attach a coin verification photo (Save row), then GO LIVE." },
-                    { title: "3. Go live + bids", content: "Cards go live on the /auction page. Share the link on your social media streams (Facebook, Twitter, Instagram). Bidders use their social handles — no account required." }
+                    { title: "1. Pick Your Cards", content: "Search your inventory, select the cards you want to auction, and set an optional starting reserve price." },
+                    { title: "2. Verify You Own It", content: "To build trust, snap a quick 'coin photo' (a picture of the card next to a piece of paper with your name and today's date) and attach it." },
+                    { title: "3. Go Live!", content: "Click 'Go Live'. Your cards are now up for auction. Copy the link and share it on your Facebook, Twitter, or Instagram to get bidders!" }
                  ]}
               />
           </h1>

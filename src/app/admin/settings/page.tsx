@@ -68,8 +68,8 @@ export default function SettingsPage() {
             <InstructionTrigger 
               title="Store Operations Policy"
               steps={[
-                 { title: "Discount Percentage", content: "This parameter controls your direct-to-buyer pricing structure. It overrides the specific settings." },
-                 { title: "Payment Routing", content: "Leaving payment links blank dynamically hides those options from the checkout funnel. We recommend activating Venmo and CashApp strictly, as PayPal incurs commercial merchant fees." }
+                 { title: "Global Discount", content: "Set a discount percentage here to automatically price your cards below market value. This is a great way to show buyers how much they save by buying direct from you." },
+                 { title: "Payment Methods", content: "Enter your Venmo, CashApp, or Zelle usernames to accept zero-fee payments. If you leave a payment method blank, it simply won't show up for buyers at checkout." }
               ]}
             />
         </h1>

@@ -41,6 +41,7 @@ export function InventoryTable({
   const [isBulkUpdating, setIsBulkUpdating] = useState(false)
   const [bulkCostBasis, setBulkCostBasis] = useState<string>('0')
   const [bulkAcceptsOffers, setBulkAcceptsOffers] = useState(false)
+  const [inlineSaving, setInlineSaving] = useState<Record<string, 'price' | 'cost' | null>>({});
   
   const [pendingCorrections, setPendingCorrections] = useState<any[]>([])
   const [processingCorrectionId, setProcessingCorrectionId] = useState<string | null>(null)

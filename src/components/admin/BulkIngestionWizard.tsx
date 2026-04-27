@@ -119,24 +119,19 @@ export function BulkIngestionWizard() {
   // Step 2 — scanning spinner
   const [scanJobId, setScanJobId] = useState<string | null>(null)
   const [scanProgress, setScanProgress] = useState('')
-
-  // Step 3 — staging grid
-  const [staging, setStaging] = useState<StagingCard[]>([])
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [isPublishingAsIs, setIsPublishingAsIs] = useState(false)
-  const [isDiscarding, setIsDiscarding] = useState(false)
-
-  // Step 4 — AI identification spinner
   const [identProgress, setIdentProgress] = useState('')
 
-  // Step 5 — review
+
+
+  // Step 5 -> 3 review
   const [reviewCards, setReviewCards] = useState<StagingCard[]>([])
   const [reviewSelected, setReviewSelected] = useState<Set<string>>(new Set())
   const [activeTab, setActiveTab] = useState<'ready' | 'correction'>('ready')
   const [isPublishing, setIsPublishing] = useState(false)
+  const [isDiscarding, setIsDiscarding] = useState(false)
 
-  // Wizard: 1 Upload → 2 Staging → 3 Crop (spinner) → 4 AI → 5 Review
-  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1)
+  // Wizard: 1 Upload → 2 Process → 3 Publish
+  const [step, setStep] = useState<1 | 2 | 3>(1)
   const [isSendingToScanner, setIsSendingToScanner] = useState(false)
   /** HSV mat keying for OpenCV — use Green/Blue when your scan pad matches; improves crop detection vs gray Canny. */
   const [scannerMat, setScannerMat] = useState<'none' | 'green' | 'blue'>('green')
@@ -155,15 +150,10 @@ export function BulkIngestionWizard() {
     listScanStagingAction()
       .then((rows) => {
         if (!rows?.length) return
-        setStaging((prev) => {
-          const merged = new Map<string, StagingCard>()
-          for (const p of prev) merged.set(p.id, p)
-          for (const r of rows as Record<string, unknown>[]) {
-            merged.set(String(r.id), rowToStagingCard(r))
-          }
-          return Array.from(merged.values()).sort((a, b) => (a.id < b.id ? 1 : -1))
-        })
-        setStep(2)
+        const loaded = (rows as Record<string, unknown>[]).map(rowToStagingCard)
+        setReviewCards(loaded)
+        setReviewSelected(new Set(loaded.map(x => x.id)))
+        setStep(3)
       })
       .catch(() => {})
   }, [])
@@ -191,10 +181,10 @@ export function BulkIngestionWizard() {
 
   // ── Step 1: paired upload → staging (free, no scanner) ─────────────────────
 
-  const runSingleCardPipeline = async (card: StagingCard) => {
+  const runPipeline = async (card: StagingCard) => {
     try {
       setIsSendingToScanner(true)
-      setStep(3)
+      setStep(2)
       setScanProgress('Uploading scan job…')
       const { job_id } = await submitStagingRowToScannerAction(
         card.id,
@@ -207,17 +197,11 @@ export function BulkIngestionWizard() {
         cropped.map((c) => ({ side_a_url: c.side_a_url, side_b_url: c.side_b_url }))
       )
       const added = (newRows as Record<string, unknown>[]).map((r) => rowToStagingCard(r))
-      setStaging((prev) => {
-        const rest = prev.filter((r) => r.id !== card.id)
-        return [...added, ...rest]
-      })
 
       setIsSendingToScanner(false)
       setScanJobId(null)
-      setStep(4)
       
-      const latestStaging = [...staging.filter(c => c.id !== card.id), ...added]
-      const updates = [...latestStaging]
+      const updates = [...added]
       for (let i = 0; i < added.length; i++) {
         const c = added[i]
         setIdentProgress(`Identifying card ${i + 1} of ${added.length}…`)
@@ -263,16 +247,19 @@ export function BulkIngestionWizard() {
         }
       }
       setIdentProgress('')
-      setStaging(updates)
-      setReviewCards(updates)
-      setReviewSelected(new Set(updates.map(x => x.id)))
+      setReviewCards(prev => [...updates, ...prev])
+      setReviewSelected(prev => {
+        const next = new Set(prev)
+        updates.forEach(u => next.add(u.id))
+        return next
+      })
       setActiveTab('ready')
-      setStep(5)
+      setStep(3)
     } catch (e: any) {
       setIsSendingToScanner(false)
       setScanJobId(null)
-      setStep(2)
-      showToast('Auto-advance failed: ' + e.message, 'error')
+      setStep(3) // Advance anyway to let them see existing reviewCards
+      showToast('Processing failed: ' + e.message, 'error')
     }
   }
 
@@ -287,11 +274,9 @@ export function BulkIngestionWizard() {
         fd.append('kind', 'matrix')
         const row = await stagePairedUploadAction(fd)
         const card = rowToStagingCard(row as Record<string, unknown>)
-        setStaging((prev) => [card, ...prev])
-        setSelectedIds((prev) => new Set([...prev, card.id]))
         setBatchFront(null)
         setBatchBack(null)
-        setStep(2)
+        runPipeline(card)
       } else {
         if (!singleFront || !singleBack) return
         const fd = new FormData()
@@ -300,11 +285,9 @@ export function BulkIngestionWizard() {
         fd.append('kind', 'single_pair')
         const row = await stagePairedUploadAction(fd)
         const card = rowToStagingCard(row as Record<string, unknown>)
-        setStaging((prev) => [card, ...prev])
-        setSelectedIds((prev) => new Set([...prev, card.id]))
         setSingleFront(null)
         setSingleBack(null)
-        runSingleCardPipeline(card)
+        runPipeline(card)
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
@@ -314,150 +297,8 @@ export function BulkIngestionWizard() {
     }
   }
 
-  // ── Staging: send selected raw pairs to scanner (1 credit per pair sent) ─
-
-  const handleSendSelectedToScanner = async () => {
-    const pending = staging.filter((c) => selectedIds.has(c.id) && isPendingScan(c))
-    if (!pending.length) {
-      showToast('Select one or more uncropped uploads (orange badge). Each sheet uses a paired front + back.', 'info')
-      return
-    }
-    const missingBack = pending.filter((c) => !c.raw_back_url)
-    if (missingBack.length) {
-      showToast('Scanner requires a back image for each selected upload. Re-stage with front + back, or use "Use as-is" only when both raw sides exist.', 'error')
-      return
-    }
-    setIsSendingToScanner(true)
-    setStep(3)
-    try {
-      for (const card of pending) {
-        setScanProgress(`Uploading scan job…`)
-        const { job_id } = await submitStagingRowToScannerAction(
-          card.id,
-          scannerMat === 'none' ? undefined : { chroma: scannerMat },
-        )
-        setScanJobId(job_id)
-        const cropped = await pollScannerUntilDone(job_id)
-        const newRows = await finalizeStagingScanAction(
-          card.id,
-          cropped.map((c) => ({ side_a_url: c.side_a_url, side_b_url: c.side_b_url }))
-        )
-        const added = (newRows as Record<string, unknown>[]).map((r) => rowToStagingCard(r))
-        setStaging((prev) => {
-          const rest = prev.filter((r) => r.id !== card.id)
-          return [...added, ...rest]
-        })
-        setSelectedIds((prev) => {
-          const n = new Set(prev)
-          n.delete(card.id)
-          added.forEach((a) => n.add(a.id))
-          return n
-        })
-      }
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e)
-      if (msg === 'credits_exhausted' || msg.includes('402') || msg.toLowerCase().includes('insufficient')) {
-        creditsExhausted()
-        return
-      }
-      showToast('Scanner error: ' + msg, 'error')
-    } finally {
-      setIsSendingToScanner(false)
-      setScanJobId(null)
-      setScanProgress('')
-      setStep(2)
-    }
-  }
-
-  const handlePromoteRawAsCropped = async () => {
-    const pending = staging.filter((c) => selectedIds.has(c.id) && isPendingScan(c))
-    if (!pending.length) {
-      showToast('Select uncropped uploads to promote.', 'info')
-      return
-    }
-    const missingBack = pending.filter((c) => !c.raw_back_url)
-    if (missingBack.length) {
-      showToast('Use as-is requires a back image for each row. Upload paired front + back, then promote.', 'error')
-      return
-    }
-    try {
-      const ids = pending.map((c) => c.id)
-      await promoteRawStagingToCroppedAction(ids)
-      setStaging((prev) =>
-        prev.map((c) =>
-          ids.includes(c.id)
-            ? {
-                ...c,
-                image_url: c.raw_front_url ?? null,
-                back_image_url: c.raw_back_url ?? null,
-                raw_front_url: null,
-                raw_back_url: null,
-              }
-            : c
-        )
-      )
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e)
-      showToast('Could not promote images: ' + msg, 'error')
-    }
-  }
-
-  // ── Step 3: staging field updates (auto-save on blur) ─────────────────────
-
-  const updateField = (id: string, field: keyof StagingCard, value: string | boolean) => {
-    setStaging(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c))
-  }
-
-  const saveField = async (id: string, field: string, value: string) => {
-    try {
-      await updateDraftCardAction(id, { [field]: value })
-    } catch (e) {
-      console.warn('Auto-save failed for field', field, e)
-    }
-  }
-
-  const applyTaxonomy = async (id: string, data: { player_name: string; card_set: string; card_number: string }) => {
-    setStaging(prev => prev.map(c => c.id === id ? { ...c, ...data } : c))
-    await updateDraftCardAction(id, data)
-  }
-
-  const toggleSelect = (id: string) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
-  }
-
-  const selectAll = () => setSelectedIds(new Set(staging.map(c => c.id)))
-  const deselectAll = () => setSelectedIds(new Set())
-
-  const handlePublishAsIs = async () => {
-    const ids = staging
-      .filter((c) => selectedIds.has(c.id) && c.image_url)
-      .map((c) => c.id)
-    if (!ids.length) {
-      showToast('Select cards that already have a front image (cropped or promoted).', 'info')
-      return
-    }
-    setIsPublishingAsIs(true)
-    try {
-      const pub = await publishDraftCardsAction(ids)
-      if (!pub.success) {
-        showToast('Publish failed: ' + pub.error, 'error')
-        return
-      }
-      const remaining = staging.filter(c => !selectedIds.has(c.id))
-      setStaging(remaining)
-      setSelectedIds(new Set(remaining.map(c => c.id)))
-      if (remaining.length === 0) resetWizard()
-    } finally {
-      setIsPublishingAsIs(false)
-    }
-  }
-
-  const handleDiscard = async () => {
-    const ids = [...selectedIds]
+  const handleReviewDiscard = async () => {
+    const ids = [...reviewSelected]
     if (!ids.length) return
     setIsDiscarding(true)
     try {
@@ -466,100 +307,14 @@ export function BulkIngestionWizard() {
         showToast('Discard failed: ' + del.error, 'error')
         return
       }
-      const remaining = staging.filter(c => !selectedIds.has(c.id))
-      setStaging(remaining)
-      setSelectedIds(new Set(remaining.map(c => c.id)))
+      const remaining = reviewCards.filter(c => !reviewSelected.has(c.id))
+      setReviewCards(remaining)
+      setReviewSelected(new Set(remaining.map(c => c.id)))
       if (remaining.length === 0) resetWizard()
     } finally {
       setIsDiscarding(false)
     }
   }
-
-  // ── Step 3 → 4: send selected for AI identification (card-identifier direct) ─
-
-  const handleIdentify = async () => {
-    const selected = staging.filter(
-      (c) =>
-        selectedIds.has(c.id) &&
-        c.image_url &&
-        (c.back_image_url || c.raw_back_url),
-    )
-    if (!selected.length) {
-      showToast(
-        'Select cards that have both a front and a back (cropped image_url/back_image_url, or raw pair not yet promoted). Finish the scanner or use "Use as-is" first.',
-        'info'
-      )
-      return
-    }
-    setStep(4)
-    const updates: StagingCard[] = [...staging]
-    try {
-      for (let i = 0; i < selected.length; i++) {
-        const card = selected[i]
-        setIdentProgress(`Identifying card ${i + 1} of ${selected.length}…`)
-        try {
-          const res = await identifyCardDirectAction(card.id, card.image_url!, card.back_image_url)
-          const confidence = res.confidence ?? 0
-          const aiStatus = confidence >= 0.85 ? 'High Confidence' : 'Manual Correction'
-          const idx = updates.findIndex(c => c.id === card.id)
-          if (idx !== -1) {
-            // Prefer AI team when non-empty; never overwrite a user-typed team with null.
-            const aiTeam = (res.team_name ?? '').trim()
-            const mergedTeam = aiTeam || updates[idx].team_name
-            const mergedPrint =
-              res.print_run != null && Number.isFinite(Number(res.print_run))
-                ? String(res.print_run)
-                : updates[idx].print_run
-            const mergedCardNum =
-              normalizeCardNumberForPlayerIndex(
-                (res.card_number && String(res.card_number).trim()) ? res.card_number : updates[idx].card_number,
-              ) || updates[idx].card_number
-            updates[idx] = {
-              ...updates[idx],
-              player_name:   res.player_name   || updates[idx].player_name,
-              team_name:     mergedTeam,
-              card_set:      res.card_set       || updates[idx].card_set,
-              card_number:   mergedCardNum,
-              insert_name:   res.insert_name    || updates[idx].insert_name,
-              parallel_name: res.parallel_name  || updates[idx].parallel_name,
-              print_run:     mergedPrint,
-              confidence,
-              ai_status: aiStatus,
-              team_name_source: res.team_name_source,
-              team_name_confidence: res.team_name_confidence,
-              team_name_verified: res.team_name_verified,
-            }
-            const dbPayload: Record<string, unknown> = {
-              player_name:   updates[idx].player_name,
-              team_name:     updates[idx].team_name,
-              card_set:      updates[idx].card_set,
-              card_number:   mergedCardNum,
-              insert_name:   updates[idx].insert_name,
-              parallel_name: updates[idx].parallel_name,
-              print_run: (() => {
-                const n = parseInt(String(mergedPrint ?? '').replace(/\D/g, ''), 10)
-                return Number.isFinite(n) ? n : null
-              })(),
-            }
-            updateDraftCardAction(updates[idx].id, dbPayload).catch(() => {})
-          }
-        } catch (e: any) {
-          if (e.message === 'credits_exhausted') { creditsExhausted(); return }
-          console.warn(`[identify] card ${card.id} failed:`, e.message)
-          const idx = updates.findIndex(c => c.id === card.id)
-          if (idx !== -1) updates[idx] = { ...updates[idx], ai_status: 'Failed', confidence: 0 }
-        }
-      }
-    } finally {
-      setIdentProgress('')
-    }
-    setStaging(updates)
-    setReviewCards(updates)
-    setReviewSelected(new Set(updates.map(c => c.id)))
-    setActiveTab('ready')
-    setStep(5)
-  }
-
   // ── Step 5: re-price a single card ────────────────────────────────────────
 
   const handleReprice = async (id: string, imageUrl: string) => {
@@ -715,7 +470,6 @@ export function BulkIngestionWizard() {
     setBatchFront(null); setBatchBack(null)
     setSingleFront(null); setSingleBack(null)
     setScanJobId(null); setScanProgress('')
-    setStaging([]); setSelectedIds(new Set())
     setIdentProgress('')
     setReviewCards([]); setReviewSelected(new Set())
   }
@@ -724,10 +478,8 @@ export function BulkIngestionWizard() {
 
   const stepLabels = [
     { num: 1, label: 'Upload' },
-    { num: 2, label: 'Staging' },
-    { num: 3, label: 'Crop' },
-    { num: 4, label: 'AI' },
-    { num: 5, label: 'Mint' },
+    { num: 2, label: 'Process' },
+    { num: 3, label: 'Publish' },
   ]
 
   return (
@@ -744,11 +496,9 @@ export function BulkIngestionWizard() {
             <InstructionTrigger
               title="AI Ingestion Instructions"
               steps={[
-                { title: "Step 1: Upload", content: "Upload a paired front and back (single card or full matrix sheet). Images are stored in staging first — no credits until you send a pair to the scanner for auto-crop." },
-                { title: "Step 2: Staging", content: "Each row is one front+back pair. Select rows and send them to the scanner to crop and rotate (1 credit per send), or use as-is to keep full images without cropping." },
-                { title: "Step 3: Crop", content: "While the scanner runs, cropped card images replace the raw pair with one row per detected card." },
-                { title: "Step 4: AI", content: "Send cropped cards to identification. Catalog search remains free." },
-                { title: "Step 5: Mint", content: "Review, re-price, then publish to inventory." },
+                { title: "Step 1: Upload", content: "Upload a paired front and back (single card or full matrix sheet)." },
+                { title: "Step 2: Process", content: "The AI automatically crops the sheet and identifies each card's metadata." },
+                { title: "Step 3: Publish", content: "Review, edit pricing, and publish directly to your inventory." },
               ]}
             />
           </h2>
@@ -809,238 +559,8 @@ export function BulkIngestionWizard() {
             </>
           )}
 
-          <button
-            onClick={handleUpload}
-            disabled={isUploading || (uploadMode === 'batch' ? (!batchFront || !batchBack) : (!singleFront || !singleBack))}
-            className="w-full bg-brand text-background font-black text-lg py-4 rounded-xl disabled:opacity-40 hover:bg-brand-hover transition flex items-center justify-center gap-3"
-          >
-            {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5" />}
-            {isUploading
-              ? 'Uploading…'
-              : 'Add paired upload to staging (free)'}
-          </button>
-        </div>
-      )}
-
-      {/* ── Step 3: Scanning spinner ────────────────────────────────────────── */}
-      {step === 3 && (
-        <div className="text-center py-20 animate-in fade-in">
-          <Loader2 className="w-14 h-14 animate-spin text-brand mx-auto mb-5" />
-          <h3 className="text-2xl font-black text-foreground mb-2">Scanning & Cropping</h3>
-          <p className="text-muted font-medium">{scanProgress || 'Processing your scan…'}</p>
-        </div>
-      )}
-
-      {/* ── Step 2: Staging area ────────────────────────────────────────────── */}
-      {step === 2 && (
-        <div className="space-y-5 animate-in fade-in">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div>
-              <p className="font-black text-foreground text-lg">{staging.length} item{staging.length !== 1 ? 's' : ''} in staging</p>
-              <p className="text-xs text-muted font-medium">Every row is a front+back pair; crop with scanner (credit) or use as-is (free), then AI / publish</p>
-            </div>
-            <div className="flex gap-2 flex-wrap items-center">
-              <button type="button" onClick={() => setStep(1)} className="text-xs font-black text-brand hover:underline">
-                + Add more uploads
-              </button>
-              <span className="text-muted text-xs">·</span>
-              <button onClick={selectAll} className="text-xs font-bold text-brand hover:underline">Select All</button>
-              <span className="text-muted text-xs">·</span>
-              <button onClick={deselectAll} className="text-xs font-bold text-muted hover:underline">Deselect All</button>
-            </div>
-          </div>
-
-          <div className="space-y-3 max-h-[72vh] overflow-y-auto pr-1">
-            {staging.map(card => {
-              const pending = isPendingScan(card)
-              const displayFront = pending ? (card.raw_front_url ?? null) : (card.image_url ?? null)
-              const displayBack = pending ? (card.raw_back_url ?? null) : (card.back_image_url ?? null)
-              return (
-              <div key={card.id}
-                className={`border rounded-xl p-3 bg-surface transition ${selectedIds.has(card.id) ? 'border-brand/50' : 'border-border opacity-60'}`}>
-                <div className="flex gap-3">
-                  {/* Images — front + back side by side, click to zoom */}
-                  <div className="flex-shrink-0 flex flex-col gap-1">
-                    {pending && (
-                      <span className="block text-[9px] font-black uppercase tracking-wide text-orange-600 bg-orange-500/15 rounded px-1 py-0.5 text-center">
-                        Uncropped
-                      </span>
-                    )}
-                    <div className="flex gap-2">
-                      <div className="flex flex-col items-center gap-0.5">
-                        <span className="text-[9px] font-bold text-muted uppercase tracking-wide">Front</span>
-                        {displayFront ? (
-                          <img src={displayFront} alt="front" onClick={() => setZoomedImg(displayFront)}
-                            className="w-28 h-40 object-contain rounded-lg border border-border bg-surface cursor-zoom-in hover:border-brand/50 transition" />
-                        ) : (
-                          <div className="w-28 h-40 rounded-lg border border-border bg-surface-hover flex items-center justify-center text-muted text-[10px] text-center p-1">
-                            No image
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex flex-col items-center gap-0.5">
-                        <span className="text-[9px] font-bold text-muted uppercase tracking-wide">Back</span>
-                        {displayBack ? (
-                          <img src={displayBack} alt="back" onClick={() => setZoomedImg(displayBack)}
-                            className="w-28 h-40 object-contain rounded-lg border border-border bg-surface cursor-zoom-in hover:border-brand/50 transition" />
-                        ) : (
-                          <div className="w-28 h-40 rounded-lg border border-border bg-surface-hover flex items-center justify-center text-muted text-[10px] text-center p-1">
-                            No image
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Fields */}
-                  <div className="flex-1 space-y-1.5">
-                    <TaxonomySearch onSelect={data => applyTaxonomy(card.id, data)} />
-                    <div className="grid grid-cols-2 gap-1.5">
-                      <input
-                        value={card.player_name}
-                        onChange={e => updateField(card.id, 'player_name', e.target.value)}
-                        onBlur={e => saveField(card.id, 'player_name', e.target.value)}
-                        placeholder="Player Name"
-                        className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
-                      />
-                      <input
-                        value={card.team_name}
-                        onChange={e => updateField(card.id, 'team_name', e.target.value)}
-                        onBlur={e => saveField(card.id, 'team_name', e.target.value)}
-                        placeholder="Team"
-                        className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
-                      />
-                      {card.team_name_source && card.team_name_source !== 'none' && (
-                        <div className="col-span-2 text-[10px] text-muted font-medium bg-surface-hover border border-border rounded-md px-2 py-1">
-                          Team source: {card.team_name_source}
-                          {typeof card.team_name_confidence === 'number' ? ` · ${(card.team_name_confidence * 100).toFixed(0)}%` : ''}
-                          {typeof card.team_name_verified === 'boolean'
-                            ? card.team_name_verified
-                              ? ' · DB verified'
-                              : ' · OCR/DB conflict'
-                            : ''}
-                        </div>
-                      )}
-                      <input
-                        value={card.card_set}
-                        onChange={e => updateField(card.id, 'card_set', e.target.value)}
-                        onBlur={e => saveField(card.id, 'card_set', e.target.value)}
-                        placeholder="Card Set"
-                        className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
-                      />
-                      <input
-                        value={card.card_number}
-                        onChange={e => updateField(card.id, 'card_number', e.target.value)}
-                        onBlur={e => saveField(card.id, 'card_number', e.target.value)}
-                        placeholder="Card #"
-                        className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
-                      />
-                      <input
-                        value={card.insert_name}
-                        onChange={e => updateField(card.id, 'insert_name', e.target.value)}
-                        onBlur={e => saveField(card.id, 'insert_name', e.target.value)}
-                        placeholder="Insert"
-                        className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
-                      />
-                      <input
-                        value={card.parallel_name}
-                        onChange={e => updateField(card.id, 'parallel_name', e.target.value)}
-                        onBlur={e => saveField(card.id, 'parallel_name', e.target.value)}
-                        placeholder="Parallel"
-                        className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
-                      />
-                      <input
-                        value={card.print_run}
-                        onChange={e => updateField(card.id, 'print_run', e.target.value)}
-                        onBlur={e => saveField(card.id, 'print_run', e.target.value)}
-                        placeholder="Print Run"
-                        className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
-                      />
-                      <input
-                        value={card.listed_price}
-                        onChange={e => updateField(card.id, 'listed_price', e.target.value)}
-                        onBlur={e => saveField(card.id, 'price', e.target.value)}
-                        placeholder="Price $"
-                        type="number"
-                        className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
-                      />
-                    </div>
-
-                    {/* Attribute flags */}
-                    <div className="flex items-center gap-3 flex-wrap pt-0.5">
-                      {([
-                        { key: 'is_rookie', label: 'RC' },
-                        { key: 'is_auto',   label: 'Auto' },
-                        { key: 'is_relic',  label: 'Relic' },
-                      ] as const).map(({ key, label }) => (
-                        <label key={key} className="flex items-center gap-1 cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={card[key]}
-                            onChange={e => {
-                              updateField(card.id, key, e.target.checked as any)
-                              updateDraftCardAction(card.id, { [key]: e.target.checked }).catch(() => {})
-                            }}
-                            className="w-3.5 h-3.5 accent-brand"
-                          />
-                          <span className="text-[10px] font-bold text-muted">{label}</span>
-                        </label>
-                      ))}
-                      <label className="flex items-center gap-1 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={!!card.grading_company}
-                          onChange={e => {
-                            if (!e.target.checked) {
-                              updateField(card.id, 'grading_company', '' as any)
-                              updateField(card.id, 'grade', '' as any)
-                              updateDraftCardAction(card.id, { grading_company: '', grade: '' }).catch(() => {})
-                            } else {
-                              updateField(card.id, 'grading_company', 'PSA' as any)
-                            }
-                          }}
-                          className="w-3.5 h-3.5 accent-brand"
-                        />
-                        <span className="text-[10px] font-bold text-muted">Graded</span>
-                      </label>
-                      {!!card.grading_company && (
-                        <>
-                          <select
-                            value={card.grading_company}
-                            onChange={e => {
-                              updateField(card.id, 'grading_company', e.target.value as any)
-                              updateDraftCardAction(card.id, { grading_company: e.target.value }).catch(() => {})
-                            }}
-                            className="border border-border rounded px-1.5 py-0.5 text-[10px] bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
-                          >
-                            {['PSA', 'BGS', 'SGC', 'CGC', 'CSG'].map(g => <option key={g}>{g}</option>)}
-                          </select>
-                          <input
-                            value={card.grade}
-                            onChange={e => updateField(card.id, 'grade', e.target.value as any)}
-                            onBlur={e => updateDraftCardAction(card.id, { grade: e.target.value }).catch(() => {})}
-                            placeholder="10"
-                            className="border border-border rounded px-1.5 py-0.5 text-[10px] w-12 bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
-                          />
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Checkbox */}
-                  <div className="flex-shrink-0 pt-1">
-                    <input type="checkbox" checked={selectedIds.has(card.id)}
-                      onChange={() => toggleSelect(card.id)}
-                      className="w-5 h-5 accent-brand cursor-pointer" />
-                  </div>
-                </div>
-              </div>
-            )
-            })}
-          </div>
-
           {/* Scanner mat — drives chroma-key in vision worker */}
-          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface/80 px-4 py-3 text-sm">
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface/80 px-4 py-3 text-sm mt-4">
             <span className="font-bold text-foreground shrink-0">Scanner mat</span>
             <span className="text-xs text-muted max-w-md">
               Green or blue pad: pick the match so each card separates from the background. Use “None” only for neutral mats.
@@ -1065,64 +585,33 @@ export function BulkIngestionWizard() {
             </div>
           </div>
 
-          {/* Action buttons */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-2">
-            <button
-              type="button"
-              onClick={handleSendSelectedToScanner}
-              disabled={isSendingToScanner || selectedIds.size === 0}
-              className="bg-amber-600 text-white font-black py-3 rounded-xl disabled:opacity-40 hover:bg-amber-700 transition flex items-center justify-center gap-2"
-            >
-              {isSendingToScanner ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scissors className="w-4 h-4" />}
-              Crop & Rotate
-            </button>
-            <button
-              type="button"
-              onClick={handlePromoteRawAsCropped}
-              disabled={selectedIds.size === 0}
-              className="bg-slate-600 text-white font-black py-3 rounded-xl disabled:opacity-40 hover:bg-slate-700 transition flex items-center justify-center gap-2 text-sm"
-            >
-              Use as-is (no crop)
-            </button>
-            <button
-              onClick={handleIdentify}
-              disabled={selectedIds.size === 0}
-              className="bg-brand text-background font-black py-3 rounded-xl disabled:opacity-40 hover:bg-brand-hover transition flex items-center justify-center gap-2"
-            >
-              <Send className="w-4 h-4" />
-              Send {selectedIds.size > 0 ? `${selectedIds.size} ` : ''}for AI ID
-            </button>
-            <button
-              onClick={handlePublishAsIs}
-              disabled={selectedIds.size === 0 || isPublishingAsIs}
-              className="bg-emerald-600 text-white font-black py-3 rounded-xl disabled:opacity-40 hover:bg-emerald-700 transition flex items-center justify-center gap-2"
-            >
-              {isPublishingAsIs ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-              Publish As-Is
-            </button>
-            <button
-              onClick={handleDiscard}
-              disabled={selectedIds.size === 0 || isDiscarding}
-              className="bg-surface border border-border text-muted font-bold py-3 rounded-xl disabled:opacity-40 hover:bg-surface-hover hover:text-foreground transition flex items-center justify-center gap-2"
-            >
-              {isDiscarding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-              Discard Selected
-            </button>
-          </div>
+          <button
+            onClick={handleUpload}
+            disabled={isUploading || (uploadMode === 'batch' ? (!batchFront || !batchBack) : (!singleFront || !singleBack))}
+            className="w-full bg-brand text-background font-black text-lg py-4 rounded-xl disabled:opacity-40 hover:bg-brand-hover transition flex items-center justify-center gap-3 mt-4"
+          >
+            {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5" />}
+            {isUploading
+              ? 'Uploading…'
+              : 'Upload & Process Cards'}
+          </button>
         </div>
       )}
 
-      {/* ── Step 4: AI identification spinner ─────────────────────────────── */}
-      {step === 4 && (
+      {/* ── Step 2: Processing spinner ────────────────────────────────────────── */}
+      {step === 2 && (
         <div className="text-center py-20 animate-in fade-in">
           <Loader2 className="w-14 h-14 animate-spin text-brand mx-auto mb-5" />
-          <h3 className="text-2xl font-black text-foreground mb-2">AI Identifying Cards</h3>
-          <p className="text-muted font-medium">{identProgress || 'Processing…'}</p>
+          <h3 className="text-2xl font-black text-foreground mb-2">Processing Cards</h3>
+          <p className="text-muted font-medium">
+             {isSendingToScanner ? scanProgress : identProgress || 'Processing…'}
+          </p>
         </div>
       )}
 
-      {/* ── Step 5: Review, edit, price, publish ───────────────────────────── */}
-      {step === 5 && (
+      {/* ── Step 3: Review, edit, price, publish ───────────────────────────── */}
+      {step === 3 && (
+
         <div className="space-y-5 animate-in fade-in">
           {/* Tabs */}
           <div className="flex gap-1 bg-surface border border-border rounded-lg p-1 w-full max-w-xs">
@@ -1341,7 +830,15 @@ export function BulkIngestionWizard() {
               ))}
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            <button
+              onClick={handleReviewDiscard}
+              disabled={reviewSelected.size === 0 || isDiscarding}
+              className="bg-surface border border-border text-muted font-bold py-3 px-6 rounded-xl disabled:opacity-40 hover:bg-surface-hover hover:text-foreground transition flex items-center justify-center gap-2"
+            >
+              {isDiscarding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              Discard Selected
+            </button>
             <button
               onClick={handlePriceAll}
               disabled={isPricingAll || isPublishing}
