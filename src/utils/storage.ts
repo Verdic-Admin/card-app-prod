@@ -39,6 +39,32 @@ function getConfig() {
 
 let _s3: S3Client | null = null;
 let _configHash = '';
+let _policySet = false;
+
+async function ensureBucketPublic(client: S3Client, bucket: string) {
+  if (_policySet) return;
+  try {
+    const { PutBucketPolicyCommand } = await import('@aws-sdk/client-s3');
+    const policy = {
+      Version: "2012-10-17",
+      Statement: [{
+        Sid: "PublicReadGetObject",
+        Effect: "Allow",
+        Principal: "*",
+        Action: ["s3:GetObject"],
+        Resource: `arn:aws:s3:::${bucket}/*`
+      }]
+    };
+    await client.send(new PutBucketPolicyCommand({
+      Bucket: bucket,
+      Policy: JSON.stringify(policy)
+    }));
+    _policySet = true;
+    console.log('[storage] Verified public bucket policy');
+  } catch (e) {
+    console.warn('[storage] Could not set public bucket policy (might already be public or lack permissions):', e);
+  }
+}
 
 function getS3Client(): S3Client {
   const cfg = getConfig();
@@ -56,7 +82,12 @@ function getS3Client(): S3Client {
       forcePathStyle: false,
     });
     _configHash = hash;
+    _policySet = false;
   }
+  
+  // Fire and forget policy check
+  ensureBucketPublic(_s3, cfg.bucket);
+  
   return _s3;
 }
 
