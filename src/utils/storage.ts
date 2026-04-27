@@ -13,11 +13,13 @@ import {
 } from '@aws-sdk/client-s3';
 
 // Resolve from Railway bucket variable names first, then S3_* fallbacks
-const S3_ENDPOINT   = (process.env.AWS_ENDPOINT_URL_S3 || process.env.AWS_ENDPOINT_URL || process.env.S3_ENDPOINT || '').replace(/\/$/, '').trim();
-const S3_BUCKET     = (process.env.BUCKET_NAME || process.env.AWS_S3_BUCKET_NAME || process.env.S3_BUCKET_NAME || '').trim();
-const S3_ACCESS_KEY = (process.env.AWS_ACCESS_KEY_ID || process.env.S3_ACCESS_KEY_ID || '').trim();
-const S3_SECRET_KEY = (process.env.AWS_SECRET_ACCESS_KEY || process.env.S3_SECRET_ACCESS_KEY || '').trim();
-const S3_REGION     = (process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || process.env.S3_REGION || 'auto').trim();
+const getEnv = (key: string) => process.env[key] || '';
+
+const S3_ENDPOINT   = (getEnv('AWS_ENDPOINT_URL_S3') || getEnv('AWS_ENDPOINT_URL') || getEnv('S3_ENDPOINT')).replace(/\/$/, '').trim();
+const S3_BUCKET     = (getEnv('BUCKET_NAME') || getEnv('AWS_S3_BUCKET_NAME') || getEnv('S3_BUCKET_NAME')).trim();
+const S3_ACCESS_KEY = (getEnv('AWS_ACCESS_KEY_ID') || getEnv('S3_ACCESS_KEY_ID')).trim();
+const S3_SECRET_KEY = (getEnv('AWS_SECRET_ACCESS_KEY') || getEnv('S3_SECRET_ACCESS_KEY')).trim();
+const S3_REGION     = (getEnv('AWS_REGION') || getEnv('AWS_DEFAULT_REGION') || getEnv('S3_REGION') || 'auto').trim();
 
 let s3: S3Client | null = null;
 
