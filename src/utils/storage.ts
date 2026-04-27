@@ -59,10 +59,11 @@ export async function put(
   options?: StoragePutOptions,
 ): Promise<{ url: string }> {
   if (!S3_ENDPOINT || !S3_BUCKET || !S3_ACCESS_KEY || !S3_SECRET_KEY) {
+    const liveKeys = Object.keys(process.env).filter(k => k.includes('S3') || k.includes('AWS') || k.includes('BUCKET') || k.includes('TIGRIS')).join(', ');
     throw new Error(
       `Object storage is not configured. Detected vars — ENDPOINT: "${S3_ENDPOINT || 'missing'}", BUCKET: "${S3_BUCKET || 'missing'}", KEY: "${S3_ACCESS_KEY ? 'set' : 'missing'}". ` +
-      `Add AWS_ENDPOINT_URL_S3, BUCKET_NAME, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY (Railway Tigris names) ` +
-      `or S3_ENDPOINT, S3_BUCKET_NAME, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY to your service Variables.`,
+      `LIVE S3 VARIABLES IN CONTAINER: [${liveKeys || 'NONE FOUND'}]. ` +
+      `If 'NONE FOUND', your Railway variables are missing from the mycardshop service. Please check your Template Builder variable references.`
     );
   }
 
