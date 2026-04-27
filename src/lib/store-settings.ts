@@ -40,7 +40,7 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   social_discord: '',
   social_threads: '',
   oracle_discount_percentage: 0.0,
-  site_name: 'My Card Store',
+  site_name: 'Card Shop',
   site_author: null,
   site_theme: 'dark',
   payment_link: '',

@@ -226,7 +226,7 @@ async function init() {
       id INT PRIMARY KEY,
       oracle_discount_percentage NUMERIC(5, 2) DEFAULT 0.0,
       live_stream_url TEXT,
-      site_name TEXT DEFAULT 'My Card Shop',
+      site_name TEXT DEFAULT 'Card Shop',
       store_description TEXT DEFAULT 'Zero-fee sports card storefront',
       site_theme TEXT DEFAULT 'dark',
       projection_timeframe TEXT DEFAULT '90-Day',
