@@ -1,24 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { getShopOracleApiKey } from '@/lib/shop-oracle-credentials';
+import { requestPasswordReset } from './actions';
 import Link from 'next/link';
-
-async function requestReset(email: string) {
-  const apiKey = await getShopOracleApiKey();
-  if (!apiKey) throw new Error('Store not linked to Player Index.');
-
-  const res = await fetch('https://playerindexdata.com/api/auth/reset-password', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, api_key: apiKey }),
-  });
-
-  if (!res.ok) {
-    const data = await res.json();
-    throw new Error(data.error || 'Failed to send reset email.');
-  }
-}
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -29,11 +13,11 @@ export default function ForgotPasswordPage() {
     e.preventDefault();
     setStatus('loading');
     setErrorMsg('');
-    try {
-      await requestReset(email);
+    const result = await requestPasswordReset(email);
+    if (result.success) {
       setStatus('sent');
-    } catch (err: unknown) {
-      setErrorMsg(err instanceof Error ? err.message : 'Something went wrong.');
+    } else {
+      setErrorMsg(result.error || 'Something went wrong.');
       setStatus('error');
     }
   };
