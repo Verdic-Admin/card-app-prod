@@ -111,6 +111,7 @@ export async function put(
     Key: path,
     Body: body,
     ContentType: contentType,
+    ACL: 'public-read',
   };
 
   await getS3Client().send(new PutObjectCommand(params));
