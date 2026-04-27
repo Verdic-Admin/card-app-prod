@@ -20,7 +20,8 @@ export async function register() {
       : null);
 
   const apiKey = process.env.PLAYERINDEX_API_KEY;
-  const oracleBase = process.env.API_BASE_URL;
+  // Oracle base URL is hardcoded — no env var needed
+  const oracleBase = process.env.API_BASE_URL || 'https://playerindexdata.com';
 
   if (!storeUrl || !apiKey || !oracleBase) {
     console.log(
