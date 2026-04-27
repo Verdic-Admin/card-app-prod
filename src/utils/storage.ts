@@ -74,7 +74,8 @@ export async function put(
     Key: path,
     Body: body,
     ContentType: contentType,
-    ACL: 'public-read',
+    // Note: ACL is intentionally omitted — Railway Tigris and most S3-compatible
+    // providers manage bucket-level access policies, not per-object ACLs.
   };
 
   await getS3Client().send(new PutObjectCommand(params));
