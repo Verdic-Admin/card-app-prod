@@ -196,29 +196,33 @@ export default function SettingsPage() {
             Live Auction
           </h3>
           <div className="space-y-4 p-5 bg-surface md:bg-surface-hover border border-border rounded-xl">
-            <div>
-              <label className="block text-xs font-bold text-foreground md:text-muted uppercase tracking-wider mb-2">
-                QR Code Target URL
-              </label>
-              <input
-                type="url"
-                value={settings.auction_qr_url || ''}
-                onChange={e => setSettings({ ...settings, auction_qr_url: e.target.value })}
-                className="w-full px-3 py-2 bg-surface border border-border md:border-muted/30 rounded-lg text-sm text-foreground focus:ring-2 focus:ring-brand outline-none shadow-sm placeholder:text-muted/40"
-                placeholder="Leave blank to auto-point at /bid → /auction"
-              />
-              <div className="text-[11px] text-muted mt-1.5 font-medium leading-relaxed space-y-1">
-                <p>
-                  The in-studio QR code encodes this URL. Leave blank and it falls back to{' '}
-                  <code className="text-foreground">/bid</code>, a stable short link on your own
-                  domain that redirects to the Live Auctions page — ideal for printed signage so
-                  you never have to reprint if the destination changes.
-                </p>
-                <p>
-                  Set it explicitly to anything (external bidding form, bit.ly link, Discord
-                  invite, etc.) to override where the QR code scans to.
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-bold text-foreground">Show QR Code in Auction Studio</p>
+                <p className="text-xs text-muted font-medium mt-0.5">
+                  Display a scannable QR code during live auctions that sends buyers directly to your Live Auctions page.
                 </p>
               </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={!!settings.auction_qr_url}
+                onClick={() =>
+                  setSettings({
+                    ...settings,
+                    auction_qr_url: settings.auction_qr_url ? '' : '/bid',
+                  })
+                }
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2 ${
+                  settings.auction_qr_url ? 'bg-brand' : 'bg-slate-200'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-md transform transition-transform duration-200 ${
+                    settings.auction_qr_url ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
             </div>
           </div>
         </div>
