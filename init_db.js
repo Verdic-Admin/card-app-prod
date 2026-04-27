@@ -327,6 +327,16 @@ async function init() {
   console.log('- draft_cards table OK');
 
   await client.query(`
+    CREATE TABLE IF NOT EXISTS stored_images (
+      id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+      data BYTEA NOT NULL,
+      content_type TEXT NOT NULL DEFAULT 'image/jpeg',
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  console.log('- stored_images table OK');
+
+  await client.query(`
     CREATE TABLE IF NOT EXISTS store_updates (
       id INT PRIMARY KEY,
       deploy_hook_url TEXT,
