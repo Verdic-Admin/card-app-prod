@@ -3,6 +3,7 @@
 import { useActionState, useEffect } from "react";
 import { loginAction } from "@/app/actions/auth";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Lock } from "lucide-react";
 
 export default function LoginPage() {
@@ -40,7 +41,10 @@ export default function LoginPage() {
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block text-sm font-medium text-neutral-300">Password</label>
-              {/* Optional: Future home of a direct 'Forgot Password' link to the SaaS master platform */}
+              {/* Forgot password link */}
+              <Link href="/forgot-password" className="text-xs text-neutral-500 hover:text-blue-400 transition-colors">
+                Forgot password?
+              </Link>
             </div>
             <input 
               name="password"
