@@ -12,15 +12,25 @@ import {
   type PutObjectCommandInput,
 } from '@aws-sdk/client-s3';
 
-/** Read an env var at runtime (never at build time). */
-function env(key: string): string {
-  return process.env[key] ?? '';
+/** Read an env var at runtime (never at build time), ignoring key whitespace. */
+function env(searchKey: string): string {
+  // Check exact match first
+  if (process.env[searchKey] !== undefined) {
+    return process.env[searchKey] ?? '';
+  }
+  // Check for keys with accidental leading/trailing spaces
+  for (const k of Object.keys(process.env)) {
+    if (k.trim() === searchKey) {
+      return process.env[k] ?? '';
+    }
+  }
+  return '';
 }
 
 /** Resolve S3 configuration lazily from the live environment. */
 function getConfig() {
   const endpoint   = (env('AWS_ENDPOINT_URL_S3') || env('AWS_ENDPOINT_URL') || env('S3_ENDPOINT')).replace(/\/$/, '').trim();
-  const bucket     = (env('BUCKET_NAME') || env('AWS_S3_BUCKET_NAME') || env('S3_BUCKET_NAME')).trim();
+  const bucket     = (env('BUCKET_NAME') || env('AWS_S3_BUCKET_NAME') || env('S3_BUCKET_NAME') || env('S3_BUCKET')).trim();
   const accessKey  = (env('AWS_ACCESS_KEY_ID') || env('S3_ACCESS_KEY_ID')).trim();
   const secretKey  = (env('AWS_SECRET_ACCESS_KEY') || env('S3_SECRET_ACCESS_KEY')).trim();
   const region     = (env('AWS_REGION') || env('AWS_DEFAULT_REGION') || env('S3_REGION') || 'auto').trim();
