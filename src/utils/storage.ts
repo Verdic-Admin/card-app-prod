@@ -1,6 +1,9 @@
 /**
- * Object Storage — S3-compatible (t3.storageapi.dev / Railway Tigris / AWS S3).
- * Uses virtual-hosted-style URLs: https://<bucket>.<endpoint>/<key>
+ * Object Storage — S3-compatible (Railway Tigris / t3.storageapi.dev / AWS S3).
+ *
+ * Supports both Railway's auto-injected variable names AND custom S3_* overrides:
+ *   Railway Tigris:  AWS_ENDPOINT_URL_S3, BUCKET_NAME, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+ *   Custom/legacy:   S3_ENDPOINT,         S3_BUCKET_NAME, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY
  */
 import {
   S3Client,
@@ -9,9 +12,12 @@ import {
   type PutObjectCommandInput,
 } from '@aws-sdk/client-s3';
 
-const S3_ENDPOINT = (process.env.S3_ENDPOINT || '').replace(/\/$/, '').trim();
-const S3_BUCKET   = (process.env.S3_BUCKET_NAME || '').trim();
-const S3_REGION   = (process.env.AWS_REGION || 'auto').trim();
+// Resolve from either naming convention (Railway Tigris first, then custom S3_* fallback)
+const S3_ENDPOINT   = (process.env.AWS_ENDPOINT_URL_S3 || process.env.S3_ENDPOINT        || '').replace(/\/$/, '').trim();
+const S3_BUCKET     = (process.env.BUCKET_NAME          || process.env.S3_BUCKET_NAME     || '').trim();
+const S3_ACCESS_KEY = (process.env.AWS_ACCESS_KEY_ID    || process.env.S3_ACCESS_KEY_ID   || '').trim();
+const S3_SECRET_KEY = (process.env.AWS_SECRET_ACCESS_KEY|| process.env.S3_SECRET_ACCESS_KEY|| '').trim();
+const S3_REGION     = (process.env.AWS_REGION           || 'auto').trim();
 
 let s3: S3Client | null = null;
 
@@ -21,8 +27,8 @@ function getS3Client(): S3Client {
       endpoint: S3_ENDPOINT || undefined,
       region: S3_REGION,
       credentials: {
-        accessKeyId:     process.env.S3_ACCESS_KEY_ID     || '',
-        secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || '',
+        accessKeyId:     S3_ACCESS_KEY,
+        secretAccessKey: S3_SECRET_KEY,
       },
       forcePathStyle: false, // virtual-hosted-style: https://<bucket>.<endpoint>/<key>
     });
@@ -32,10 +38,10 @@ function getS3Client(): S3Client {
 
 /** Public URL for a stored object — virtual-hosted style. */
 function publicUrl(key: string): string {
-  // Strip https:// prefix, prepend bucket as subdomain
   const host = S3_ENDPOINT.replace(/^https?:\/\//, '');
   return `https://${S3_BUCKET}.${host}/${key}`;
 }
+
 
 export interface StoragePutOptions {
   contentType?: string;
@@ -52,9 +58,11 @@ export async function put(
   file: File | Blob | Buffer,
   options?: StoragePutOptions,
 ): Promise<{ url: string }> {
-  if (!S3_ENDPOINT || !S3_BUCKET || !process.env.S3_ACCESS_KEY_ID || !process.env.S3_SECRET_ACCESS_KEY) {
+  if (!S3_ENDPOINT || !S3_BUCKET || !S3_ACCESS_KEY || !S3_SECRET_KEY) {
     throw new Error(
-      'Object storage is not configured. Set S3_ENDPOINT, S3_BUCKET_NAME, S3_ACCESS_KEY_ID, and S3_SECRET_ACCESS_KEY in your Railway service Variables, then redeploy.',
+      `Object storage is not configured. Detected vars — ENDPOINT: "${S3_ENDPOINT || 'missing'}", BUCKET: "${S3_BUCKET || 'missing'}", KEY: "${S3_ACCESS_KEY ? 'set' : 'missing'}". ` +
+      `Add AWS_ENDPOINT_URL_S3, BUCKET_NAME, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY (Railway Tigris names) ` +
+      `or S3_ENDPOINT, S3_BUCKET_NAME, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY to your service Variables.`,
     );
   }
 
