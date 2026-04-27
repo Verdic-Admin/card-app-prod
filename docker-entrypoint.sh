@@ -10,8 +10,11 @@ echo "[entrypoint] Running database schema initialization..."
 node init_db.js || echo "[entrypoint] DB init warning (non-fatal) — continuing startup."
 
 # ── Self-registration: tell Oracle where this store lives ────────────────────
-# Railway injects RAILWAY_PUBLIC_DOMAIN automatically once a domain is generated.
-# We also check NEXTAUTH_URL as a fallback for custom domains.
+echo "[entrypoint] DEBUG: RAILWAY_PUBLIC_DOMAIN=${RAILWAY_PUBLIC_DOMAIN}"
+echo "[entrypoint] DEBUG: NEXTAUTH_URL=${NEXTAUTH_URL}"
+echo "[entrypoint] DEBUG: API_BASE_URL=${API_BASE_URL}"
+echo "[entrypoint] DEBUG: PLAYERINDEX_API_KEY present=$([ -n "$PLAYERINDEX_API_KEY" ] && echo yes || echo no)"
+
 if [ -n "$RAILWAY_PUBLIC_DOMAIN" ]; then
   STORE_URL="https://$RAILWAY_PUBLIC_DOMAIN"
 elif [ -n "$NEXTAUTH_URL" ]; then
@@ -20,9 +23,11 @@ else
   STORE_URL=""
 fi
 
+echo "[entrypoint] DEBUG: STORE_URL resolved to=${STORE_URL}"
+
 if [ -n "$STORE_URL" ] && [ -n "$PLAYERINDEX_API_KEY" ] && [ -n "$API_BASE_URL" ]; then
   echo "[entrypoint] Registering store with Oracle at $API_BASE_URL..."
-  curl -sf -X POST "$API_BASE_URL/api/fleet/register" \
+  curl -v -X POST "$API_BASE_URL/api/fleet/register" \
     -H "Content-Type: application/json" \
     -H "X-API-Key: $PLAYERINDEX_API_KEY" \
     -d "{\"store_url\": \"$STORE_URL\"}" \
