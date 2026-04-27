@@ -13,7 +13,6 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: '25mb',
     },
-    instrumentationHook: true,
   },
   turbopack: {},
 };
