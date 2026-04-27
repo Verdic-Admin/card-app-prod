@@ -53,6 +53,13 @@ export async function put(
   file: File | Blob | Buffer,
   options?: StoragePutOptions
 ): Promise<{ url: string }> {
+  // Guard: catch missing S3 config early so the error is readable in production
+  if (!S3_ENDPOINT || !process.env.S3_ACCESS_KEY_ID || !process.env.S3_SECRET_ACCESS_KEY) {
+    throw new Error(
+      'Object storage is not configured. Set S3_ENDPOINT, S3_ACCESS_KEY_ID, and S3_SECRET_ACCESS_KEY in your Railway Environment Variables (Variables tab on your service), then redeploy.'
+    );
+  }
+
   const contentType =
     options?.contentType ??
     (file instanceof File ? file.type : 'application/octet-stream');
