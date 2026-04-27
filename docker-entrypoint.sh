@@ -37,7 +37,7 @@ else
   echo "[entrypoint] Skipping self-registration (STORE_URL, PLAYERINDEX_API_KEY, or API_BASE_URL not set)."
 fi
 
-export PORT="${PORT:-3000}"
+export PORT=3000
 export HOSTNAME="0.0.0.0"
 echo "[entrypoint] Starting Next.js server on $HOSTNAME:$PORT..."
 exec node server.js
