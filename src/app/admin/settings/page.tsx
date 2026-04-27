@@ -5,6 +5,7 @@ import { getStoreSettings, updateStoreSettings } from '@/app/actions/settings'
 import { DEFAULT_STORE_SETTINGS, type StoreSettings } from '@/lib/store-settings'
 import { Loader2, Save, CheckCircle2, AlertCircle } from 'lucide-react'
 import { InstructionTrigger } from '@/components/admin/DraggableGuide'
+import { CronSetupPanel } from '@/components/admin/CronSetupPanel'
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<StoreSettings>(DEFAULT_STORE_SETTINGS)
@@ -248,6 +249,9 @@ export default function SettingsPage() {
             </button>
         </div>
       </form>
+
+      <CronSetupPanel />
+
     </div>
   )
 }
