@@ -44,6 +44,7 @@ export async function register() {
         'X-API-Key': apiKey,
       },
       body: JSON.stringify({ store_url: storeUrl }),
+      signal: AbortSignal.timeout(5000),
     });
 
     if (res.ok) {
