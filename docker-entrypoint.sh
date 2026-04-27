@@ -37,5 +37,6 @@ else
   echo "[entrypoint] Skipping self-registration (STORE_URL, PLAYERINDEX_API_KEY, or API_BASE_URL not set)."
 fi
 
-echo "[entrypoint] Starting Next.js server on port ${PORT:-3000}..."
+export PORT=3000
+echo "[entrypoint] Starting Next.js server on port 3000..."
 exec node server.js
