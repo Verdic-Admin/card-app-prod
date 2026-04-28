@@ -25,6 +25,10 @@ export async function uploadImagesToScanner(
     throw new Error('credits_exhausted');
   }
   if (!response.ok) {
+    console.error(`Debug [uploadImagesToScanner] Base: ${base}, Status: ${response.status} ${response.statusText}`);
+    console.error(`Debug [uploadImagesToScanner] Headers:`, Object.fromEntries(response.headers.entries()));
+    const text = await response.text().catch(() => 'no body');
+    console.error(`Debug [uploadImagesToScanner] Body:`, text);
     throw new Error(`Scanner upload failed: ${response.statusText}`);
   }
 
