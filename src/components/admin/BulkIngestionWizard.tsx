@@ -529,7 +529,7 @@ export function BulkIngestionWizard() {
   /** Move a single card to Cropped (skip crop for already-cropped singles) */
   const handleSkipToCropped = async (id: string) => {
     try {
-      const rows = await promoteRawStagingToCroppedAction(id)
+      const rows = await promoteRawStagingToCroppedAction([id])
       const updated = (rows as Record<string, unknown>[]).map(rowToStagingCard)
       setReviewCards(prev => prev.map(c => c.id === id ? (updated[0] ?? c) : c))
       showToast('Moved to Cropped.', 'success')
