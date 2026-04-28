@@ -7,14 +7,9 @@
 set -e
 
 echo "[entrypoint] Running database schema initialization..."
-node init_db.js || echo "[entrypoint] DB init warning (non-fatal) — continuing startup."
+node init_db.js 2>&1 || echo "[entrypoint] DB init warning (non-fatal) — continuing startup."
 
 # ── Self-registration: tell Oracle where this store lives ────────────────────
-echo "[entrypoint] DEBUG: RAILWAY_PUBLIC_DOMAIN=${RAILWAY_PUBLIC_DOMAIN}"
-echo "[entrypoint] DEBUG: NEXTAUTH_URL=${NEXTAUTH_URL}"
-echo "[entrypoint] DEBUG: API_BASE_URL=${API_BASE_URL}"
-echo "[entrypoint] DEBUG: PLAYERINDEX_API_KEY present=$([ -n "$PLAYERINDEX_API_KEY" ] && echo yes || echo no)"
-
 if [ -n "$RAILWAY_PUBLIC_DOMAIN" ]; then
   STORE_URL="https://$RAILWAY_PUBLIC_DOMAIN"
 elif [ -n "$NEXTAUTH_URL" ]; then
@@ -23,22 +18,20 @@ else
   STORE_URL=""
 fi
 
-echo "[entrypoint] DEBUG: STORE_URL resolved to=${STORE_URL}"
-
 if [ -n "$STORE_URL" ] && [ -n "$PLAYERINDEX_API_KEY" ] && [ -n "$API_BASE_URL" ]; then
-  echo "[entrypoint] Registering store with Oracle at $API_BASE_URL..."
+  echo "[entrypoint] Registering store with Oracle..."
   REGISTER_RESPONSE=$(curl -s --show-error --fail-with-body \
     -H "Content-Type: application/json" \
     -H "X-API-Key: $PLAYERINDEX_API_KEY" \
     -d "{\"store_url\": \"$STORE_URL\"}" \
     "$API_BASE_URL/api/fleet/register" 2>&1) \
-    && echo "[entrypoint] Store registered successfully: $REGISTER_RESPONSE" \
-    || echo "[entrypoint] Store registration failed (non-fatal): $REGISTER_RESPONSE — continuing startup."
+    && echo "[entrypoint] Store registered successfully." \
+    || echo "[entrypoint] Store registration failed (non-fatal) — continuing startup."
 else
-  echo "[entrypoint] Skipping self-registration (STORE_URL, PLAYERINDEX_API_KEY, or API_BASE_URL not set)."
+  echo "[entrypoint] Skipping self-registration (missing config)."
 fi
 
 export PORT=3000
 export HOSTNAME="0.0.0.0"
-echo "[entrypoint] Starting Next.js server on $HOSTNAME:$PORT..."
+echo "[entrypoint] Starting Next.js server..."
 exec node server.js
