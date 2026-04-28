@@ -68,11 +68,21 @@ export default function DesignPage() {
                <p className="text-muted mt-2 font-medium">Configure visuals, themes, layouts, and public descriptions.</p>
                <div className="mt-2 text-left">
                   <InstructionTrigger 
-                     title="Theming Engine Rules"
-                     steps={[
-                        { title: "Store Themes", content: "Changing your theme here updates your entire website instantly for your buyers. Play around and see what looks best!" },
-                        { title: "Logo Tips", content: "Make sure any logos you upload have a transparent background (like a .PNG file). If your logo has a solid white background, it will look like a white box if you switch to Dark Mode." }
-                     ]}
+                    title="Theming & Design Guide" 
+                    steps={[
+                      { 
+                        title: "Store Themes", 
+                        content: "Changing your theme here updates the entire website's color palette instantly for your buyers. Test different themes to see what matches your brand's vibe." 
+                      },
+                      { 
+                        title: "Transparent Logos", 
+                        content: "Ensure any logos you upload have a transparent background (e.g., .PNG or .WEBP). A solid white background will look like a harsh white box if you switch to a dark theme." 
+                      },
+                      { 
+                        title: "Store Description", 
+                        content: "Your store description appears on the homepage and in search engine results. Keep it punchy and mention your specialties (e.g., 'Vintage Baseball' or 'Zero-fee modern slabs')." 
+                      }
+                    ]} 
                   />
                </div>
             </div>

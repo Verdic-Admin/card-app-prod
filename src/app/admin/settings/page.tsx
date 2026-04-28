@@ -66,11 +66,21 @@ export default function SettingsPage() {
         <h1 className="text-2xl font-black text-foreground tracking-tight flex items-center gap-2">
             Global Store Settings
             <InstructionTrigger 
-              title="Store Operations Policy"
+              title="Store Operations Policy" 
               steps={[
-                 { title: "Global Discount", content: "Set a discount percentage here to automatically price your cards below market value. This is a great way to show buyers how much they save by buying direct from you." },
-                 { title: "Payment Methods", content: "Enter your Venmo, CashApp, or Zelle usernames to accept zero-fee payments. If you leave a payment method blank, it simply won't show up for buyers at checkout." }
-              ]}
+                { 
+                  title: "Global Oracle Discount", 
+                  content: "Set a discount percentage here to automatically price your cards below the Player Index market value. This shows buyers exactly how much they save by buying direct, effectively replacing the 'eBay tax'." 
+                },
+                { 
+                  title: "Payment Methods", 
+                  content: "Enter your Venmo, CashApp, PayPal, or Zelle details to accept zero-fee payments. If you leave a payment field blank, it will simply be hidden from buyers at checkout." 
+                },
+                { 
+                  title: "Cart Minimums & Shipping", 
+                  content: "Set a minimum cart value to prevent unprofitable small transactions. You can also configure a flat shipping fee and a 'Free Shipping' threshold to encourage larger orders." 
+                }
+              ]} 
             />
         </h1>
         <p className="text-sm font-medium text-muted mt-1">Configure checkout thresholds, platform toggles, and payment methods.</p>

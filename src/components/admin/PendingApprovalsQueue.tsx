@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, CheckCircle2, X } from 'lucide-react'
 import { price } from '@/utils/math'
+import { InstructionTrigger } from '@/components/admin/DraggableGuide'
 
 interface PendingAuction {
   id: string
@@ -87,6 +88,23 @@ export function PendingApprovalsQueue() {
       <h2 className="text-lg font-black text-amber-400 mb-1 flex items-center gap-2">
         🔨 Pending Auction Approvals
         <span className="bg-amber-500 text-slate-950 text-xs font-black px-2 py-0.5 rounded-full">{items.length}</span>
+        <InstructionTrigger 
+          title="Auction Approvals Guide" 
+          steps={[
+            { 
+              title: "1. Auction End", 
+              content: "When a Live or 24/7 asynchronous auction runs out of time or hits its end date, it lands here. The card is temporarily locked in your inventory so no one else can buy it." 
+            },
+            { 
+              title: "2. Review & Approve", 
+              content: "Check the winning bid amount. If the reserve was met and you're happy with the final price, click 'Approve'. This instantly generates a pending order and emails the winner a secure checkout link." 
+            },
+            { 
+              title: "3. Rejecting / Canceling", 
+              content: "If you need to cancel the result (e.g., due to a suspected troll bidder or non-payment), click the 'X' to reject. The card will immediately return to your available inventory at its standard Buy It Now price." 
+            }
+          ]} 
+        />
       </h2>
       <p className="text-sm text-amber-200/60 mb-4">
         These auctions have closed. Review the winning bid and approve to create a checkout link, or reject to return the card to inventory.

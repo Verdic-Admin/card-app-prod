@@ -278,15 +278,23 @@ export function BulkIngestionWizard() {
     ))
 
     try {
-      const { results } = await identifyCardBatchAction(
-        visibleCards.map(c => ({
-          queue_id: c.id,
-          side_a_url: c.image_url!,
-          side_b_url: c.back_image_url || null,
-        }))
-      )
+      // Chunk into batches of 9 (backend enforces max_length=9 per request)
+      const BATCH_SIZE = 9
+      const allResults: any[] = []
 
-      for (const r of results) {
+      for (let i = 0; i < visibleCards.length; i += BATCH_SIZE) {
+        const chunk = visibleCards.slice(i, i + BATCH_SIZE)
+        const { results } = await identifyCardBatchAction(
+          chunk.map(c => ({
+            queue_id: c.id,
+            side_a_url: c.image_url!,
+            side_b_url: c.back_image_url || null,
+          }))
+        )
+        allResults.push(...results)
+      }
+
+      for (const r of allResults) {
         if (r.status === 'error') {
           setReviewCards(prev => prev.map(x =>
             x.id === r.queue_id ? { ...x, ai_status: 'Failed — Retry', confidence: 0 } : x
@@ -352,7 +360,8 @@ export function BulkIngestionWizard() {
         }).catch(() => {})
       }
 
-      showToast(`Batch identified ${results.length} card(s) with 1 token.`, 'success')
+      const tokensUsed = Math.ceil(visibleCards.length / BATCH_SIZE)
+      showToast(`Batch identified ${allResults.length} card(s) using ${tokensUsed} token(s).`, 'success')
     } catch (e: any) {
       if (e.message === 'credits_exhausted') { creditsExhausted(); return }
       showToast('Batch identify failed: ' + e.message, 'error')
@@ -670,15 +679,34 @@ export function BulkIngestionWizard() {
         <div>
           <h2 className="text-xl font-bold text-foreground">
             Player Index Batch Importer
-            <InstructionTrigger
-              title="AI Ingestion Instructions"
+            <InstructionTrigger 
+              title="Bulk Ingestion & AI Pipeline Guide" 
               steps={[
-                { title: "Step 1: Upload", content: "Upload a paired front and back (single card or full matrix sheet)." },
-                { title: "Step 2: Crop & Rotate", content: "Click 'Crop & Rotate' to send raw scans to the vision worker. Cropped cards appear in the Cropped tab." },
-                { title: "Step 3: AI Identify", content: "Click 'Identify AI' to auto-detect player, set, team, and card number." },
-                { title: "Step 4: Edit & Price", content: "Review and correct AI results, then send to pricing engine." },
-                { title: "Step 5: Publish", content: "Publish priced cards to your live inventory." },
-              ]}
+                { 
+                  title: "1. Photographing Your Cards (The 'Matrix')", 
+                  content: "For bulk 'matrix' uploads (multiple cards in one photo), place your cards on a solid, contrasting background. A Green or Blue mat works best for the AI's OpenCV edge detection. Ensure good, even lighting to minimize foil glare, and leave a little space between each card so their edges do not touch." 
+                },
+                { 
+                  title: "2. Photographing the Backs", 
+                  content: "The AI scanner absolutely requires a paired back image to function. After taking the photo of the card fronts, flip the cards over in the exact same grid arrangement and take your second photo. This allows the AI to correctly pair the front and back of each specific card." 
+                },
+                { 
+                  title: "3. Uploading & Cropping", 
+                  content: "Upload your paired front and back photos, selecting 'batch' for matrix sheets or 'single' for individual cards. Click 'Crop All' to send them to the vision scanner, which will automatically slice the sheet into individual, perfectly paired card rows." 
+                },
+                { 
+                  title: "4. Identify & Classify", 
+                  content: "Run the 'Identify' step. The AI reads the card text to find the Player Name, Set, Card Number, and Parallels. High-confidence matches are tagged automatically; low-confidence ones are flagged for your manual review." 
+                },
+                { 
+                  title: "5. Oracle Pricing", 
+                  content: "Hit 'Price All' to query the Player Index Oracle. It calculates real-time market values based on recent comps and automatically applies your store's global discount percentage." 
+                },
+                { 
+                  title: "6. Review & Publish", 
+                  content: "Double-check the AI's work in the review table. Fix any misread fields, select the ready cards, and click 'Publish' to instantly move them to your live store inventory." 
+                }
+              ]} 
             />
           </h2>
           <p className="text-sm font-medium text-muted">Upload → Crop → Identify → Edit & Price → Publish</p>

@@ -53,6 +53,19 @@ export function CoinRequestsCRM() {
       <div className="bg-amber-50 rounded-t-xl px-6 py-4 border-b border-amber-200 flex justify-between items-center">
         <h2 className="text-xl font-bold text-amber-900 flex items-center gap-2">
           <span>📸</span> Coin Requests Action Center
+          <InstructionTrigger 
+            title="Coin Photo Workflows" 
+            steps={[
+              { 
+                title: "1. What is Coining?", 
+                content: "Savvy buyers will occasionally request a 'coin' photo—a picture of the specific card next to a piece of paper with your shop name and today's date written on it. It proves you physically hold the high-value card they are looking at." 
+              },
+              { 
+                title: "2. Fulfilling Requests", 
+                content: "Snap the requested photo with your phone, click 'Fulfill' on the pending request here, and upload it. This builds immense trust and usually results in an immediate, frictionless sale." 
+              }
+            ]} 
+          />
         </h2>
         <span className="bg-amber-600 text-white font-black px-3 py-1 rounded-full text-sm">
           {requests.length} Pending

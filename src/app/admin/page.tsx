@@ -116,7 +116,26 @@ export default async function AdminPage() {
       </div>
       <div className="flex justify-between items-center mb-10">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-foreground">Admin Platform</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-extrabold tracking-tight text-foreground">Admin Platform</h1>
+            <InstructionTrigger 
+              title="Command Center Guide" 
+              steps={[
+                { 
+                  title: "Daily Operations", 
+                  content: "This is your control room. Check this dashboard daily for pending trade offers, expired auctions awaiting your approval, and high-priority collector requests." 
+                },
+                { 
+                  title: "Quick Actions", 
+                  content: "Use the top navigation to quickly jump into the Auction Studio to stage cards for tonight's stream, or hit 'Add Inventory' to run a new batch of raw photos through the AI scanner." 
+                },
+                {
+                  title: "Platform Updates",
+                  content: "To keep your storefront synchronized with the latest Player Index features, ensure 'Auto-Deploy' is enabled in your Railway service settings. This ensures you always have the latest vision-scanner optimizations."
+                }
+              ]} 
+            />
+          </div>
           <p className="text-muted mt-1 font-medium">Manage inventory, perform massive bulk scans, and track sales.</p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
@@ -141,6 +160,9 @@ export default async function AdminPage() {
           <Link href="/admin/settings" className="px-4 py-2 bg-indigo-50 text-indigo-700 font-bold rounded-lg hover:bg-indigo-100 transition-colors">
             Store Operations
           </Link>
+          <a href="/docs/Master-Operations-Manual.md" download="Gap-Sportscards-Master-Operations-Manual.md" className="px-4 py-2 bg-slate-900 text-white font-black rounded-lg hover:bg-slate-800 transition-colors shadow-lg border border-slate-700 text-sm">
+            Master Ops Manual (.md)
+          </a>
           <a href="/docs/Operations-Guide.pdf" download="Operations-Guide.pdf" className="px-4 py-2 bg-slate-100 text-slate-700 border border-slate-300 font-bold rounded-lg hover:bg-slate-200 transition-colors">
             Operations Guide
           </a>
@@ -212,7 +234,7 @@ export default async function AdminPage() {
                    <span className="md:hidden">🚀</span> Welcome to your new Edge Storefront!
                 </h2>
                 <p className="text-indigo-100 text-sm md:text-base font-medium leading-relaxed">
-                  Your storefront is successfully deployed and connected. The database is primed. Now all you need is your inventory. Site instructions are automatically turned on and are available by clicking the <strong className="text-white bg-indigo-500/50 px-2 py-0.5 rounded ml-1">? Instructions</strong> button next to any admin tool!
+                  Your storefront is successfully deployed and connected. The database is primed. Now all you need is your inventory. Site instructions and <strong>platform update workflows</strong> are available by clicking the <strong className="text-white bg-indigo-500/50 px-2 py-0.5 rounded ml-1">? Instructions</strong> button next to any admin tool!
                 </p>
               </div>
               <div className="hidden md:block w-24 h-24 bg-indigo-500 rounded-full flex items-center justify-center flex-shrink-0 animate-pulse border-4 border-indigo-400 shadow-inner">

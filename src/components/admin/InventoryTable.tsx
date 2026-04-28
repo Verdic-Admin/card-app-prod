@@ -10,6 +10,7 @@ import { syncSingleItemWithOracle, syncInventoryWithOracle, applyOracleDiscount,
 import { Loader2, Trash2, Edit2, Check, X, Search, Download, RotateCw, RefreshCw, DollarSign, Save, AlertCircle, Gavel, Package, Share2, CopyPlus, MoreHorizontal } from 'lucide-react'
 import { price } from '@/utils/math'
 import { deriveDisplayPricing } from '@/utils/pricing'
+import { InstructionTrigger } from '@/components/admin/DraggableGuide'
 
 type InventoryItem = Database['public']['Tables']['inventory']['Row']
 
@@ -1095,14 +1096,37 @@ export function InventoryTable({
 
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-4">
-         <div className="relative w-full max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input 
-              type="text" 
-              placeholder="Search inventory database..." 
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2.5 text-sm bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-colors placeholder:text-slate-400 text-slate-900 font-medium shadow-sm"
+         <div className="flex items-center gap-3 flex-1">
+            <div className="relative w-full max-w-md">
+               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+               <input 
+                 type="text" 
+                 placeholder="Search inventory database..." 
+                 value={searchQuery}
+                 onChange={e => setSearchQuery(e.target.value)}
+                 className="w-full pl-9 pr-4 py-2.5 text-sm bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-colors placeholder:text-slate-400 text-slate-900 font-medium shadow-sm"
+               />
+            </div>
+            <InstructionTrigger 
+              title="Inventory Management Rules" 
+              steps={[
+                { 
+                  title: "1. Quick Edits & Overrides", 
+                  content: "Click the pencil icon next to any card to manually override its price, cost basis, or print run. Note: Manually editing a listed price instantly locks it and prevents automatic Oracle market updates." 
+                },
+                { 
+                  title: "2. Master Oracle Sync", 
+                  content: "Hit the 'Master Sync' button to ping the Player Index database. This checks your entire active inventory against the latest market comps and updates prices automatically based on your global discount rate." 
+                },
+                { 
+                  title: "3. Bundles & Lots", 
+                  content: "Check the boxes next to multiple cards and click 'Bundle into Lot'. This groups them into a single purchasable item on your storefront while automatically summing up their underlying cost bases for your tax ledger." 
+                },
+                { 
+                  title: "4. Status Toggles", 
+                  content: "Toggle a card's status to instantly hide it from the public storefront without deleting it. Use the red trash can to permanently delete a card if it is no longer in your physical possession." 
+                }
+              ]} 
             />
          </div>
          <div className="flex items-center gap-2">

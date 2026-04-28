@@ -75,14 +75,27 @@ export default async function AuctionStudioPage() {
               <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500"></span>
             </span>
             Live Auction Studio
-              <InstructionTrigger 
-                 title="Live Auction Setup Guide"
-                 steps={[
-                    { title: "1. Pick Your Cards", content: "Search your inventory, select the cards you want to auction, and set an optional starting reserve price." },
-                    { title: "2. Verify You Own It", content: "To build trust, snap a quick 'coin photo' (a picture of the card next to a piece of paper with your name and today's date) and attach it." },
-                    { title: "3. Go Live!", content: "Click 'Go Live'. Your cards are now up for auction. Copy the link and share it on your Facebook, Twitter, or Instagram to get bidders!" }
-                 ]}
-              />
+            <InstructionTrigger 
+              title="Live Auction Setup Guide" 
+              steps={[
+                { 
+                  title: "1. Stage Inventory", 
+                  content: "Search your available inventory below and select the cards you want to auction. Set an optional starting 'Reserve Price'. If bidding doesn't reach this number, the card won't sell." 
+                },
+                { 
+                  title: "2. The 'Coin' Photo (Verification)", 
+                  content: "To build bidder trust, snap a quick photo of the card next to a piece of paper with your social handle and today's date. Upload this as the 'Coin Image'." 
+                },
+                { 
+                  title: "3. Countdown vs. Live Stream", 
+                  content: "Set an 'End Time' for a traditional asynchronous auction (like eBay). Leave the End Time blank if you are running a live stream (Whatnot/YouTube) and want to control the 'Sold' hammer manually." 
+                },
+                { 
+                  title: "4. Go Live & Market", 
+                  content: "Click 'Go Live'. Your cards will appear on the public /auction page. Copy the item links or generate a QR code to share on your social channels to drive traffic!" 
+                }
+              ]} 
+            />
           </h1>
           <p className="text-muted mt-1 font-medium">Stage inventory, control live status, and manage your auctions.</p>
         </div>

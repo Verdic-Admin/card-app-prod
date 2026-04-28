@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react'
 import { Database } from '@/types/database.types'
 import { Download, TrendingUp, DollarSign, Package } from 'lucide-react'
 import { price } from '@/utils/math'
+import { InstructionTrigger } from '@/components/admin/DraggableGuide'
 
 type InventoryItem = Database['public']['Tables']['inventory']['Row']
 
@@ -76,6 +77,19 @@ export function LedgerDashboard({ soldItems }: { soldItems: InventoryItem[] }) {
       <div className="flex justify-between items-center mb-6">
          <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
            <TrendingUp className="w-5 h-5 text-emerald-500" /> Financial Tax Ledger
+           <InstructionTrigger 
+             title="Financial Ledger Tips" 
+             steps={[
+               { 
+                 title: "Cost Basis Tracking", 
+                 content: "To get accurate Net Profit and Gross Margin numbers, ensure you enter your 'Cost Basis' (exactly what you paid for the raw card) when adding inventory. The ledger handles the rest of the math automatically." 
+               },
+               { 
+                 title: "Tax Season Export", 
+                 content: "Use the '1-Click Export CSV' button to download your entire sales history. You can hand this spreadsheet directly to your accountant during tax season to calculate capital gains and inventory flow." 
+               }
+             ]} 
+           />
          </h2>
          <button onClick={exportCSV} className="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 font-bold px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors">
             <Download className="w-4 h-4" /> 1-Click CSV Export

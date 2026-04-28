@@ -150,11 +150,25 @@ export function TradeLeadsCRM() {
            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
               Trade & Order Inbox
               <InstructionTrigger 
-                 title="Trade & Order Inbox Rules"
-                 steps={[
-                    { title: "Reviewing Offers", content: "Buyers will send you trade requests or cash offers here. If you accept an offer, it temporarily locks that price just for them so no one else can steal it." },
-                    { title: "Managing Your Inbox", content: "Offers expire automatically after 24 hours. Keep an eye on your email notifications so you don't miss out on a deal! If you reject an offer, it deletes it from the system entirely." }
-                 ]}
+                title="Trade & Order Inbox Rules" 
+                steps={[
+                  { 
+                    title: "1. Incoming Cash Checkouts", 
+                    content: "Buyers checking out manually will appear here. When they check out, their items are temporarily locked ('Pending Payment') in your inventory so no one else can snipe them." 
+                  },
+                  { 
+                    title: "2. Trade Proposals", 
+                    content: "If a collector proposes a trade, you'll see their attached photos and notes. You can reach out to them via their provided email to negotiate the deal." 
+                  },
+                  { 
+                    title: "3. Approving Payments", 
+                    content: "Once you verify the funds have hit your PayPal, Venmo, or CashApp, click 'Approve Payment'. This permanently marks the inventory as 'Sold' and logs the transaction for your ledger." 
+                  },
+                  { 
+                    title: "4. Expirations & Clean Up", 
+                    content: "Unpaid checkouts expire automatically after a set time (usually 7 days) and return to your available inventory. Use 'Mass Cleanup' to clear out old, rejected, or completed trade logs." 
+                  }
+                ]} 
               />
            </h2>
            <p className="text-sm font-medium text-slate-500">
