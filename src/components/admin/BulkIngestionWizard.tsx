@@ -259,7 +259,7 @@ export function BulkIngestionWizard() {
   const [isIdentifyingAll, setIsIdentifyingAll] = useState(false)
 
   const handleIdentifyAll = async () => {
-    const visibleCards = reviewCards.filter(c => activeTab === 'ready' ? (!isPendingScan(c) && (c.confidence ?? 0) > 0.85) : (!isPendingScan(c) && (c.confidence ?? 1) <= 0.85)).filter(c => !c.player_name)
+    const visibleCards = reviewCards.filter(c => activeTab === 'ready' ? (!isPendingScan(c) && (c.confidence ?? 0) > 0.85) : (!isPendingScan(c) && (c.confidence ?? 0) <= 0.85)).filter(c => !c.player_name)
     if (!visibleCards.length) {
       showToast('No un-identified cards on this tab.', 'info')
       return
@@ -416,7 +416,7 @@ export function BulkIngestionWizard() {
 
   const handlePriceAll = async () => {
     const visibleCards = reviewCards.filter(c =>
-      activeTab === 'ready' ? (c.confidence ?? 0) > 0.85 : (c.confidence ?? 1) <= 0.85
+      activeTab === 'ready' ? (c.confidence ?? 0) > 0.85 : (c.confidence ?? 0) <= 0.85
     ).filter(c => c.player_name)
     if (!visibleCards.length) {
       showToast('No cards with a Player Name on this tab to price.', 'info')
@@ -645,7 +645,7 @@ export function BulkIngestionWizard() {
                 ? reviewCards.filter(c => isPendingScan(c)).length
                 : tab === 'ready'
                 ? reviewCards.filter(c => !isPendingScan(c) && (c.confidence ?? 0) > 0.85).length
-                : reviewCards.filter(c => !isPendingScan(c) && (c.confidence ?? 1) <= 0.85).length
+                : reviewCards.filter(c => !isPendingScan(c) && (c.confidence ?? 0) <= 0.85).length
               return (
                 <button key={tab} onClick={() => setActiveTab(tab)}
                   className={`flex-1 py-2 text-xs font-black rounded-md transition ${activeTab === tab ? 'bg-brand text-brand-foreground shadow' : 'text-muted hover:text-foreground'}`}>
@@ -666,7 +666,7 @@ export function BulkIngestionWizard() {
 
           <div className="space-y-3 max-h-[72vh] overflow-y-auto pr-1">
             {reviewCards
-              .filter(c => activeTab === 'staging' ? isPendingScan(c) : activeTab === 'ready' ? (!isPendingScan(c) && (c.confidence ?? 0) > 0.85) : (!isPendingScan(c) && (c.confidence ?? 1) <= 0.85))
+              .filter(c => activeTab === 'staging' ? isPendingScan(c) : activeTab === 'ready' ? (!isPendingScan(c) && (c.confidence ?? 0) > 0.85) : (!isPendingScan(c) && (c.confidence ?? 0) <= 0.85))
               .map(card => (
                 <div key={card.id}
                   className={`border rounded-xl p-3 bg-surface transition ${reviewSelected.has(card.id) ? 'border-brand/50' : 'border-border opacity-60'}`}>
