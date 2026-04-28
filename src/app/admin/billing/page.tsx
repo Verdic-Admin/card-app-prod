@@ -27,7 +27,7 @@ export default async function BillingPage() {
 
   const tier = account?.tier ?? 'standard';
   const billingExempt = !!(account as { billing_exempt?: boolean } | null)?.billing_exempt;
-  const balance = billingExempt ? 0 : Number(account?.token_balance ?? 0);
+  const balance = Number(account?.token_balance ?? 0);
   const clientName = account?.client_name ?? 'Your Store';
   const memberSince = account?.member_since
     ? new Date(account.member_since).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
