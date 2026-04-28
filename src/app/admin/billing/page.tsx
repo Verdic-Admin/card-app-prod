@@ -15,11 +15,11 @@ async function getAccountBalance() {
   }
 }
 
-const TIER_RATES: Record<string, { price: string; tokens: number; label: string }> = {
-  basic: { price: '—', tokens: 50, label: 'Starter' },
-  standard: { price: '$9', tokens: 1000, label: 'Standard' },
-  pro: { price: '$29', tokens: 5000, label: 'Pro' },
-  enterprise: { price: '$99', tokens: 25000, label: 'Enterprise' },
+const TIER_RATES: Record<string, { price: string; tokens: number; label: string; cards: string }> = {
+  basic: { price: '—', tokens: 50, label: 'Starter', cards: 'Up to ~150 cards' },
+  standard: { price: '$9', tokens: 1000, label: 'Standard', cards: 'Up to ~3,000 cards' },
+  pro: { price: '$29', tokens: 5000, label: 'Pro', cards: 'Up to ~15,000 cards' },
+  enterprise: { price: '$99', tokens: 25000, label: 'Enterprise', cards: 'Up to ~75,000 cards' },
 };
 
 export default async function BillingPage() {
@@ -63,6 +63,13 @@ export default async function BillingPage() {
               {billingExempt && (
                 <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400 mt-1">
                   Unlimited (billing exempt)
+                </p>
+              )}
+              {!billingExempt && balance > 0 && (
+                <p className="text-sm font-bold text-brand/80 mt-2">
+                  {balance >= 3
+                    ? `≈ Up to ${(Math.floor(balance / 3) * 9).toLocaleString()} cards via 9-card bulk scan`
+                    : `≈ Up to ${balance} loose cards`}
                 </p>
               )}
             </div>
@@ -131,6 +138,7 @@ export default async function BillingPage() {
               </div>
               <p className="text-3xl font-black text-brand">{info.price}<span className="text-sm text-muted font-medium">/mo</span></p>
               <p className="text-sm text-muted font-medium">{info.tokens.toLocaleString()} tokens per month</p>
+              <p className="text-xs text-brand font-bold">{info.cards}</p>
             </div>
           ))}
         </div>

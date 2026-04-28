@@ -205,3 +205,47 @@ export async function identifyCardDirectAction(
 
   return normalizeIdentifyResponse(await response.json());
 }
+
+// ── Batch identification (1 token for up to 9 cards) ─────────────────────────
+
+export interface BatchIdentifyResultItem {
+  queue_id: string;
+  status: string;
+  confidence: number;
+  card_details?: Record<string, unknown>;
+  back_metadata?: Record<string, unknown>;
+  top_matches?: unknown[];
+  error?: string;
+}
+
+export interface BatchIdentifyResponse {
+  batch_status: string;
+  total: number;
+  succeeded: number;
+  failed: number;
+  results: BatchIdentifyResultItem[];
+}
+
+/**
+ * Identify up to 9 card pairs in a single API call (burns 1 token).
+ * Returns per-item results with partial failure support.
+ */
+export async function identifyCardBatchAction(items: {
+  queue_id: string;
+  side_a_url: string;
+  side_b_url: string | null;
+}[]): Promise<BatchIdentifyResponse> {
+  const apiKey = await getShopOracleApiKey();
+  const base = await getOracleGatewayBaseUrl();
+  const response = await fetch(`${base}/identify/batch`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
+    body: JSON.stringify({ items }),
+    signal: AbortSignal.timeout(115_000),
+  });
+
+  if (response.status === 402) throw new Error('credits_exhausted');
+  if (!response.ok) throw new Error(`Batch identify failed: ${response.statusText}`);
+
+  return response.json();
+}

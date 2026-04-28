@@ -152,3 +152,74 @@ export async function calculatePricingAction(fields: {
     },
   );
 }
+
+// ── Batch pricing (1 token for up to 9 cards) ───────────────────────────────
+
+export interface BatchPricingItem {
+  id: string;             // staging row UUID (for mapping results back)
+  player_name: string;
+  card_set: string;
+  insert_name?: string;
+  parallel_name?: string;
+  card_number?: string;
+  print_run?: number | null;
+  is_rookie?: boolean;
+  is_auto?: boolean;
+  is_relic?: boolean;
+  grade?: string | null;
+}
+
+export interface BatchPricingResultItem {
+  storefront_id?: string;
+  projected_target?: number;
+  historical_target?: number | null;
+  trend_percentage?: number;
+  source?: string;
+  url?: string | null;
+  did_you_mean?: Record<string, string>;
+  status?: string;
+  message?: string;
+}
+
+/**
+ * Price up to 9 cards in a single API call (burns 1 token).
+ * Uses the existing /v1/b2b/calculate-batch endpoint.
+ */
+export async function calculatePricingBatchAction(
+  items: BatchPricingItem[],
+): Promise<{ success: boolean; results: BatchPricingResultItem[]; error?: string }> {
+  const base = await getOracleGatewayBaseUrl();
+
+  // Map to the shape the b2b batch endpoint expects
+  const apiItems = items.map((f) => ({
+    player_name: f.player_name,
+    card_set: f.card_set,
+    insert_name: f.insert_name || 'Base',
+    parallel_name: f.parallel_name || 'Base',
+    card_number: f.card_number || '',
+    print_run: f.print_run ?? null,
+    is_rookie: f.is_rookie ?? false,
+    is_auto: f.is_auto ?? false,
+    is_relic: f.is_relic ?? false,
+    grade: f.grade || null,
+    skip_fuzzy: false,
+  }));
+
+  const raw = await submitOracleRequest(`${base}/v1/b2b/calculate-batch`, {
+    method: 'POST',
+    body: JSON.stringify({ items: apiItems }),
+  });
+
+  if (raw && typeof raw === 'object' && 'error' in raw && raw.error === 'credits_exhausted') {
+    return { success: false, results: [], error: 'credits_exhausted' };
+  }
+
+  if (!raw || typeof raw !== 'object' || !('success' in raw) || !raw.success) {
+    const r = raw as { status?: number; statusText?: string; detail?: string };
+    const msg = [r.status && `HTTP ${r.status}`, r.statusText, r.detail].filter(Boolean).join(' — ');
+    return { success: false, results: [], error: msg || 'Batch pricing failed.' };
+  }
+
+  const data = raw.data as { results?: BatchPricingResultItem[] };
+  return { success: true, results: data.results ?? [] };
+}

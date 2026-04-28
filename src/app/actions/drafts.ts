@@ -4,7 +4,8 @@ import { put } from '@/utils/storage';
 import { getAppOrigin } from '@/utils/app-origin';
 import { uploadImagesToScanner, requestPricingAction } from '@/app/actions/visionSync';
 import { hasShopOracleApiKey } from '@/lib/shop-oracle-credentials';
-import { calculatePricingAction } from '@/app/actions/oracleAPI';
+import { calculatePricingAction, calculatePricingBatchAction } from '@/app/actions/oracleAPI';
+import type { BatchPricingItem } from '@/app/actions/oracleAPI';
 
 async function checkAuth() {
   if (!(await hasShopOracleApiKey())) {
@@ -632,4 +633,111 @@ export async function publishDraftCardsAction(ids: string[]): Promise<PublishDra
   }
 
   return { success: true };
+}
+
+// ── Batch pricing (1 token for up to 9 cards) ────────────────────────────────
+
+export interface BatchPricingResult {
+  id: string;
+  success: boolean;
+  listed_price?: number;
+  market_price?: number;
+  error?: string;
+}
+
+/**
+ * Price up to 9 staging cards in a single API call (burns 1 token).
+ * Reads all rows, sends them to the batch pricing endpoint, then
+ * bulk-updates the database with the results.
+ */
+export async function applyStagingDraftBatchPricingAction(
+  ids: string[],
+): Promise<{ success: boolean; results: BatchPricingResult[]; error?: string }> {
+  await checkAuth();
+  if (!ids.length) return { success: false, results: [], error: 'No IDs provided.' };
+
+  // 1. Read all staging rows
+  const { rows } = await pool.query(
+    `SELECT * FROM scan_staging WHERE id = ANY($1::uuid[])`,
+    [ids],
+  );
+
+  if (!rows.length) return { success: false, results: [], error: 'No drafts found.' };
+
+  const discountRate = await getOracleDiscountRate();
+
+  // 2. Build batch payload
+  const batchItems: BatchPricingItem[] = rows.map((row: Record<string, unknown>) => {
+    const printRaw = row.print_run;
+    const printRun =
+      printRaw != null && String(printRaw).trim() !== ''
+        ? Number(String(printRaw).replace(/,/g, ''))
+        : null;
+    const gradeStr =
+      row.grading_company && row.grade
+        ? `${String(row.grading_company)} ${String(row.grade)}`
+        : undefined;
+    return {
+      id: String(row.id),
+      player_name: String(row.player_name ?? ''),
+      card_set: String(row.card_set ?? ''),
+      insert_name: String(row.insert_name ?? ''),
+      parallel_name: String(row.parallel_name ?? ''),
+      card_number: String(row.card_number ?? ''),
+      print_run: printRun != null && Number.isFinite(printRun) ? printRun : null,
+      is_rookie: Boolean(row.is_rookie),
+      is_auto: Boolean(row.is_auto),
+      is_relic: Boolean(row.is_relic),
+      grade: gradeStr || null,
+    };
+  });
+
+  // 3. Call batch pricing (1 token)
+  const batchRes = await calculatePricingBatchAction(batchItems);
+
+  if (!batchRes.success) {
+    return { success: false, results: [], error: batchRes.error };
+  }
+
+  // 4. Map results back and bulk-update the database
+  const output: BatchPricingResult[] = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i] as Record<string, unknown>;
+    const id = String(row.id);
+    const priceResult = batchRes.results[i];
+
+    if (!priceResult || priceResult.status === 'accepted' || priceResult.projected_target == null) {
+      output.push({ id, success: false, error: priceResult?.message || 'No price returned.' });
+      continue;
+    }
+
+    const projection = Number(priceResult.projected_target);
+    if (!Number.isFinite(projection) || projection <= 0) {
+      output.push({ id, success: false, error: 'Invalid projection returned.' });
+      continue;
+    }
+
+    const listed = roundMoney(projection * (1 - discountRate / 100));
+    const trend = priceResult.trend_percentage != null ? Number(priceResult.trend_percentage) : null;
+    const playerIndexUrl = priceResult.url || '';
+
+    try {
+      await pool.query(
+        `UPDATE scan_staging SET
+           listed_price = $1,
+           market_price = $2,
+           oracle_projection = $3,
+           oracle_trend_percentage = $4,
+           player_index_url = $5
+         WHERE id = $6::uuid`,
+        [listed, projection, projection, trend, playerIndexUrl || null, id],
+      );
+      output.push({ id, success: true, listed_price: listed, market_price: projection });
+    } catch (e: unknown) {
+      output.push({ id, success: false, error: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
+  return { success: true, results: output };
 }

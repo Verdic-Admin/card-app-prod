@@ -34,6 +34,11 @@ async function CreditsInner() {
             <span className="font-black text-foreground tabular-nums">
               {balance!.toLocaleString()}
               <span className="text-muted font-semibold text-xs ml-1.5">remaining</span>
+              <span className="text-muted/70 font-medium text-xs ml-2">
+                {balance! >= 3
+                  ? `(Up to ${(Math.floor(balance! / 3) * 9).toLocaleString()} cards via bulk)`
+                  : `(Up to ${balance!} loose cards)`}
+              </span>
             </span>
           )}
         </div>

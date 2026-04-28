@@ -4,7 +4,8 @@ import {
   Upload, Loader2, Play, CheckCircle2, Wand2,
   RefreshCw, Trash2, Send, Scissors, DollarSign
 } from 'lucide-react'
-import { pollScannerResult, identifyCardDirectAction } from '@/app/actions/visionSync'
+import { pollScannerResult, identifyCardDirectAction, identifyCardBatchAction } from '@/app/actions/visionSync'
+import type { BatchIdentifyResultItem } from '@/app/actions/visionSync'
 import {
   stagePairedUploadAction,
   listScanStagingAction,
@@ -15,6 +16,7 @@ import {
   publishDraftCardsAction,
   applyStagingDraftFieldPricingAction,
   applyStagingDraftImagePricingAction,
+  applyStagingDraftBatchPricingAction,
 } from '@/app/actions/drafts'
 import { deleteStagingCardsAction } from '@/app/actions/inventory'
 import { TaxonomySearch } from '@/components/admin/TaxonomySearch'
@@ -269,10 +271,98 @@ export function BulkIngestionWizard() {
       return
     }
     setIsIdentifyingAll(true)
-    for (const card of visibleCards) {
-      await handleIdentify(card.id)
+
+    // Mark all as identifying
+    setReviewCards(prev => prev.map(x =>
+      visibleCards.some(v => v.id === x.id) ? { ...x, ai_status: 'Identifying...' } : x
+    ))
+
+    try {
+      const { results } = await identifyCardBatchAction(
+        visibleCards.map(c => ({
+          queue_id: c.id,
+          side_a_url: c.image_url!,
+          side_b_url: c.back_image_url || null,
+        }))
+      )
+
+      for (const r of results) {
+        if (r.status === 'error') {
+          setReviewCards(prev => prev.map(x =>
+            x.id === r.queue_id ? { ...x, ai_status: 'Failed — Retry', confidence: 0 } : x
+          ))
+          continue
+        }
+        // Inline normalize: extract fields from card_details
+        const cd = r.card_details ?? {} as Record<string, unknown>
+        const rawPr = cd.print_run
+        let printRunParsed: number | null = null
+        if (typeof rawPr === 'number' && Number.isFinite(rawPr)) {
+          printRunParsed = Math.trunc(rawPr)
+        } else if (rawPr != null && String(rawPr).trim() !== '') {
+          const digits = String(rawPr).replace(/\D/g, '')
+          if (digits) { const n = parseInt(digits, 10); if (Number.isFinite(n)) printRunParsed = n }
+        }
+        const res = {
+          status: r.status,
+          confidence: r.confidence ?? 0,
+          player_name: (cd.player_name as string) ?? null,
+          card_set: (cd.card_set as string) ?? null,
+          card_number: (cd.card_number as string) ?? null,
+          insert_name: (cd.insert_name as string) ?? null,
+          parallel_name: (cd.parallel_type as string) ?? null,
+          team_name: (cd.team_name as string) ?? null,
+          team_name_source: (cd.team_name_source as string) ?? null,
+          team_name_confidence: typeof cd.team_name_confidence === 'number' ? cd.team_name_confidence : null,
+          team_name_verified: typeof cd.team_name_verified === 'boolean' ? cd.team_name_verified : null,
+          print_run: printRunParsed,
+        }
+
+        const card = visibleCards.find(c => c.id === r.queue_id)
+        if (!card) continue
+
+        const confidence = res.confidence ?? 0
+        const aiStatus = confidence >= 0.85 ? 'High Confidence' : 'Manual Correction'
+        const aiTeam = (res.team_name ?? '').trim()
+        const mergedTeam = aiTeam || card.team_name
+        const mergedPrint = res.print_run != null && Number.isFinite(Number(res.print_run)) ? String(res.print_run) : card.print_run
+        const mergedCardNum = normalizeCardNumberForPlayerIndex((res.card_number && String(res.card_number).trim()) ? res.card_number : card.card_number) || card.card_number
+
+        const updates = {
+          player_name:   res.player_name   || card.player_name,
+          team_name:     mergedTeam,
+          card_set:      res.card_set       || card.card_set,
+          card_number:   mergedCardNum,
+          insert_name:   res.insert_name    || card.insert_name,
+          parallel_name: res.parallel_name  || card.parallel_name,
+          print_run:     mergedPrint,
+          confidence,
+          ai_status: aiStatus,
+          team_name_source: res.team_name_source as 'ocr_back' | 'ocr_with_db_conflict' | 'catalog_db' | 'none' | null,
+          team_name_confidence: res.team_name_confidence,
+          team_name_verified: res.team_name_verified,
+        }
+
+        setReviewCards(prev => prev.map(x => x.id === r.queue_id ? { ...x, ...updates } : x))
+
+        // Persist to DB in background (fire and forget)
+        updateDraftCardAction(r.queue_id, {
+          ...updates,
+          print_run: (() => { const n = parseInt(String(mergedPrint ?? '').replace(/\D/g, ''), 10); return Number.isFinite(n) ? n : null })()
+        }).catch(() => {})
+      }
+
+      showToast(`Batch identified ${results.length} card(s) with 1 token.`, 'success')
+    } catch (e: any) {
+      if (e.message === 'credits_exhausted') { creditsExhausted(); return }
+      showToast('Batch identify failed: ' + e.message, 'error')
+      // Reset all to allow retry
+      setReviewCards(prev => prev.map(x =>
+        visibleCards.some(v => v.id === x.id) ? { ...x, ai_status: undefined } : x
+      ))
+    } finally {
+      setIsIdentifyingAll(false)
     }
-    setIsIdentifyingAll(false)
   }
 
   const [isCroppingAll, setIsCroppingAll] = useState(false)
@@ -429,29 +519,53 @@ export function BulkIngestionWizard() {
       return
     }
     setIsPricingAll(true)
-    for (const card of visibleCards) {
-      setReviewCards(prev => prev.map(c => c.id === card.id ? { ...c, repricing: true } : c))
-      try {
-        const res = await applyStagingDraftFieldPricingAction(card.id)
-        if (!res.success) {
-          if (res.error === 'credits_exhausted') {
-            creditsExhausted()
-            setIsPricingAll(false)
-            return
-          }
-          setReviewCards(prev => prev.map(c => (c.id === card.id ? { ...c, repricing: false } : c)))
-        } else {
-          const newPrice =
-            res.listed_price != null && Number.isFinite(res.listed_price)
-              ? String(res.listed_price)
-              : ''
-          setReviewCards(prev => prev.map(c => (c.id === card.id ? { ...c, repricing: false, listed_price: newPrice } : c)))
+
+    // Mark all as repricing
+    setReviewCards(prev => prev.map(c =>
+      visibleCards.some(v => v.id === c.id) ? { ...c, repricing: true } : c
+    ))
+
+    try {
+      const batchRes = await applyStagingDraftBatchPricingAction(
+        visibleCards.map(c => c.id)
+      )
+
+      if (!batchRes.success) {
+        if (batchRes.error === 'credits_exhausted') {
+          creditsExhausted()
+          return
         }
-      } catch {
-        setReviewCards(prev => prev.map(c => c.id === card.id ? { ...c, repricing: false } : c))
+        showToast('Batch pricing failed: ' + (batchRes.error || 'Unknown error'), 'error')
+        setReviewCards(prev => prev.map(c =>
+          visibleCards.some(v => v.id === c.id) ? { ...c, repricing: false } : c
+        ))
+        return
       }
+
+      // Map results back to cards
+      for (const r of batchRes.results) {
+        if (r.success && r.listed_price != null) {
+          setReviewCards(prev => prev.map(c =>
+            c.id === r.id ? { ...c, repricing: false, listed_price: String(r.listed_price) } : c
+          ))
+        } else {
+          setReviewCards(prev => prev.map(c =>
+            c.id === r.id ? { ...c, repricing: false } : c
+          ))
+        }
+      }
+
+      const priced = batchRes.results.filter(r => r.success).length
+      showToast(`Batch priced ${priced} card(s) with 1 token.`, 'success')
+    } catch (e: any) {
+      if (e.message === 'credits_exhausted') { creditsExhausted(); return }
+      showToast('Batch pricing failed: ' + e.message, 'error')
+      setReviewCards(prev => prev.map(c =>
+        visibleCards.some(v => v.id === c.id) ? { ...c, repricing: false } : c
+      ))
+    } finally {
+      setIsPricingAll(false)
     }
-    setIsPricingAll(false)
   }
 
   const updateReviewField = async (id: string, field: keyof StagingCard, value: string | boolean) => {
