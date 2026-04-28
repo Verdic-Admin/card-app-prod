@@ -8,7 +8,7 @@ import { PendingApprovalsQueue } from '@/components/admin/PendingApprovalsQueue'
 import Link from 'next/link'
 import { Gavel } from 'lucide-react'
 import { InstructionTrigger } from '@/components/admin/DraggableGuide'
-import { PlatformUpdateBanner } from '@/components/admin/PlatformUpdateBanner'
+
 import { price } from '@/utils/math'
 
 export const dynamic = 'force-dynamic'
@@ -110,9 +110,7 @@ export default async function AdminPage() {
 
   return (
     <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-      <div className="mb-4">
-        <PlatformUpdateBanner />
-      </div>
+
       <div className="flex justify-between items-center mb-10">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-foreground">Admin Platform</h1>
