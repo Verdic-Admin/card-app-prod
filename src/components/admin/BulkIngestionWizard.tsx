@@ -587,10 +587,10 @@ export function BulkIngestionWizard() {
 
         <div className="space-y-5 animate-in fade-in">
 
-          {/* Inline upload controls — visible when Staging tab is active */}
+          {/* Inline upload — visible when Staging tab is active */}
           {activeTab === 'staging' && (
             <div className="border border-border rounded-xl p-4 bg-surface/50 space-y-3">
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2">
                 <Upload className="w-4 h-4 text-brand" />
                 <span className="text-sm font-black text-foreground">Upload Card Pair</span>
                 <div className="flex bg-surface border border-border rounded-md p-0.5 ml-auto">
@@ -604,10 +604,49 @@ export function BulkIngestionWizard() {
                   </button>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <DropZone label={uploadMode === 'batch' ? 'Front Matrix' : 'Front Side'} file={uploadMode === 'batch' ? batchFront : singleFront} id="upload-front" onFile={uploadMode === 'batch' ? setBatchFront : setSingleFront} />
-                <DropZone label={uploadMode === 'batch' ? 'Back Matrix' : 'Back Side'} file={uploadMode === 'batch' ? batchBack : singleBack} id="upload-back" onFile={uploadMode === 'batch' ? setBatchBack : setSingleBack} />
+
+              {/* Single file picker — select 2 images (front + back) */}
+              <div
+                className="border-2 border-dashed border-brand/30 bg-brand/5 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-surface-hover transition"
+                onDragOver={e => e.preventDefault()}
+                onDrop={e => {
+                  e.preventDefault()
+                  const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/')).slice(0, 2)
+                  if (files.length === 2) {
+                    if (uploadMode === 'batch') { setBatchFront(files[0]); setBatchBack(files[1]) }
+                    else { setSingleFront(files[0]); setSingleBack(files[1]) }
+                  }
+                }}
+                onClick={() => document.getElementById('pair-upload')?.click()}
+              >
+                <Upload className="w-6 h-6 text-brand/70 mb-2" />
+                {(uploadMode === 'batch' ? batchFront : singleFront) ? (
+                  <div className="text-center">
+                    <p className="text-xs font-bold text-brand">Front: {(uploadMode === 'batch' ? batchFront : singleFront)?.name}</p>
+                    <p className="text-xs font-bold text-brand">Back: {(uploadMode === 'batch' ? batchBack : singleBack)?.name || 'Not selected'}</p>
+                  </div>
+                ) : (
+                  <span className="text-sm font-bold text-brand">
+                    {uploadMode === 'batch' ? 'Select or drop 2 images (Front Matrix + Back Matrix)' : 'Select or drop 2 images (Front + Back)'}
+                  </span>
+                )}
+                <input id="pair-upload" type="file" accept="image/*" multiple className="hidden"
+                  onChange={e => {
+                    const files = Array.from(e.target.files || []).slice(0, 2)
+                    if (files.length >= 2) {
+                      if (uploadMode === 'batch') { setBatchFront(files[0]); setBatchBack(files[1]) }
+                      else { setSingleFront(files[0]); setSingleBack(files[1]) }
+                    } else if (files.length === 1) {
+                      // First file = front, prompt for second
+                      if (uploadMode === 'batch') { setBatchFront(files[0]); setBatchBack(null) }
+                      else { setSingleFront(files[0]); setSingleBack(null) }
+                    }
+                    e.target.value = ''
+                  }}
+                />
+                <span className="text-[10px] text-muted mt-1">Select exactly 2 images — first is Front, second is Back</span>
               </div>
+
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2 text-xs">
                   <span className="font-bold text-muted">Mat:</span>
