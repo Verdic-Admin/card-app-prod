@@ -126,7 +126,7 @@ export function BulkIngestionWizard() {
   // Step 5 -> 3 review
   const [reviewCards, setReviewCards] = useState<StagingCard[]>([])
   const [reviewSelected, setReviewSelected] = useState<Set<string>>(new Set())
-  const [activeTab, setActiveTab] = useState<'ready' | 'correction'>('ready')
+  const [activeTab, setActiveTab] = useState<'staging' | 'ready' | 'correction'>('staging')
   const [isPublishing, setIsPublishing] = useState(false)
   const [isDiscarding, setIsDiscarding] = useState(false)
 
@@ -181,86 +181,109 @@ export function BulkIngestionWizard() {
 
   // ── Step 1: paired upload → staging (free, no scanner) ─────────────────────
 
-  const runPipeline = async (card: StagingCard) => {
+  const handleCrop = async (id: string) => {
+    setIsSendingToScanner(true)
+    setScanJobId(id)
+    setScanProgress('Uploading scan job…')
+    setStep(2)
     try {
-      setIsSendingToScanner(true)
-      setStep(2)
-      setScanProgress('Uploading scan job…')
       const { job_id } = await submitStagingRowToScannerAction(
-        card.id,
+        id,
         scannerMat === 'none' ? undefined : { chroma: scannerMat }
       )
-      setScanJobId(job_id)
       const cropped = await pollScannerUntilDone(job_id)
       const newRows = await finalizeStagingScanAction(
-        card.id,
+        id,
         cropped.map((c) => ({ side_a_url: c.side_a_url, side_b_url: c.side_b_url }))
       )
       const added = (newRows as Record<string, unknown>[]).map((r) => rowToStagingCard(r))
-
-      setIsSendingToScanner(false)
-      setScanJobId(null)
       
-      const updates = [...added]
-      for (let i = 0; i < added.length; i++) {
-        const c = added[i]
-        setIdentProgress(`Identifying card ${i + 1} of ${added.length}…`)
-        try {
-          const res = await identifyCardDirectAction(c.id, c.image_url!, c.back_image_url)
-          const confidence = res.confidence ?? 0
-          const aiStatus = confidence >= 0.85 ? 'High Confidence' : 'Manual Correction'
-          const idx = updates.findIndex(x => x.id === c.id)
-          if (idx !== -1) {
-            const aiTeam = (res.team_name ?? '').trim()
-            const mergedTeam = aiTeam || updates[idx].team_name
-            const mergedPrint = res.print_run != null && Number.isFinite(Number(res.print_run)) ? String(res.print_run) : updates[idx].print_run
-            const mergedCardNum = normalizeCardNumberForPlayerIndex((res.card_number && String(res.card_number).trim()) ? res.card_number : updates[idx].card_number) || updates[idx].card_number
-            updates[idx] = {
-              ...updates[idx],
-              player_name:   res.player_name   || updates[idx].player_name,
-              team_name:     mergedTeam,
-              card_set:      res.card_set       || updates[idx].card_set,
-              card_number:   mergedCardNum,
-              insert_name:   res.insert_name    || updates[idx].insert_name,
-              parallel_name: res.parallel_name  || updates[idx].parallel_name,
-              print_run:     mergedPrint,
-              confidence,
-              ai_status: aiStatus,
-              team_name_source: res.team_name_source,
-              team_name_confidence: res.team_name_confidence,
-              team_name_verified: res.team_name_verified,
-            }
-            updateDraftCardAction(updates[idx].id, {
-              player_name: updates[idx].player_name,
-              team_name: updates[idx].team_name,
-              card_set: updates[idx].card_set,
-              card_number: mergedCardNum,
-              insert_name: updates[idx].insert_name,
-              parallel_name: updates[idx].parallel_name,
-              print_run: (() => { const n = parseInt(String(mergedPrint ?? '').replace(/\D/g, ''), 10); return Number.isFinite(n) ? n : null })()
-            }).catch(() => {})
-          }
-        } catch (e: any) {
-          if (e.message === 'credits_exhausted') { creditsExhausted(); return }
-          const idx = updates.findIndex(x => x.id === c.id)
-          if (idx !== -1) updates[idx] = { ...updates[idx], ai_status: 'Failed', confidence: 0 }
-        }
-      }
-      setIdentProgress('')
-      setReviewCards(prev => [...updates, ...prev])
+      setReviewCards(prev => [...added, ...prev.filter(c => c.id !== id)])
       setReviewSelected(prev => {
         const next = new Set(prev)
-        updates.forEach(u => next.add(u.id))
+        next.delete(id)
+        added.forEach(u => next.add(u.id))
         return next
       })
-      setActiveTab('ready')
-      setStep(3)
     } catch (e: any) {
+      showToast('Crop failed: ' + e.message, 'error')
+    } finally {
       setIsSendingToScanner(false)
       setScanJobId(null)
-      setStep(3) // Advance anyway to let them see existing reviewCards
-      showToast('Processing failed: ' + e.message, 'error')
+      setStep(3)
     }
+  }
+
+  const handleIdentify = async (id: string) => {
+    const c = reviewCards.find(x => x.id === id)
+    if (!c || !c.image_url) return
+    setReviewCards(prev => prev.map(x => x.id === id ? { ...x, ai_status: 'Identifying...' } : x))
+    try {
+      const res = await identifyCardDirectAction(c.id, c.image_url, c.back_image_url)
+      const confidence = res.confidence ?? 0
+      const aiStatus = confidence >= 0.85 ? 'High Confidence' : 'Manual Correction'
+      
+      const aiTeam = (res.team_name ?? '').trim()
+      const mergedTeam = aiTeam || c.team_name
+      const mergedPrint = res.print_run != null && Number.isFinite(Number(res.print_run)) ? String(res.print_run) : c.print_run
+      const mergedCardNum = normalizeCardNumberForPlayerIndex((res.card_number && String(res.card_number).trim()) ? res.card_number : c.card_number) || c.card_number
+
+      const updates = {
+        player_name:   res.player_name   || c.player_name,
+        team_name:     mergedTeam,
+        card_set:      res.card_set       || c.card_set,
+        card_number:   mergedCardNum,
+        insert_name:   res.insert_name    || c.insert_name,
+        parallel_name: res.parallel_name  || c.parallel_name,
+        print_run:     mergedPrint,
+        confidence,
+        ai_status: aiStatus,
+        team_name_source: res.team_name_source,
+        team_name_confidence: res.team_name_confidence,
+        team_name_verified: res.team_name_verified,
+      }
+
+      setReviewCards(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x))
+      
+      await updateDraftCardAction(id, {
+        ...updates,
+        print_run: (() => { const n = parseInt(String(mergedPrint ?? '').replace(/\D/g, ''), 10); return Number.isFinite(n) ? n : null })()
+      })
+    } catch (e: any) {
+      if (e.message === 'credits_exhausted') { creditsExhausted(); return }
+      setReviewCards(prev => prev.map(x => x.id === id ? { ...x, ai_status: 'Failed', confidence: 0 } : x))
+      showToast('Identify failed: ' + e.message, 'error')
+    }
+  }
+
+  const [isIdentifyingAll, setIsIdentifyingAll] = useState(false)
+
+  const handleIdentifyAll = async () => {
+    const visibleCards = reviewCards.filter(c => activeTab === 'ready' ? (!isPendingScan(c) && (c.confidence ?? 0) > 0.85) : (!isPendingScan(c) && (c.confidence ?? 1) <= 0.85)).filter(c => !c.player_name)
+    if (!visibleCards.length) {
+      showToast('No un-identified cards on this tab.', 'info')
+      return
+    }
+    setIsIdentifyingAll(true)
+    for (const card of visibleCards) {
+      await handleIdentify(card.id)
+    }
+    setIsIdentifyingAll(false)
+  }
+
+  const [isCroppingAll, setIsCroppingAll] = useState(false)
+
+  const handleCropAll = async () => {
+    const visibleCards = reviewCards.filter(c => activeTab === 'staging' && isPendingScan(c))
+    if (!visibleCards.length) {
+      showToast('No raw scan pairs on this tab.', 'info')
+      return
+    }
+    setIsCroppingAll(true)
+    for (const card of visibleCards) {
+      await handleCrop(card.id)
+    }
+    setIsCroppingAll(false)
   }
 
   const handleUpload = async () => {
@@ -276,7 +299,8 @@ export function BulkIngestionWizard() {
         const card = rowToStagingCard(row as Record<string, unknown>)
         setBatchFront(null)
         setBatchBack(null)
-        runPipeline(card)
+        setReviewCards(prev => [card, ...prev])
+        setStep(3)
       } else {
         if (!singleFront || !singleBack) return
         const fd = new FormData()
@@ -287,7 +311,8 @@ export function BulkIngestionWizard() {
         const card = rowToStagingCard(row as Record<string, unknown>)
         setSingleFront(null)
         setSingleBack(null)
-        runPipeline(card)
+        setReviewCards(prev => [card, ...prev])
+        setStep(3)
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
@@ -614,15 +639,17 @@ export function BulkIngestionWizard() {
 
         <div className="space-y-5 animate-in fade-in">
           {/* Tabs */}
-          <div className="flex gap-1 bg-surface border border-border rounded-lg p-1 w-full max-w-xs">
-            {(['ready', 'correction'] as const).map(tab => {
-              const count = tab === 'ready'
-                ? reviewCards.filter(c => (c.confidence ?? 0) > 0.85).length
-                : reviewCards.filter(c => (c.confidence ?? 1) <= 0.85).length
+          <div className="flex gap-1 bg-surface border border-border rounded-lg p-1 w-full max-w-md">
+            {(['staging', 'ready', 'correction'] as const).map(tab => {
+              const count = tab === 'staging'
+                ? reviewCards.filter(c => isPendingScan(c)).length
+                : tab === 'ready'
+                ? reviewCards.filter(c => !isPendingScan(c) && (c.confidence ?? 0) > 0.85).length
+                : reviewCards.filter(c => !isPendingScan(c) && (c.confidence ?? 1) <= 0.85).length
               return (
                 <button key={tab} onClick={() => setActiveTab(tab)}
                   className={`flex-1 py-2 text-xs font-black rounded-md transition ${activeTab === tab ? 'bg-brand text-brand-foreground shadow' : 'text-muted hover:text-foreground'}`}>
-                  {tab === 'ready' ? `Ready (${count})` : `Correction (${count})`}
+                  {tab === 'staging' ? `Staging (${count})` : tab === 'ready' ? `Ready (${count})` : `Correction (${count})`}
                 </button>
               )
             })}
@@ -639,7 +666,7 @@ export function BulkIngestionWizard() {
 
           <div className="space-y-3 max-h-[72vh] overflow-y-auto pr-1">
             {reviewCards
-              .filter(c => activeTab === 'ready' ? (c.confidence ?? 0) > 0.85 : (c.confidence ?? 1) <= 0.85)
+              .filter(c => activeTab === 'staging' ? isPendingScan(c) : activeTab === 'ready' ? (!isPendingScan(c) && (c.confidence ?? 0) > 0.85) : (!isPendingScan(c) && (c.confidence ?? 1) <= 0.85))
               .map(card => (
                 <div key={card.id}
                   className={`border rounded-xl p-3 bg-surface transition ${reviewSelected.has(card.id) ? 'border-brand/50' : 'border-border opacity-60'}`}>
@@ -650,6 +677,9 @@ export function BulkIngestionWizard() {
                         <span className="text-[9px] font-bold text-muted uppercase tracking-wide">Front</span>
                         {card.image_url ? (
                           <img src={card.image_url} alt="front" onClick={() => setZoomedImg(card.image_url!)}
+                            className="w-28 h-40 object-contain rounded-lg border border-border bg-surface cursor-zoom-in hover:border-brand/50 transition" />
+                        ) : card.raw_front_url ? (
+                          <img src={card.raw_front_url} alt="front raw" onClick={() => setZoomedImg(card.raw_front_url!)}
                             className="w-28 h-40 object-contain rounded-lg border border-border bg-surface cursor-zoom-in hover:border-brand/50 transition" />
                         ) : (
                           <div className="w-28 h-40 rounded-lg border border-border bg-surface-hover flex items-center justify-center text-muted text-[10px] text-center p-1">
@@ -662,6 +692,9 @@ export function BulkIngestionWizard() {
                         {card.back_image_url ? (
                           <img src={card.back_image_url} alt="back" onClick={() => setZoomedImg(card.back_image_url!)}
                             className="w-28 h-40 object-contain rounded-lg border border-border bg-surface cursor-zoom-in hover:border-brand/50 transition" />
+                        ) : card.raw_back_url ? (
+                          <img src={card.raw_back_url} alt="back raw" onClick={() => setZoomedImg(card.raw_back_url!)}
+                            className="w-28 h-40 object-contain rounded-lg border border-border bg-surface cursor-zoom-in hover:border-brand/50 transition" />
                         ) : (
                           <div className="w-28 h-40 rounded-lg border border-border bg-surface-hover flex items-center justify-center text-muted text-[10px] text-center p-1">
                             No image
@@ -673,27 +706,55 @@ export function BulkIngestionWizard() {
                     {/* Fields */}
                     <div className="flex-1 space-y-1.5">
                       {/* Confidence badge */}
-                      {card.confidence !== undefined && (
+                      {!isPendingScan(card) && (
                         <div className="flex items-center gap-2">
-                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
-                            card.confidence > 0.85
-                              ? 'bg-emerald-500/20 text-emerald-500'
-                              : 'bg-orange-500/20 text-orange-500'
-                          }`}>
-                            {(card.confidence * 100).toFixed(0)}% confidence
-                          </span>
+                          {card.confidence !== undefined && (
+                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                              card.confidence > 0.85
+                                ? 'bg-emerald-500/20 text-emerald-500'
+                                : 'bg-orange-500/20 text-orange-500'
+                            }`}>
+                              {(card.confidence * 100).toFixed(0)}% confidence
+                            </span>
+                          )}
                           {card.ai_status && (
                             <span className="text-[10px] text-muted font-medium">{card.ai_status}</span>
                           )}
+                          {!card.player_name && (
+                            <button
+                              onClick={() => handleIdentify(card.id)}
+                              disabled={card.ai_status === 'Identifying...'}
+                              className="ml-auto flex items-center gap-1 text-xs font-bold text-brand hover:text-brand-hover disabled:opacity-40 transition"
+                            >
+                              {card.ai_status === 'Identifying...' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
+                              Identify AI
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      
+                      {isPendingScan(card) && (
+                        <div className="flex items-center justify-between w-full">
+                          <span className="text-xs font-bold text-muted uppercase tracking-wide">Raw Scan Pair</span>
+                          <button
+                            onClick={() => handleCrop(card.id)}
+                            disabled={scanJobId === card.id}
+                            className="flex items-center gap-1 text-xs font-bold bg-brand text-brand-foreground px-3 py-1.5 rounded-lg hover:bg-brand-hover disabled:opacity-40 transition"
+                          >
+                            {scanJobId === card.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Scissors className="w-3.5 h-3.5" />}
+                            Crop & Rotate
+                          </button>
                         </div>
                       )}
 
-                      {/* Taxonomy search for correction tab */}
-                      {activeTab === 'correction' && (
-                        <TaxonomySearch onSelect={data => applyReviewTaxonomy(card.id, data)} />
-                      )}
+                      {!isPendingScan(card) && (
+                        <>
+                          {/* Taxonomy search for correction tab */}
+                          {activeTab === 'correction' && (
+                            <TaxonomySearch onSelect={data => applyReviewTaxonomy(card.id, data)} />
+                          )}
 
-                      <div className="grid grid-cols-2 gap-1.5">
+                          <div className="grid grid-cols-2 gap-1.5">
                         {[
                           { field: 'player_name', placeholder: 'Player Name' },
                           { field: 'team_name', placeholder: 'Team' },
@@ -817,6 +878,8 @@ export function BulkIngestionWizard() {
                           Send to Pricing
                         </button>
                       </div>
+                      </>
+                    )}
                     </div>
 
                     {/* Checkbox */}
@@ -839,6 +902,26 @@ export function BulkIngestionWizard() {
               {isDiscarding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
               Discard Selected
             </button>
+            {activeTab !== 'staging' && (
+              <button
+                onClick={handleIdentifyAll}
+                disabled={isIdentifyingAll || isPublishing}
+                className="flex-1 bg-brand text-brand-foreground font-black py-3 rounded-xl disabled:opacity-40 hover:bg-brand-hover transition flex items-center justify-center gap-2"
+              >
+                {isIdentifyingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                Identify All on Tab
+              </button>
+            )}
+            {activeTab === 'staging' && (
+              <button
+                onClick={handleCropAll}
+                disabled={isCroppingAll || isPublishing}
+                className="flex-1 bg-brand text-brand-foreground font-black py-3 rounded-xl disabled:opacity-40 hover:bg-brand-hover transition flex items-center justify-center gap-2"
+              >
+                {isCroppingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scissors className="w-4 h-4" />}
+                Crop All on Tab
+              </button>
+            )}
             <button
               onClick={handlePriceAll}
               disabled={isPricingAll || isPublishing}
