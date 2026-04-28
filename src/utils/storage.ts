@@ -39,34 +39,8 @@ function getConfig() {
 
 let _s3: S3Client | null = null;
 let _configHash = '';
-let _policySet = false;
 
-async function ensureBucketPublic(client: S3Client, bucket: string) {
-  if (_policySet) return;
-  try {
-    const { PutBucketPolicyCommand } = await import('@aws-sdk/client-s3');
-    const policy = {
-      Version: "2012-10-17",
-      Statement: [{
-        Sid: "PublicReadGetObject",
-        Effect: "Allow",
-        Principal: "*",
-        Action: ["s3:GetObject"],
-        Resource: `arn:aws:s3:::${bucket}/*`
-      }]
-    };
-    await client.send(new PutBucketPolicyCommand({
-      Bucket: bucket,
-      Policy: JSON.stringify(policy)
-    }));
-    _policySet = true;
-    console.log('[storage] Verified public bucket policy');
-  } catch (e) {
-    console.warn('[storage] Could not set public bucket policy (might already be public or lack permissions):', e);
-  }
-}
-
-function getS3Client(): S3Client {
+export function getS3Client(): S3Client {
   const cfg = getConfig();
   const hash = `${cfg.endpoint}|${cfg.bucket}|${cfg.accessKey}`;
 
@@ -82,20 +56,17 @@ function getS3Client(): S3Client {
       forcePathStyle: false,
     });
     _configHash = hash;
-    _policySet = false;
   }
-  
-  // Fire and forget policy check
-  ensureBucketPublic(_s3, cfg.bucket);
-  
   return _s3;
 }
 
-/** Public URL for a stored object — virtual-hosted style. */
+export function getBucketName(): string {
+  return getConfig().bucket;
+}
+
+/** Public URL for a stored object — routes to Next.js API for presigning to bypass Tigris private restrictions. */
 function publicUrl(key: string): string {
-  const cfg = getConfig();
-  const host = cfg.endpoint.replace(/^https?:\/\//, '');
-  return `https://${cfg.bucket}.${host}/${key}`;
+  return `/api/storage?key=${encodeURIComponent(key)}`;
 }
 
 export interface StoragePutOptions {
@@ -158,9 +129,22 @@ export async function del(urlOrUrls: string | string[]): Promise<void> {
   const client = getS3Client();
   for (const url of urls) {
     try {
-      const u = new URL(url);
-      const key = u.pathname.startsWith('/') ? u.pathname.slice(1) : u.pathname;
-      if (key) await client.send(new DeleteObjectCommand({ Bucket: cfg.bucket, Key: key }));
+      let key = '';
+      if (url.startsWith('/api/storage')) {
+        // Extract key from local proxy URL: /api/storage?key=...
+        const match = url.match(/[?&]key=([^&]+)/);
+        if (match) {
+          key = decodeURIComponent(match[1]);
+        }
+      } else {
+        // Extract key from absolute public URL (legacy)
+        const u = new URL(url);
+        key = u.pathname.startsWith('/') ? u.pathname.slice(1) : u.pathname;
+      }
+
+      if (key) {
+        await client.send(new DeleteObjectCommand({ Bucket: cfg.bucket, Key: key }));
+      }
     } catch (e) {
       console.warn('[storage] Failed to delete object:', url, e);
     }
