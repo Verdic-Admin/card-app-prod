@@ -126,7 +126,7 @@ export function BulkIngestionWizard() {
   // Step 5 -> 3 review
   const [reviewCards, setReviewCards] = useState<StagingCard[]>([])
   const [reviewSelected, setReviewSelected] = useState<Set<string>>(new Set())
-  const [activeTab, setActiveTab] = useState<'staging' | 'ready' | 'correction'>('staging')
+  const [activeTab, setActiveTab] = useState<'staging' | 'cropped' | 'identified' | 'priced'>('staging')
   const [isPublishing, setIsPublishing] = useState(false)
   const [isDiscarding, setIsDiscarding] = useState(false)
 
@@ -259,7 +259,7 @@ export function BulkIngestionWizard() {
   const [isIdentifyingAll, setIsIdentifyingAll] = useState(false)
 
   const handleIdentifyAll = async () => {
-    const visibleCards = reviewCards.filter(c => activeTab === 'ready' ? (!isPendingScan(c) && (c.confidence ?? 0) > 0.85) : (!isPendingScan(c) && (c.confidence ?? 0) <= 0.85)).filter(c => !c.player_name)
+    const visibleCards = reviewCards.filter(c => !isPendingScan(c) && !c.player_name && !(parseFloat(String(c.listed_price)) > 0))
     if (!visibleCards.length) {
       showToast('No un-identified cards on this tab.', 'info')
       return
@@ -274,7 +274,7 @@ export function BulkIngestionWizard() {
   const [isCroppingAll, setIsCroppingAll] = useState(false)
 
   const handleCropAll = async () => {
-    const visibleCards = reviewCards.filter(c => activeTab === 'staging' && isPendingScan(c))
+    const visibleCards = reviewCards.filter(c => isPendingScan(c))
     if (!visibleCards.length) {
       showToast('No raw scan pairs on this tab.', 'info')
       return
@@ -416,8 +416,8 @@ export function BulkIngestionWizard() {
 
   const handlePriceAll = async () => {
     const visibleCards = reviewCards.filter(c =>
-      activeTab === 'ready' ? (c.confidence ?? 0) > 0.85 : (c.confidence ?? 0) <= 0.85
-    ).filter(c => c.player_name)
+      !!c.player_name && !(parseFloat(String(c.listed_price)) > 0)
+    )
     if (!visibleCards.length) {
       showToast('No cards with a Player Name on this tab to price.', 'info')
       return
@@ -507,6 +507,23 @@ export function BulkIngestionWizard() {
     { num: 3, label: 'Publish' },
   ]
 
+  // ── Phase classification helpers ──────────────────────────────────────────
+  /** Raw upload, not yet cropped */
+  const isPhaseStaging = (c: StagingCard) => isPendingScan(c)
+  /** Cropped, not yet AI identified */
+  const isPhaseCropped = (c: StagingCard) => !isPendingScan(c) && !c.player_name && !(parseFloat(String(c.listed_price)) > 0)
+  /** AI identified (has player_name), awaiting pricing */
+  const isPhaseIdentified = (c: StagingCard) => !isPendingScan(c) && !!c.player_name && !(parseFloat(String(c.listed_price)) > 0)
+  /** Priced and ready to publish */
+  const isPhasePriced = (c: StagingCard) => !isPendingScan(c) && !!c.player_name && parseFloat(String(c.listed_price)) > 0
+
+  const phaseFilter = (c: StagingCard) => {
+    if (activeTab === 'staging') return isPhaseStaging(c)
+    if (activeTab === 'cropped') return isPhaseCropped(c)
+    if (activeTab === 'identified') return isPhaseIdentified(c)
+    return isPhasePriced(c)
+  }
+
   return (
     <div className="bg-surface rounded-xl shadow-sm border border-border p-6 relative overflow-hidden">
 
@@ -522,12 +539,14 @@ export function BulkIngestionWizard() {
               title="AI Ingestion Instructions"
               steps={[
                 { title: "Step 1: Upload", content: "Upload a paired front and back (single card or full matrix sheet)." },
-                { title: "Step 2: Process", content: "The AI automatically crops the sheet and identifies each card's metadata." },
-                { title: "Step 3: Publish", content: "Review, edit pricing, and publish directly to your inventory." },
+                { title: "Step 2: Crop & Rotate", content: "Click 'Crop & Rotate' to send raw scans to the vision worker. Cropped cards appear in the Cropped tab." },
+                { title: "Step 3: AI Identify", content: "Click 'Identify AI' to auto-detect player, set, team, and card number." },
+                { title: "Step 4: Edit & Price", content: "Review and correct AI results, then send to pricing engine." },
+                { title: "Step 5: Publish", content: "Publish priced cards to your live inventory." },
               ]}
             />
           </h2>
-          <p className="text-sm font-medium text-muted">Upload → Staging → Crop → AI → Inventory</p>
+          <p className="text-sm font-medium text-muted">Upload → Crop → Identify → Edit & Price → Publish</p>
         </div>
       </div>
 
@@ -638,26 +657,27 @@ export function BulkIngestionWizard() {
       {step === 3 && (
 
         <div className="space-y-5 animate-in fade-in">
-          {/* Tabs */}
-          <div className="flex gap-1 bg-surface border border-border rounded-lg p-1 w-full max-w-md">
-            {(['staging', 'ready', 'correction'] as const).map(tab => {
-              const count = tab === 'staging'
-                ? reviewCards.filter(c => isPendingScan(c)).length
-                : tab === 'ready'
-                ? reviewCards.filter(c => !isPendingScan(c) && (c.confidence ?? 0) > 0.85).length
-                : reviewCards.filter(c => !isPendingScan(c) && (c.confidence ?? 0) <= 0.85).length
+          {/* Pipeline Tabs */}
+          <div className="flex gap-1 bg-surface border border-border rounded-lg p-1 w-full max-w-2xl">
+            {([
+              { key: 'staging' as const, label: 'Staging', filter: isPhaseStaging },
+              { key: 'cropped' as const, label: 'Cropped', filter: isPhaseCropped },
+              { key: 'identified' as const, label: 'Identified', filter: isPhaseIdentified },
+              { key: 'priced' as const, label: 'Priced', filter: isPhasePriced },
+            ]).map(tab => {
+              const count = reviewCards.filter(tab.filter).length
               return (
-                <button key={tab} onClick={() => setActiveTab(tab)}
-                  className={`flex-1 py-2 text-xs font-black rounded-md transition ${activeTab === tab ? 'bg-brand text-brand-foreground shadow' : 'text-muted hover:text-foreground'}`}>
-                  {tab === 'staging' ? `Staging (${count})` : tab === 'ready' ? `Ready (${count})` : `Correction (${count})`}
+                <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+                  className={`flex-1 py-2 text-xs font-black rounded-md transition ${activeTab === tab.key ? 'bg-brand text-brand-foreground shadow' : 'text-muted hover:text-foreground'}`}>
+                  {tab.label} ({count})
                 </button>
               )
             })}
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
-            <button onClick={() => setReviewSelected(new Set(reviewCards.map(c => c.id)))}
-              className="text-xs font-bold text-brand hover:underline">Select All</button>
+            <button onClick={() => setReviewSelected(new Set(reviewCards.filter(phaseFilter).map(c => c.id)))}
+              className="text-xs font-bold text-brand hover:underline">Select All on Tab</button>
             <span className="text-muted text-xs">·</span>
             <button onClick={() => setReviewSelected(new Set())}
               className="text-xs font-bold text-muted hover:underline">Deselect All</button>
@@ -666,7 +686,7 @@ export function BulkIngestionWizard() {
 
           <div className="space-y-3 max-h-[72vh] overflow-y-auto pr-1">
             {reviewCards
-              .filter(c => activeTab === 'staging' ? isPendingScan(c) : activeTab === 'ready' ? (!isPendingScan(c) && (c.confidence ?? 0) > 0.85) : (!isPendingScan(c) && (c.confidence ?? 0) <= 0.85))
+              .filter(phaseFilter)
               .map(card => (
                 <div key={card.id}
                   className={`border rounded-xl p-3 bg-surface transition ${reviewSelected.has(card.id) ? 'border-brand/50' : 'border-border opacity-60'}`}>
@@ -749,8 +769,8 @@ export function BulkIngestionWizard() {
 
                       {!isPendingScan(card) && (
                         <>
-                          {/* Taxonomy search for correction tab */}
-                          {activeTab === 'correction' && (
+                          {/* Taxonomy search for identified tab (manual correction) */}
+                          {activeTab === 'identified' && (
                             <TaxonomySearch onSelect={data => applyReviewTaxonomy(card.id, data)} />
                           )}
 
@@ -893,6 +913,7 @@ export function BulkIngestionWizard() {
               ))}
           </div>
 
+          {/* Phase-specific action bar */}
           <div className="flex flex-col sm:flex-row gap-3 pt-2">
             <button
               onClick={handleReviewDiscard}
@@ -902,42 +923,54 @@ export function BulkIngestionWizard() {
               {isDiscarding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
               Discard Selected
             </button>
-            {activeTab !== 'staging' && (
+
+            {/* Staging: Crop All */}
+            {activeTab === 'staging' && (
+              <button
+                onClick={handleCropAll}
+                disabled={isCroppingAll || isPublishing}
+                className="flex-1 bg-orange-600 text-white font-black py-3 rounded-xl disabled:opacity-40 hover:bg-orange-500 transition flex items-center justify-center gap-2"
+              >
+                {isCroppingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scissors className="w-4 h-4" />}
+                Crop & Rotate All
+              </button>
+            )}
+
+            {/* Cropped: Identify All */}
+            {activeTab === 'cropped' && (
               <button
                 onClick={handleIdentifyAll}
                 disabled={isIdentifyingAll || isPublishing}
                 className="flex-1 bg-brand text-brand-foreground font-black py-3 rounded-xl disabled:opacity-40 hover:bg-brand-hover transition flex items-center justify-center gap-2"
               >
                 {isIdentifyingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
-                Identify All on Tab
+                Identify All with AI
               </button>
             )}
-            {activeTab === 'staging' && (
+
+            {/* Identified: Price All */}
+            {activeTab === 'identified' && (
               <button
-                onClick={handleCropAll}
-                disabled={isCroppingAll || isPublishing}
-                className="flex-1 bg-brand text-brand-foreground font-black py-3 rounded-xl disabled:opacity-40 hover:bg-brand-hover transition flex items-center justify-center gap-2"
+                onClick={handlePriceAll}
+                disabled={isPricingAll || isPublishing}
+                className="flex-1 bg-emerald-700 text-white font-black py-3 rounded-xl disabled:opacity-40 hover:bg-emerald-600 transition flex items-center justify-center gap-2"
               >
-                {isCroppingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scissors className="w-4 h-4" />}
-                Crop All on Tab
+                {isPricingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <DollarSign className="w-4 h-4" />}
+                Price All on Tab
               </button>
             )}
-            <button
-              onClick={handlePriceAll}
-              disabled={isPricingAll || isPublishing}
-              className="flex-1 bg-emerald-700 text-white font-black py-3 rounded-xl disabled:opacity-40 hover:bg-emerald-600 transition flex items-center justify-center gap-2"
-            >
-              {isPricingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <DollarSign className="w-4 h-4" />}
-              Price All on Tab
-            </button>
-            <button
-              onClick={handlePublish}
-              disabled={reviewSelected.size === 0 || isPublishing}
-              className="flex-[2] bg-slate-900 text-white font-black text-lg py-4 rounded-xl disabled:opacity-40 hover:bg-brand transition flex items-center justify-center gap-3 drop-shadow-md"
-            >
-              {isPublishing ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
-              Publish {reviewSelected.size > 0 ? `${reviewSelected.size} Cards` : 'Selected'} to Inventory
-            </button>
+
+            {/* Priced: Publish */}
+            {activeTab === 'priced' && (
+              <button
+                onClick={handlePublish}
+                disabled={reviewSelected.size === 0 || isPublishing}
+                className="flex-[2] bg-slate-900 text-white font-black text-lg py-4 rounded-xl disabled:opacity-40 hover:bg-brand transition flex items-center justify-center gap-3 drop-shadow-md"
+              >
+                {isPublishing ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+                Publish {reviewSelected.size > 0 ? `${reviewSelected.size} Cards` : 'Selected'} to Inventory
+              </button>
+            )}
           </div>
         </div>
       )}
