@@ -27,12 +27,13 @@ echo "[entrypoint] DEBUG: STORE_URL resolved to=${STORE_URL}"
 
 if [ -n "$STORE_URL" ] && [ -n "$PLAYERINDEX_API_KEY" ] && [ -n "$API_BASE_URL" ]; then
   echo "[entrypoint] Registering store with Oracle at $API_BASE_URL..."
-  curl -v -X POST "$API_BASE_URL/api/fleet/register" \
+  REGISTER_RESPONSE=$(curl -s --show-error --fail-with-body \
     -H "Content-Type: application/json" \
     -H "X-API-Key: $PLAYERINDEX_API_KEY" \
     -d "{\"store_url\": \"$STORE_URL\"}" \
-    && echo "[entrypoint] Store registered successfully." \
-    || echo "[entrypoint] Store registration failed (non-fatal) — continuing startup."
+    "$API_BASE_URL/api/fleet/register" 2>&1) \
+    && echo "[entrypoint] Store registered successfully: $REGISTER_RESPONSE" \
+    || echo "[entrypoint] Store registration failed (non-fatal): $REGISTER_RESPONSE — continuing startup."
 else
   echo "[entrypoint] Skipping self-registration (STORE_URL, PLAYERINDEX_API_KEY, or API_BASE_URL not set)."
 fi
