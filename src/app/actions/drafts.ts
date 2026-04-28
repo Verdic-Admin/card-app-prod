@@ -423,7 +423,7 @@ export async function finalizeStagingScanAction(
 /** Copy raw URLs into cropped columns without calling the scanner (free). */
 export async function promoteRawStagingToCroppedAction(ids: string[]) {
   await checkAuth();
-  if (!ids.length) return { replaced: 0 };
+  if (!ids.length) return [];
   const res = await pool.query(
     `UPDATE scan_staging
      SET image_url = raw_front_url,
@@ -433,10 +433,11 @@ export async function promoteRawStagingToCroppedAction(ids: string[]) {
      WHERE id = ANY($1::uuid[])
        AND raw_front_url IS NOT NULL
        AND raw_back_url IS NOT NULL
-       AND image_url IS NULL`,
+       AND image_url IS NULL
+     RETURNING *`,
     [ids]
   );
-  return { replaced: res.rowCount ?? 0 };
+  return res.rows;
 }
 
 export async function updateDraftCardAction(id: string, updates: any) {
