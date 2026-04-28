@@ -129,9 +129,11 @@ export function BulkIngestionWizard() {
   const [activeTab, setActiveTab] = useState<'staging' | 'cropped' | 'identified' | 'priced'>('staging')
   const [isPublishing, setIsPublishing] = useState(false)
   const [isDiscarding, setIsDiscarding] = useState(false)
+  /** Cards explicitly moved to the Priced phase (prevents auto-move while typing price) */
+  const [pricedIds, setPricedIds] = useState<Set<string>>(new Set())
 
   // Wizard: 1 Upload → 2 Process → 3 Publish
-  const [step, setStep] = useState<1 | 2 | 3>(1)
+  const [step, setStep] = useState<1 | 2 | 3>(3)
   const [isSendingToScanner, setIsSendingToScanner] = useState(false)
   /** HSV mat keying for OpenCV — use Green/Blue when your scan pad matches; improves crop detection vs gray Canny. */
   const [scannerMat, setScannerMat] = useState<'none' | 'green' | 'blue'>('green')
@@ -153,7 +155,9 @@ export function BulkIngestionWizard() {
         const loaded = (rows as Record<string, unknown>[]).map(rowToStagingCard)
         setReviewCards(loaded)
         setReviewSelected(new Set(loaded.map(x => x.id)))
-        setStep(3)
+        // Auto-mark cards that already have a price as priced
+        const alreadyPriced = new Set(loaded.filter(c => parseFloat(String(c.listed_price)) > 0 && !!c.player_name).map(c => c.id))
+        if (alreadyPriced.size) setPricedIds(alreadyPriced)
       })
       .catch(() => {})
   }, [])
@@ -300,7 +304,8 @@ export function BulkIngestionWizard() {
         setBatchFront(null)
         setBatchBack(null)
         setReviewCards(prev => [card, ...prev])
-        setStep(3)
+        setReviewSelected(prev => { const n = new Set(prev); n.add(card.id); return n })
+        showToast('Pair staged successfully.', 'success')
       } else {
         if (!singleFront || !singleBack) return
         const fd = new FormData()
@@ -312,7 +317,8 @@ export function BulkIngestionWizard() {
         setSingleFront(null)
         setSingleBack(null)
         setReviewCards(prev => [card, ...prev])
-        setStep(3)
+        setReviewSelected(prev => { const n = new Set(prev); n.add(card.id); return n })
+        showToast('Pair staged successfully.', 'success')
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
@@ -501,21 +507,36 @@ export function BulkIngestionWizard() {
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
-  const stepLabels = [
-    { num: 1, label: 'Upload' },
-    { num: 2, label: 'Process' },
-    { num: 3, label: 'Publish' },
-  ]
 
   // ── Phase classification helpers ──────────────────────────────────────────
   /** Raw upload, not yet cropped */
   const isPhaseStaging = (c: StagingCard) => isPendingScan(c)
   /** Cropped, not yet AI identified */
-  const isPhaseCropped = (c: StagingCard) => !isPendingScan(c) && !c.player_name && !(parseFloat(String(c.listed_price)) > 0)
-  /** AI identified (has player_name), awaiting pricing */
-  const isPhaseIdentified = (c: StagingCard) => !isPendingScan(c) && !!c.player_name && !(parseFloat(String(c.listed_price)) > 0)
-  /** Priced and ready to publish */
-  const isPhasePriced = (c: StagingCard) => !isPendingScan(c) && !!c.player_name && parseFloat(String(c.listed_price)) > 0
+  const isPhaseCropped = (c: StagingCard) => !isPendingScan(c) && !c.player_name && !pricedIds.has(c.id)
+  /** AI identified (has player_name), NOT yet explicitly moved to priced */
+  const isPhaseIdentified = (c: StagingCard) => !isPendingScan(c) && !!c.player_name && !pricedIds.has(c.id)
+  /** Explicitly moved to priced — only via button, never auto */
+  const isPhasePriced = (c: StagingCard) => pricedIds.has(c.id)
+
+  /** Move selected cards to the Priced tab */
+  const handleMoveToPriced = () => {
+    const ids = reviewCards.filter(isPhaseIdentified).filter(c => reviewSelected.has(c.id)).map(c => c.id)
+    if (!ids.length) { showToast('Select identified cards to move to Priced.', 'info'); return }
+    setPricedIds(prev => { const n = new Set(prev); ids.forEach(id => n.add(id)); return n })
+    showToast(`${ids.length} card(s) moved to Priced.`, 'success')
+  }
+
+  /** Move a single card to Cropped (skip crop for already-cropped singles) */
+  const handleSkipToCropped = async (id: string) => {
+    try {
+      const rows = await promoteRawStagingToCroppedAction(id)
+      const updated = (rows as Record<string, unknown>[]).map(rowToStagingCard)
+      setReviewCards(prev => prev.map(c => c.id === id ? (updated[0] ?? c) : c))
+      showToast('Moved to Cropped.', 'success')
+    } catch (e: any) {
+      showToast('Skip failed: ' + e.message, 'error')
+    }
+  }
 
   const phaseFilter = (c: StagingCard) => {
     if (activeTab === 'staging') return isPhaseStaging(c)
@@ -550,99 +571,7 @@ export function BulkIngestionWizard() {
         </div>
       </div>
 
-      {/* Step progress bar */}
-      <div className="flex justify-between items-center mb-8 px-2 sm:px-6 relative">
-        <div className="absolute top-1/2 left-6 right-6 h-0.5 bg-border -z-10 translate-y-[-50%]" />
-        {stepLabels.map(s => (
-          <div key={s.num} className="flex flex-col items-center bg-surface px-1">
-            <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs border-2 transition-colors
-              ${step > s.num ? 'bg-emerald-500 text-white border-emerald-500' :
-                step === s.num ? 'bg-brand text-brand-foreground border-brand shadow-md' :
-                'bg-surface text-muted border-border'}`}>
-              {step > s.num ? <CheckCircle2 className="w-4 h-4" /> : s.num}
-            </div>
-            <span className={`text-[9px] mt-1.5 uppercase tracking-wide font-black hidden sm:block
-              ${step >= s.num ? 'text-foreground' : 'text-muted'}`}>{s.label}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Step 1: Upload ─────────────────────────────────────────────────── */}
-      {step === 1 && (
-        <div className="space-y-6 animate-in fade-in">
-          <div className="flex bg-surface border border-border rounded-lg p-1 w-full max-w-xs mx-auto">
-            <button onClick={() => setUploadMode('batch')}
-              className={`flex-1 py-2 text-sm font-bold rounded-md transition ${uploadMode === 'batch' ? 'bg-brand text-brand-foreground shadow' : 'text-muted hover:text-foreground'}`}>
-              Batch Matrix
-            </button>
-            <button onClick={() => setUploadMode('single')}
-              className={`flex-1 py-2 text-sm font-bold rounded-md transition ${uploadMode === 'single' ? 'bg-brand text-brand-foreground shadow' : 'text-muted hover:text-foreground'}`}>
-              Single Pair
-            </button>
-          </div>
-
-          {uploadMode === 'batch' ? (
-            <>
-              <p className="text-center text-xs text-muted font-medium -mt-2 mb-1">
-                Free to stage one sheet pair — select it in staging and send to scanner when ready (1 credit per send).
-              </p>
-              <div className="grid grid-cols-2 gap-4">
-                <DropZone label="Front Matrix (up to 9 cards)" file={batchFront} id="batch-front" onFile={setBatchFront} />
-                <DropZone label="Back Matrix (same layout)" file={batchBack} id="batch-back" onFile={setBatchBack} />
-              </div>
-            </>
-          ) : (
-            <>
-              <p className="text-center text-xs text-muted font-medium -mt-2 mb-1">
-                One physical card: front + back photos (required). Same flow as the full matrix — one pair per job.
-              </p>
-              <div className="grid grid-cols-2 gap-4">
-                <DropZone label="Front Side (required)" file={singleFront} id="single-front" onFile={setSingleFront} />
-                <DropZone label="Back Side (required)" file={singleBack} id="single-back" onFile={setSingleBack} />
-              </div>
-            </>
-          )}
-
-          {/* Scanner mat — drives chroma-key in vision worker */}
-          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface/80 px-4 py-3 text-sm mt-4">
-            <span className="font-bold text-foreground shrink-0">Scanner mat</span>
-            <span className="text-xs text-muted max-w-md">
-              Green or blue pad: pick the match so each card separates from the background. Use “None” only for neutral mats.
-            </span>
-            <div className="flex flex-wrap gap-3 ml-auto">
-              {([
-                { id: 'none' as const, label: 'None' },
-                { id: 'green' as const, label: 'Green' },
-                { id: 'blue' as const, label: 'Blue' },
-              ]).map(({ id, label }) => (
-                <label key={id} className="flex items-center gap-1.5 cursor-pointer font-semibold text-foreground text-xs">
-                  <input
-                    type="radio"
-                    name="scannerMat"
-                    checked={scannerMat === id}
-                    onChange={() => setScannerMat(id)}
-                    className="accent-brand"
-                  />
-                  {label}
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <button
-            onClick={handleUpload}
-            disabled={isUploading || (uploadMode === 'batch' ? (!batchFront || !batchBack) : (!singleFront || !singleBack))}
-            className="w-full bg-brand text-background font-black text-lg py-4 rounded-xl disabled:opacity-40 hover:bg-brand-hover transition flex items-center justify-center gap-3 mt-4"
-          >
-            {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5" />}
-            {isUploading
-              ? 'Uploading…'
-              : 'Upload & Process Cards'}
-          </button>
-        </div>
-      )}
-
-      {/* ── Step 2: Processing spinner ────────────────────────────────────────── */}
+      {/* ── Processing overlay ────────────────────────────────────────────── */}
       {step === 2 && (
         <div className="text-center py-20 animate-in fade-in">
           <Loader2 className="w-14 h-14 animate-spin text-brand mx-auto mb-5" />
@@ -653,10 +582,53 @@ export function BulkIngestionWizard() {
         </div>
       )}
 
-      {/* ── Step 3: Review, edit, price, publish ───────────────────────────── */}
-      {step === 3 && (
+      {/* ── Pipeline View ─────────────────────────────────────────────────── */}
+      {step !== 2 && (
 
         <div className="space-y-5 animate-in fade-in">
+
+          {/* Inline upload controls — visible when Staging tab is active */}
+          {activeTab === 'staging' && (
+            <div className="border border-border rounded-xl p-4 bg-surface/50 space-y-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Upload className="w-4 h-4 text-brand" />
+                <span className="text-sm font-black text-foreground">Upload Card Pair</span>
+                <div className="flex bg-surface border border-border rounded-md p-0.5 ml-auto">
+                  <button onClick={() => setUploadMode('batch')}
+                    className={`px-3 py-1 text-[10px] font-bold rounded transition ${uploadMode === 'batch' ? 'bg-brand text-brand-foreground shadow' : 'text-muted hover:text-foreground'}`}>
+                    Batch Matrix
+                  </button>
+                  <button onClick={() => setUploadMode('single')}
+                    className={`px-3 py-1 text-[10px] font-bold rounded transition ${uploadMode === 'single' ? 'bg-brand text-brand-foreground shadow' : 'text-muted hover:text-foreground'}`}>
+                    Single Pair
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <DropZone label={uploadMode === 'batch' ? 'Front Matrix' : 'Front Side'} file={uploadMode === 'batch' ? batchFront : singleFront} id="upload-front" onFile={uploadMode === 'batch' ? setBatchFront : setSingleFront} />
+                <DropZone label={uploadMode === 'batch' ? 'Back Matrix' : 'Back Side'} file={uploadMode === 'batch' ? batchBack : singleBack} id="upload-back" onFile={uploadMode === 'batch' ? setBatchBack : setSingleBack} />
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="font-bold text-muted">Mat:</span>
+                  {(['none', 'green', 'blue'] as const).map(id => (
+                    <label key={id} className="flex items-center gap-1 cursor-pointer">
+                      <input type="radio" name="scannerMat" checked={scannerMat === id} onChange={() => setScannerMat(id)} className="accent-brand w-3 h-3" />
+                      <span className="text-[10px] font-semibold text-foreground capitalize">{id}</span>
+                    </label>
+                  ))}
+                </div>
+                <button
+                  onClick={handleUpload}
+                  disabled={isUploading || (uploadMode === 'batch' ? (!batchFront || !batchBack) : (!singleFront || !singleBack))}
+                  className="ml-auto bg-brand text-brand-foreground font-black text-sm py-2 px-6 rounded-lg disabled:opacity-40 hover:bg-brand-hover transition flex items-center gap-2"
+                >
+                  {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                  {isUploading ? 'Uploading…' : 'Stage Pair'}
+                </button>
+              </div>
+            </div>
+          )}
           {/* Pipeline Tabs */}
           <div className="flex gap-1 bg-surface border border-border rounded-lg p-1 w-full max-w-2xl">
             {([
@@ -756,14 +728,22 @@ export function BulkIngestionWizard() {
                       {isPendingScan(card) && (
                         <div className="flex items-center justify-between w-full">
                           <span className="text-xs font-bold text-muted uppercase tracking-wide">Raw Scan Pair</span>
-                          <button
-                            onClick={() => handleCrop(card.id)}
-                            disabled={scanJobId === card.id}
-                            className="flex items-center gap-1 text-xs font-bold bg-brand text-brand-foreground px-3 py-1.5 rounded-lg hover:bg-brand-hover disabled:opacity-40 transition"
-                          >
-                            {scanJobId === card.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Scissors className="w-3.5 h-3.5" />}
-                            Crop & Rotate
-                          </button>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleSkipToCropped(card.id)}
+                              className="flex items-center gap-1 text-xs font-bold bg-surface border border-border text-foreground px-3 py-1.5 rounded-lg hover:bg-surface-hover transition"
+                            >
+                              Use As-Is
+                            </button>
+                            <button
+                              onClick={() => handleCrop(card.id)}
+                              disabled={scanJobId === card.id}
+                              className="flex items-center gap-1 text-xs font-bold bg-orange-600 text-white px-3 py-1.5 rounded-lg hover:bg-orange-500 disabled:opacity-40 transition"
+                            >
+                              {scanJobId === card.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Scissors className="w-3.5 h-3.5" />}
+                              Crop & Rotate
+                            </button>
+                          </div>
                         </div>
                       )}
 
@@ -897,6 +877,15 @@ export function BulkIngestionWizard() {
                             : <DollarSign className="w-3.5 h-3.5" />}
                           Send to Pricing
                         </button>
+                        {activeTab === 'identified' && parseFloat(String(card.listed_price)) > 0 && (
+                          <button
+                            onClick={() => { setPricedIds(prev => { const n = new Set(prev); n.add(card.id); return n }); showToast('Moved to Priced.', 'success') }}
+                            className="flex items-center gap-1 text-xs font-black bg-slate-800 text-white px-3 py-1 rounded-lg hover:bg-slate-700 transition ml-auto"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            Move to Priced
+                          </button>
+                        )}
                       </div>
                       </>
                     )}
@@ -948,16 +937,25 @@ export function BulkIngestionWizard() {
               </button>
             )}
 
-            {/* Identified: Price All */}
+            {/* Identified: Price All + Move to Priced */}
             {activeTab === 'identified' && (
-              <button
-                onClick={handlePriceAll}
-                disabled={isPricingAll || isPublishing}
-                className="flex-1 bg-emerald-700 text-white font-black py-3 rounded-xl disabled:opacity-40 hover:bg-emerald-600 transition flex items-center justify-center gap-2"
-              >
-                {isPricingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <DollarSign className="w-4 h-4" />}
-                Price All on Tab
-              </button>
+              <>
+                <button
+                  onClick={handlePriceAll}
+                  disabled={isPricingAll || isPublishing}
+                  className="flex-1 bg-emerald-700 text-white font-black py-3 rounded-xl disabled:opacity-40 hover:bg-emerald-600 transition flex items-center justify-center gap-2"
+                >
+                  {isPricingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <DollarSign className="w-4 h-4" />}
+                  Price All on Tab
+                </button>
+                <button
+                  onClick={handleMoveToPriced}
+                  className="flex-1 bg-slate-800 text-white font-black py-3 rounded-xl hover:bg-slate-700 transition flex items-center justify-center gap-2"
+                >
+                  <Send className="w-4 h-4" />
+                  Move Selected to Priced
+                </button>
+              </>
             )}
 
             {/* Priced: Publish */}
