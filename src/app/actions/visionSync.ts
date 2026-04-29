@@ -241,7 +241,7 @@ export async function identifyCardBatchAction(items: {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
     body: JSON.stringify({ items }),
-    signal: AbortSignal.timeout(115_000),
+    signal: AbortSignal.timeout(180_000),
   });
 
   if (response.status === 402) throw new Error('credits_exhausted');

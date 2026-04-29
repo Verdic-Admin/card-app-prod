@@ -245,103 +245,123 @@ export function BulkIngestionWizard() {
     }
     setIsIdentifyingAll(true)
 
-    // Mark all as identifying
+    const BATCH_SIZE = 9
+    const totalBatches = Math.ceil(visibleCards.length / BATCH_SIZE)
+    let totalIdentified = 0
+
+    // Mark all as queued
     setReviewCards(prev => prev.map(x =>
-      visibleCards.some(v => v.id === x.id) ? { ...x, ai_status: 'Identifying...' } : x
+      visibleCards.some(v => v.id === x.id) ? { ...x, ai_status: 'Queued...' } : x
     ))
 
     try {
-      // Chunk into batches of 9 (backend enforces max_length=9 per request)
-      const BATCH_SIZE = 9
-      const allResults: any[] = []
-
       for (let i = 0; i < visibleCards.length; i += BATCH_SIZE) {
+        const batchNum = Math.floor(i / BATCH_SIZE) + 1
         const chunk = visibleCards.slice(i, i + BATCH_SIZE)
-        const { results } = await identifyCardBatchAction(
-          chunk.map(c => ({
-            queue_id: c.id,
-            side_a_url: c.image_url!,
-            side_b_url: c.back_image_url || null,
-          }))
-        )
-        allResults.push(...results)
-      }
 
-      for (const r of allResults) {
-        if (r.status === 'error') {
+        // Mark this chunk as actively identifying
+        setReviewCards(prev => prev.map(x =>
+          chunk.some(v => v.id === x.id) ? { ...x, ai_status: `Identifying… (batch ${batchNum}/${totalBatches})` } : x
+        ))
+
+        let results: BatchIdentifyResultItem[]
+        try {
+          const resp = await identifyCardBatchAction(
+            chunk.map(c => ({
+              queue_id: c.id,
+              side_a_url: c.image_url!,
+              side_b_url: c.back_image_url || null,
+            }))
+          )
+          results = resp.results
+        } catch (batchErr: any) {
+          if (batchErr.message === 'credits_exhausted') { creditsExhausted(); return }
+          // Mark this chunk as failed, continue to next batch
           setReviewCards(prev => prev.map(x =>
-            x.id === r.queue_id ? { ...x, ai_status: 'Failed — Retry', confidence: 0 } : x
+            chunk.some(v => v.id === x.id) ? { ...x, ai_status: 'Failed — Retry', confidence: 0 } : x
           ))
+          showToast(`Batch ${batchNum}/${totalBatches} failed: ${batchErr.message}`, 'error')
           continue
         }
-        // Inline normalize: extract fields from card_details
-        const cd = r.card_details ?? {} as Record<string, unknown>
-        const rawPr = cd.print_run
-        let printRunParsed: number | null = null
-        if (typeof rawPr === 'number' && Number.isFinite(rawPr)) {
-          printRunParsed = Math.trunc(rawPr)
-        } else if (rawPr != null && String(rawPr).trim() !== '') {
-          const digits = String(rawPr).replace(/\D/g, '')
-          if (digits) { const n = parseInt(digits, 10); if (Number.isFinite(n)) printRunParsed = n }
+
+        // Process results immediately for this chunk
+        for (const r of results) {
+          if (r.status === 'error') {
+            setReviewCards(prev => prev.map(x =>
+              x.id === r.queue_id ? { ...x, ai_status: 'Failed — Retry', confidence: 0 } : x
+            ))
+            continue
+          }
+
+          const cd = r.card_details ?? {} as Record<string, unknown>
+          const rawPr = cd.print_run
+          let printRunParsed: number | null = null
+          if (typeof rawPr === 'number' && Number.isFinite(rawPr)) {
+            printRunParsed = Math.trunc(rawPr)
+          } else if (rawPr != null && String(rawPr).trim() !== '') {
+            const digits = String(rawPr).replace(/\D/g, '')
+            if (digits) { const n = parseInt(digits, 10); if (Number.isFinite(n)) printRunParsed = n }
+          }
+
+          const res = {
+            status: r.status,
+            confidence: r.confidence ?? 0,
+            player_name: (cd.player_name as string) ?? null,
+            card_set: (cd.card_set as string) ?? null,
+            card_number: (cd.card_number as string) ?? null,
+            insert_name: (cd.insert_name as string) ?? null,
+            parallel_name: (cd.parallel_type as string) ?? null,
+            team_name: (cd.team_name as string) ?? null,
+            team_name_source: (cd.team_name_source as string) ?? null,
+            team_name_confidence: typeof cd.team_name_confidence === 'number' ? cd.team_name_confidence : null,
+            team_name_verified: typeof cd.team_name_verified === 'boolean' ? cd.team_name_verified : null,
+            print_run: printRunParsed,
+          }
+
+          const card = chunk.find(c => c.id === r.queue_id)
+          if (!card) continue
+
+          const confidence = res.confidence ?? 0
+          const aiStatus = confidence >= 0.85 ? 'High Confidence' : 'Manual Correction'
+          const aiTeam = (res.team_name ?? '').trim()
+          const mergedTeam = aiTeam || card.team_name
+          const mergedPrint = res.print_run != null && Number.isFinite(Number(res.print_run)) ? String(res.print_run) : card.print_run
+          const mergedCardNum = normalizeCardNumberForPlayerIndex((res.card_number && String(res.card_number).trim()) ? res.card_number : card.card_number) || card.card_number
+
+          const updates = {
+            player_name:   res.player_name   || card.player_name,
+            team_name:     mergedTeam,
+            card_set:      res.card_set       || card.card_set,
+            card_number:   mergedCardNum,
+            insert_name:   res.insert_name    || card.insert_name,
+            parallel_name: res.parallel_name  || card.parallel_name,
+            print_run:     mergedPrint,
+            confidence,
+            ai_status: aiStatus,
+            team_name_source: res.team_name_source as 'ocr_back' | 'ocr_with_db_conflict' | 'catalog_db' | 'none' | null,
+            team_name_confidence: res.team_name_confidence,
+            team_name_verified: res.team_name_verified,
+          }
+
+          setReviewCards(prev => prev.map(x => x.id === r.queue_id ? { ...x, ...updates } : x))
+
+          // Persist to DB in background
+          updateDraftCardAction(r.queue_id, {
+            ...updates,
+            print_run: (() => { const n = parseInt(String(mergedPrint ?? '').replace(/\D/g, ''), 10); return Number.isFinite(n) ? n : null })()
+          }).catch(() => {})
+
+          totalIdentified++
         }
-        const res = {
-          status: r.status,
-          confidence: r.confidence ?? 0,
-          player_name: (cd.player_name as string) ?? null,
-          card_set: (cd.card_set as string) ?? null,
-          card_number: (cd.card_number as string) ?? null,
-          insert_name: (cd.insert_name as string) ?? null,
-          parallel_name: (cd.parallel_type as string) ?? null,
-          team_name: (cd.team_name as string) ?? null,
-          team_name_source: (cd.team_name_source as string) ?? null,
-          team_name_confidence: typeof cd.team_name_confidence === 'number' ? cd.team_name_confidence : null,
-          team_name_verified: typeof cd.team_name_verified === 'boolean' ? cd.team_name_verified : null,
-          print_run: printRunParsed,
-        }
 
-        const card = visibleCards.find(c => c.id === r.queue_id)
-        if (!card) continue
-
-        const confidence = res.confidence ?? 0
-        const aiStatus = confidence >= 0.85 ? 'High Confidence' : 'Manual Correction'
-        const aiTeam = (res.team_name ?? '').trim()
-        const mergedTeam = aiTeam || card.team_name
-        const mergedPrint = res.print_run != null && Number.isFinite(Number(res.print_run)) ? String(res.print_run) : card.print_run
-        const mergedCardNum = normalizeCardNumberForPlayerIndex((res.card_number && String(res.card_number).trim()) ? res.card_number : card.card_number) || card.card_number
-
-        const updates = {
-          player_name:   res.player_name   || card.player_name,
-          team_name:     mergedTeam,
-          card_set:      res.card_set       || card.card_set,
-          card_number:   mergedCardNum,
-          insert_name:   res.insert_name    || card.insert_name,
-          parallel_name: res.parallel_name  || card.parallel_name,
-          print_run:     mergedPrint,
-          confidence,
-          ai_status: aiStatus,
-          team_name_source: res.team_name_source as 'ocr_back' | 'ocr_with_db_conflict' | 'catalog_db' | 'none' | null,
-          team_name_confidence: res.team_name_confidence,
-          team_name_verified: res.team_name_verified,
-        }
-
-        setReviewCards(prev => prev.map(x => x.id === r.queue_id ? { ...x, ...updates } : x))
-
-        // Persist to DB in background (fire and forget)
-        updateDraftCardAction(r.queue_id, {
-          ...updates,
-          print_run: (() => { const n = parseInt(String(mergedPrint ?? '').replace(/\D/g, ''), 10); return Number.isFinite(n) ? n : null })()
-        }).catch(() => {})
+        showToast(`Batch ${batchNum}/${totalBatches} complete — ${chunk.length} cards identified.`, 'success')
       }
 
       const tokensUsed = Math.ceil(visibleCards.length / BATCH_SIZE)
-      showToast(`Batch identified ${allResults.length} card(s) using ${tokensUsed} token(s).`, 'success')
+      showToast(`Done! Identified ${totalIdentified} card(s) using ${tokensUsed} token(s).`, 'success')
     } catch (e: any) {
       if (e.message === 'credits_exhausted') { creditsExhausted(); return }
       showToast('Batch identify failed: ' + e.message, 'error')
-      // Reset all to allow retry
-      setReviewCards(prev => prev.map(x =>
-        visibleCards.some(v => v.id === x.id) ? { ...x, ai_status: undefined } : x
-      ))
     } finally {
       setIsIdentifyingAll(false)
     }
