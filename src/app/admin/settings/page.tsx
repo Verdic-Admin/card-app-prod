@@ -149,6 +149,22 @@ export default function SettingsPage() {
                      <label className="block text-xs font-bold text-foreground md:text-muted uppercase tracking-wider mb-2">Instruction Copy</label>
                      <textarea rows={2} value={settings.payment_instructions || ''} onChange={e => setSettings({...settings, payment_instructions: e.target.value})} className="w-full px-3 py-2 bg-surface border border-border md:border-muted/30 rounded-lg text-sm text-foreground focus:ring-2 focus:ring-brand outline-none shadow-sm placeholder:text-muted/40" placeholder="Please put your Name in the payment notes..." />
                  </div>
+
+                 {/* P2P Scaling Disclaimer */}
+                 <div className="mt-5 p-4 rounded-xl border border-amber-300/30 bg-amber-500/5">
+                   <div className="flex gap-2.5">
+                     <span className="text-amber-400 text-base mt-0.5 flex-shrink-0">⚠️</span>
+                     <div>
+                       <p className="text-xs font-bold text-foreground mb-1">Scaling Your Zero-Fee Payments</p>
+                       <p className="text-[11px] text-muted leading-relaxed">
+                         P2P links make selling easier, but high-volume commercial use on personal Venmo/CashApp accounts can trigger processor flags. We recommend setting up dedicated{' '}
+                         <strong className="text-foreground">Venmo Business</strong> or{' '}
+                         <strong className="text-foreground">Cash App for Business</strong>{' '}
+                         accounts as your shop scales to consistent daily orders. You&apos;ll incur a small commercial fee (~1.9%), but your funds will never be frozen for violating acceptable-use policies.
+                       </p>
+                     </div>
+                   </div>
+                 </div>
              </div>
           </div>
         </div>
