@@ -1,6 +1,6 @@
 {
-  "name": "The Gap Sportscards",
-  "short_name": "Gap Cards",
+  "name": "Card Shop",
+  "short_name": "Card Shop",
   "description": "Zero-fee sports card storefront",
   "start_url": "/",
   "display": "standalone",

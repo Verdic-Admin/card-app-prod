@@ -158,13 +158,10 @@ export default async function AdminPage() {
             Brand & Design
           </Link>
           <Link href="/admin/settings" className="px-4 py-2 bg-indigo-50 text-indigo-700 font-bold rounded-lg hover:bg-indigo-100 transition-colors">
-            Store Operations
+            Store Settings
           </Link>
-          <a href="/docs/Master-Operations-Manual.md" download="Gap-Sportscards-Master-Operations-Manual.md" className="px-4 py-2 bg-slate-900 text-white font-black rounded-lg hover:bg-slate-800 transition-colors shadow-lg border border-slate-700 text-sm">
-            Master Ops Manual (.md)
-          </a>
-          <a href="/docs/Operations-Guide.pdf" download="Operations-Guide.pdf" className="px-4 py-2 bg-slate-100 text-slate-700 border border-slate-300 font-bold rounded-lg hover:bg-slate-200 transition-colors">
-            Operations Guide
+          <a href="/docs/Master-Operations-Manual.md" target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-slate-900 text-white font-black rounded-lg hover:bg-slate-800 transition-colors shadow-lg border border-slate-700 text-sm">
+            Master Ops Manual
           </a>
         </div>
       </div>

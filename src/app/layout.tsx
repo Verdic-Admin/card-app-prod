@@ -24,13 +24,13 @@ const siteOrigin = getAppOrigin();
 
 export const metadata: Metadata = {
   ...(siteOrigin ? { metadataBase: new URL(siteOrigin) } : {}),
-  title: "The Gap Sportscards",
+  title: "Card Shop",
   description: "Zero-fee sports card storefront — buy, sell and trade cards.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Gap Cards",
+    title: "Card Shop",
   },
   other: {
     "mobile-web-app-capable": "yes",
