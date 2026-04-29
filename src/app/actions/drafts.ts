@@ -160,9 +160,9 @@ export async function createDraftCardsAction(cards: any[]) {
   try {
      for (const item of payload) {
         const { rows } = await pool.query(`
-           INSERT INTO scan_staging (player_name, team_name, card_set, card_number, insert_name, parallel_name, print_run, image_url, back_image_url, listed_price, market_price, is_rookie, is_auto, is_relic, grading_company, grade)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-           RETURNING id, player_name, team_name, card_set, card_number, insert_name, parallel_name, print_run, image_url, back_image_url, listed_price, market_price, is_rookie, is_auto, is_relic, grading_company, grade
+            INSERT INTO scan_staging (player_name, team_name, card_set, card_number, insert_name, parallel_name, print_run, image_url, back_image_url, listed_price, market_price, is_rookie, is_auto, is_relic, grading_company, grade, upload_kind)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'matrix')
+            RETURNING id, player_name, team_name, card_set, card_number, insert_name, parallel_name, print_run, image_url, back_image_url, listed_price, market_price, is_rookie, is_auto, is_relic, grading_company, grade, upload_kind
         `, [item.player_name, item.team_name, item.card_set, item.card_number, item.insert_name, item.parallel_name, item.print_run, item.image_url, item.back_image_url, item.listed_price, item.market_price, item.is_rookie, item.is_auto, item.is_relic, item.grading_company, item.grade]);
         if (rows.length > 0) results.push(rows[0]);
      }
@@ -444,6 +444,32 @@ export async function promoteRawStagingToCroppedAction(ids: string[]) {
     [ids]
   );
   return res.rows;
+}
+
+/**
+ * Move free-track (single_pair) cards into the premium AI pipeline.
+ * Promotes raw images to cropped if needed, flips upload_kind to 'matrix'.
+ */
+export async function promoteToPremiumTrackAction(ids: string[]) {
+  await checkAuth();
+  if (!ids.length) return [];
+  // First promote raw → cropped for any that haven't been cropped
+  await pool.query(
+    `UPDATE scan_staging
+     SET image_url = COALESCE(image_url, raw_front_url),
+         back_image_url = COALESCE(back_image_url, raw_back_url)
+     WHERE id = ANY($1::uuid[])`,
+    [ids]
+  );
+  // Then flip to matrix so premium track picks them up
+  const { rows } = await pool.query(
+    `UPDATE scan_staging
+     SET upload_kind = 'matrix'
+     WHERE id = ANY($1::uuid[])
+     RETURNING *`,
+    [ids]
+  );
+  return rows;
 }
 
 export async function updateDraftCardAction(id: string, updates: any) {

@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Loader2, Trash2, Send, Image as ImageIcon } from 'lucide-react';
-import { listScanStagingAction, updateDraftCardAction, publishDraftCardsAction } from '@/app/actions/drafts';
+import { Loader2, Trash2, Send, Image as ImageIcon, Wand2 } from 'lucide-react';
+import { listScanStagingAction, updateDraftCardAction, publishDraftCardsAction, promoteToPremiumTrackAction } from '@/app/actions/drafts';
 import { deleteStagingCardsAction } from '@/app/actions/inventory';
 import { useToastContext } from '@/components/admin/ToastProvider';
 
@@ -19,6 +19,7 @@ export function ManualIngestionGrid({ refreshKey = 0 }: ManualIngestionGridProps
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isPublishing, setIsPublishing] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [isPromoting, setIsPromoting] = useState(false);
   const { showToast } = useToastContext();
 
   const loadDrafts = async () => {
@@ -124,7 +125,28 @@ export function ManualIngestionGrid({ refreshKey = 0 }: ManualIngestionGridProps
             <span className="text-sm font-bold text-slate-700">Select All ({selectedIds.size})</span>
           </label>
         </div>
-        <div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={async () => {
+              if (!selectedIds.size) return;
+              setIsPromoting(true);
+              try {
+                await promoteToPremiumTrackAction(Array.from(selectedIds));
+                showToast(`${selectedIds.size} card(s) moved to Premium AI track.`, 'success');
+                setSelectedIds(new Set());
+                loadDrafts();
+              } catch (e: any) {
+                showToast('Promote failed: ' + e.message, 'error');
+              } finally {
+                setIsPromoting(false);
+              }
+            }}
+            disabled={selectedIds.size === 0 || isPromoting}
+            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-sm px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+          >
+            {isPromoting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+            Push to Premium
+          </button>
           <button
             onClick={handlePublish}
             disabled={selectedIds.size === 0 || isPublishing}
