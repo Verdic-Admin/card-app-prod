@@ -176,8 +176,15 @@ export async function createDraftCardsAction(cards: any[]) {
 
 export async function listScanStagingAction(uploadKind?: 'single_pair' | 'matrix') {
   await checkAuth();
-  const filter = uploadKind ? `WHERE upload_kind = $1` : '';
-  const params: string[] = uploadKind ? [uploadKind] : [];
+  // 'matrix' also includes legacy rows with NULL upload_kind (pre-track-split cards)
+  // 'single_pair' is strict match only
+  let filter = '';
+  let params: string[] = [];
+  if (uploadKind === 'matrix') {
+    filter = `WHERE (upload_kind = 'matrix' OR upload_kind IS NULL)`;
+  } else if (uploadKind === 'single_pair') {
+    filter = `WHERE upload_kind = 'single_pair'`;
+  }
   const { rows } = await pool.query(
     `SELECT id, player_name, team_name, card_set, card_number, insert_name,
             parallel_name, print_run, raw_front_url, raw_back_url,
