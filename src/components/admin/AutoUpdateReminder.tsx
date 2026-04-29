@@ -36,8 +36,8 @@ export function AutoUpdateReminder() {
           Platform updates are available
         </p>
         <p className="text-xs text-muted font-medium mt-0.5 leading-relaxed">
-          Enable <strong className="text-foreground">auto-deploy</strong> in your Railway service settings to receive updates automatically.
-          Go to your service → Settings → enable &quot;Auto Deploy&quot; on the main branch. Setup instructions coming soon.
+          Go to your service → Settings → enable &quot;Auto Deploy&quot; on the main branch.{' '}
+          <a href="https://playerindexdata.com/update-instructions.pdf" target="_blank" rel="noopener noreferrer" className="underline text-brand font-bold hover:opacity-80">View full update instructions →</a>
         </p>
       </div>
       <button

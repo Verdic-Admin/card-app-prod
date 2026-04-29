@@ -112,9 +112,14 @@ export function AutoUpdateBanner({ adminPassword }: AutoUpdateBannerProps) {
               >
                 {loading ? 'Saving…' : '✅ I have enabled Auto-Updates in Railway'}
               </button>
-              <p className="text-amber-500/60 text-xs">
-                This banner will disappear permanently once confirmed.
-              </p>
+              <a
+                href="https://playerindexdata.com/update-instructions.pdf"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-amber-400 underline hover:text-amber-300 text-xs font-bold"
+              >
+                View full update instructions →
+              </a>
             </div>
 
           </div>

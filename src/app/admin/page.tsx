@@ -160,7 +160,7 @@ export default async function AdminPage() {
           <Link href="/admin/settings" className="px-4 py-2 bg-indigo-50 text-indigo-700 font-bold rounded-lg hover:bg-indigo-100 transition-colors">
             Store Settings
           </Link>
-          <a href="/docs/Master-Operations-Manual.md" target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-slate-900 text-white font-black rounded-lg hover:bg-slate-800 transition-colors shadow-lg border border-slate-700 text-sm">
+          <a href="https://playerindexdata.com/master-operations-manual.pdf" target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-slate-900 text-white font-black rounded-lg hover:bg-slate-800 transition-colors shadow-lg border border-slate-700 text-sm">
             Master Ops Manual
           </a>
         </div>
