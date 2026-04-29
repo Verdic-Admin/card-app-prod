@@ -1,14 +1,19 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Loader2, Trash2, Save, Send, Sparkles, Image as ImageIcon } from 'lucide-react';
+import { Loader2, Trash2, Send, Image as ImageIcon } from 'lucide-react';
 import { listScanStagingAction, updateDraftCardAction, publishDraftCardsAction } from '@/app/actions/drafts';
 import { deleteStagingCardsAction } from '@/app/actions/inventory';
 import { useToastContext } from '@/components/admin/ToastProvider';
 
 type DraftCard = any;
 
-export function ManualIngestionGrid() {
+interface ManualIngestionGridProps {
+  /** Increment this to trigger a re-fetch without lifting state globally. */
+  refreshKey?: number;
+}
+
+export function ManualIngestionGrid({ refreshKey = 0 }: ManualIngestionGridProps) {
   const [drafts, setDrafts] = useState<DraftCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -19,7 +24,7 @@ export function ManualIngestionGrid() {
   const loadDrafts = async () => {
     setLoading(true);
     try {
-      const rows = await listScanStagingAction();
+      const rows = await listScanStagingAction('single_pair');
       setDrafts(rows || []);
     } catch (e: any) {
       showToast('Failed to load drafts: ' + e.message, 'error');
@@ -30,7 +35,8 @@ export function ManualIngestionGrid() {
 
   useEffect(() => {
     loadDrafts();
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshKey]);
 
   const toggleSelect = (id: string) => {
     const next = new Set(selectedIds);
@@ -104,19 +110,6 @@ export function ManualIngestionGrid() {
 
   return (
     <div className="space-y-6">
-      {/* Skip the typing Banner */}
-      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl p-4 flex items-start gap-4">
-        <div className="bg-indigo-100 text-indigo-600 p-2 rounded-lg mt-0.5">
-          <Sparkles className="w-5 h-5" />
-        </div>
-        <div className="flex-grow">
-          <h3 className="font-bold text-indigo-900 text-sm">Skip the typing!</h3>
-          <p className="text-sm text-indigo-700/80 font-medium mt-0.5">
-            Use the <strong>AI Batch Importer</strong> to automatically identify and price your cards from photos. 
-            It's faster, more accurate, and saves you from manual data entry.
-          </p>
-        </div>
-      </div>
 
       {/* Toolbar */}
       <div className="flex items-center justify-between bg-white border border-slate-200 rounded-xl p-3 shadow-sm">

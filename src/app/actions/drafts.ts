@@ -113,13 +113,13 @@ export async function stagePairedUploadAction(formData: FormData) {
   const { url: rawBack } = await put(`scans/${prefix}-back-${ts}-${rand()}.${backExt}`, back);
 
   const { rows } = await pool.query(
-    `INSERT INTO scan_staging (raw_front_url, raw_back_url, image_url, back_image_url)
-     VALUES ($1, $2, NULL, NULL)
+    `INSERT INTO scan_staging (raw_front_url, raw_back_url, image_url, back_image_url, upload_kind)
+     VALUES ($1, $2, NULL, NULL, $3)
      RETURNING id, player_name, team_name, card_set, card_number, insert_name,
                parallel_name, print_run, raw_front_url, raw_back_url,
                image_url, back_image_url, listed_price, market_price,
-               is_rookie, is_auto, is_relic, grading_company, grade`,
-    [rawFront, rawBack]
+               is_rookie, is_auto, is_relic, grading_company, grade, upload_kind`,
+    [rawFront, rawBack, kind]
   );
 
   return rows[0];
@@ -174,16 +174,21 @@ export async function createDraftCardsAction(cards: any[]) {
   return results
 }
 
-export async function listScanStagingAction() {
+export async function listScanStagingAction(uploadKind?: 'single_pair' | 'matrix') {
   await checkAuth();
-  const { rows } = await pool.query(`
-    SELECT id, player_name, team_name, card_set, card_number, insert_name, parallel_name, print_run,
-           raw_front_url, raw_back_url, image_url, back_image_url, listed_price, market_price,
-           trend_data, player_index_url, oracle_projection, oracle_trend_percentage,
-           is_rookie, is_auto, is_relic, grading_company, grade
-    FROM scan_staging
-    ORDER BY id DESC
-  `);
+  const filter = uploadKind ? `WHERE upload_kind = $1` : '';
+  const params: string[] = uploadKind ? [uploadKind] : [];
+  const { rows } = await pool.query(
+    `SELECT id, player_name, team_name, card_set, card_number, insert_name,
+            parallel_name, print_run, raw_front_url, raw_back_url,
+            image_url, back_image_url, listed_price, market_price,
+            trend_data, player_index_url, oracle_projection, oracle_trend_percentage,
+            is_rookie, is_auto, is_relic, grading_company, grade, upload_kind
+     FROM scan_staging
+     ${filter}
+     ORDER BY id DESC`,
+    params
+  );
   return rows;
 }
 

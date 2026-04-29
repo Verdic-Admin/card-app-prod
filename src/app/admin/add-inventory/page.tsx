@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { BulkIngestionWizard } from '@/components/admin/BulkIngestionWizard';
+import { AddInventoryTabs } from '@/components/admin/AddInventoryTabs';
 
 export default function AddInventoryPage() {
   return (
@@ -11,13 +11,14 @@ export default function AddInventoryPage() {
         <Link href="/admin" className="text-sm text-brand hover:underline mb-2 inline-block font-bold">← Back to Admin</Link>
         <h1 className="text-3xl font-extrabold tracking-tight text-foreground">Add Inventory</h1>
         <p className="text-muted mt-1 font-medium max-w-2xl">
-          Upload card scans, crop &amp; identify with AI, price, and publish to your inventory.
+          Upload cards manually for free, or use the AI-powered importer to crop, identify, and price in bulk.
         </p>
       </div>
 
       <div className="animate-in slide-in-from-bottom-2 duration-300">
-        <BulkIngestionWizard />
+        <AddInventoryTabs />
       </div>
     </div>
   );
 }
+

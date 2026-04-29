@@ -19,6 +19,7 @@ import {
   applyStagingDraftBatchPricingAction,
 } from '@/app/actions/drafts'
 import { deleteStagingCardsAction } from '@/app/actions/inventory'
+import { DropZone } from '@/components/admin/DropZone'
 import { TaxonomySearch } from '@/components/admin/TaxonomySearch'
 import { normalizeCardNumberForPlayerIndex } from '@/lib/player-index-deeplink'
 import { InstructionTrigger } from '@/components/admin/DraggableGuide'
@@ -80,42 +81,14 @@ function rowToStagingCard(row: Record<string, unknown>): StagingCard {
   }
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function DropZone({
-  label, file, id, onFile
-}: { label: string; file: File | null; id: string; onFile: (f: File) => void }) {
-  return (
-    <div>
-      <label className="block text-xs font-black text-foreground mb-2 uppercase tracking-widest text-center">
-        {label}
-      </label>
-      <div
-        className="border-2 border-dashed border-brand/30 bg-brand/5 rounded-2xl h-48 flex flex-col items-center justify-center cursor-pointer hover:bg-surface-hover transition shadow-inner"
-        onDragOver={e => e.preventDefault()}
-        onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) onFile(f) }}
-        onClick={() => document.getElementById(id)?.click()}
-      >
-        <Upload className="w-7 h-7 text-brand/70 mb-2" />
-        <span className="text-sm font-bold text-brand text-center px-4">
-          {file ? file.name : `Drop ${label}`}
-        </span>
-        <input id={id} type="file" accept="image/*" className="hidden"
-          onChange={e => { const f = e.target.files?.[0]; if (f) onFile(f) }} />
-      </div>
-    </div>
-  )
-}
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function BulkIngestionWizard() {
-  // Step 1 — upload
-  const [uploadMode, setUploadMode] = useState<'batch' | 'single'>('batch')
+  // Batch matrix upload
   const [batchFront, setBatchFront] = useState<File | null>(null)
   const [batchBack, setBatchBack] = useState<File | null>(null)
-  const [singleFront, setSingleFront] = useState<File | null>(null)
-  const [singleBack, setSingleBack] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
 
   // Step 2 — scanning spinner
@@ -151,7 +124,7 @@ export function BulkIngestionWizard() {
   }, [])
 
   useEffect(() => {
-    listScanStagingAction()
+    listScanStagingAction('matrix')
       .then((rows) => {
         if (!rows?.length) return
         const loaded = (rows as Record<string, unknown>[]).map(rowToStagingCard)
@@ -390,35 +363,20 @@ export function BulkIngestionWizard() {
   }
 
   const handleUpload = async () => {
+    if (!batchFront || !batchBack) return
     setIsUploading(true)
     try {
-      if (uploadMode === 'batch') {
-        if (!batchFront || !batchBack) return
-        const fd = new FormData()
-        fd.append('front', batchFront)
-        fd.append('back', batchBack)
-        fd.append('kind', 'matrix')
-        const row = await stagePairedUploadAction(fd)
-        const card = rowToStagingCard(row as Record<string, unknown>)
-        setBatchFront(null)
-        setBatchBack(null)
-        setReviewCards(prev => [card, ...prev])
-        setReviewSelected(prev => { const n = new Set(prev); n.add(card.id); return n })
-        showToast('Pair staged successfully.', 'success')
-      } else {
-        if (!singleFront || !singleBack) return
-        const fd = new FormData()
-        fd.append('front', singleFront)
-        fd.append('back', singleBack)
-        fd.append('kind', 'single_pair')
-        const row = await stagePairedUploadAction(fd)
-        const card = rowToStagingCard(row as Record<string, unknown>)
-        setSingleFront(null)
-        setSingleBack(null)
-        setReviewCards(prev => [card, ...prev])
-        setReviewSelected(prev => { const n = new Set(prev); n.add(card.id); return n })
-        showToast('Pair staged successfully.', 'success')
-      }
+      const fd = new FormData()
+      fd.append('front', batchFront)
+      fd.append('back', batchBack)
+      fd.append('kind', 'matrix')
+      const row = await stagePairedUploadAction(fd)
+      const card = rowToStagingCard(row as Record<string, unknown>)
+      setBatchFront(null)
+      setBatchBack(null)
+      setReviewCards(prev => [card, ...prev])
+      setReviewSelected(prev => { const n = new Set(prev); n.add(card.id); return n })
+      showToast('Batch pair staged successfully.', 'success')
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
       showToast('Upload failed: ' + msg, 'error')
@@ -622,7 +580,6 @@ export function BulkIngestionWizard() {
   const resetWizard = () => {
     setStep(1)
     setBatchFront(null); setBatchBack(null)
-    setSingleFront(null); setSingleBack(null)
     setScanJobId(null); setScanProgress('')
     setIdentProgress('')
     setReviewCards([]); setReviewSelected(new Set())
@@ -734,20 +691,10 @@ export function BulkIngestionWizard() {
             <div className="border border-border rounded-xl p-4 bg-surface/50 space-y-3">
               <div className="flex items-center gap-2">
                 <Upload className="w-4 h-4 text-brand" />
-                <span className="text-sm font-black text-foreground">Upload Card Pair</span>
-                <div className="flex bg-surface border border-border rounded-md p-0.5 ml-auto">
-                  <button onClick={() => setUploadMode('batch')}
-                    className={`px-3 py-1 text-[10px] font-bold rounded transition ${uploadMode === 'batch' ? 'bg-brand text-brand-foreground shadow' : 'text-muted hover:text-foreground'}`}>
-                    Batch Matrix
-                  </button>
-                  <button onClick={() => setUploadMode('single')}
-                    className={`px-3 py-1 text-[10px] font-bold rounded transition ${uploadMode === 'single' ? 'bg-brand text-brand-foreground shadow' : 'text-muted hover:text-foreground'}`}>
-                    Single Pair
-                  </button>
-                </div>
+                <span className="text-sm font-black text-foreground">Upload Batch Matrix Pair</span>
               </div>
 
-              {/* Single file picker — select 2 images (front + back) */}
+              {/* Single file picker — select 2 images (front matrix + back matrix) */}
               <div
                 className="border-2 border-dashed border-brand/30 bg-brand/5 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-surface-hover transition"
                 onDragOver={e => e.preventDefault()}
@@ -801,11 +748,11 @@ export function BulkIngestionWizard() {
                 </div>
                 <button
                   onClick={handleUpload}
-                  disabled={isUploading || (uploadMode === 'batch' ? (!batchFront || !batchBack) : (!singleFront || !singleBack))}
+                  disabled={isUploading || !batchFront || !batchBack}
                   className="ml-auto bg-brand text-brand-foreground font-black text-sm py-2 px-6 rounded-lg disabled:opacity-40 hover:bg-brand-hover transition flex items-center gap-2"
                 >
                   {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                  {isUploading ? 'Uploading…' : 'Stage Pair'}
+                  {isUploading ? 'Uploading…' : 'Stage Batch'}
                 </button>
               </div>
             </div>

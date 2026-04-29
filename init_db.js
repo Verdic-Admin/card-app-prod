@@ -71,6 +71,7 @@ ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS trend_data JSONB;
 ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS player_index_url TEXT;
 ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS oracle_projection NUMERIC(10, 2);
 ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS oracle_trend_percentage NUMERIC(10, 4);
+ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS upload_kind TEXT DEFAULT 'single_pair';
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS is_rookie BOOLEAN DEFAULT false;
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS is_auto BOOLEAN DEFAULT false;
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS is_relic BOOLEAN DEFAULT false;
@@ -310,6 +311,7 @@ async function init() {
       back_image_url TEXT,
       listed_price NUMERIC(10, 2) DEFAULT 0,
       market_price NUMERIC(10, 2) DEFAULT 0,
+      upload_kind TEXT DEFAULT 'single_pair',
       created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
   `);
