@@ -284,6 +284,10 @@ export function BulkIngestionWizard() {
           continue
         }
 
+        // Batch-persist all DB updates at once to avoid Next.js server action serialization
+        // (server actions serialize per-client — 9 individual calls would block the next batch)
+        const dbUpdates: Promise<any>[] = []
+
         // Process results immediately for this chunk
         for (const r of results) {
           if (r.status === 'error') {
@@ -345,14 +349,20 @@ export function BulkIngestionWizard() {
 
           setReviewCards(prev => prev.map(x => x.id === r.queue_id ? { ...x, ...updates } : x))
 
-          // Persist to DB in background
-          updateDraftCardAction(r.queue_id, {
-            ...updates,
-            print_run: (() => { const n = parseInt(String(mergedPrint ?? '').replace(/\D/g, ''), 10); return Number.isFinite(n) ? n : null })()
-          }).catch(() => {})
+          // Queue DB persist (do NOT await individually — batch below)
+          dbUpdates.push(
+            updateDraftCardAction(r.queue_id, {
+              ...updates,
+              print_run: (() => { const n = parseInt(String(mergedPrint ?? '').replace(/\D/g, ''), 10); return Number.isFinite(n) ? n : null })()
+            }).catch(() => {})
+          )
 
           totalIdentified++
         }
+
+        // Await all DB writes at once BEFORE moving to the next batch
+        // This ensures the server action queue is drained before the next identifyCardBatchAction fires
+        await Promise.all(dbUpdates)
 
         showToast(`Batch ${batchNum}/${totalBatches} complete — ${chunk.length} cards identified.`, 'success')
       }
