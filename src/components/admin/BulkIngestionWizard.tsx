@@ -702,33 +702,32 @@ export function BulkIngestionWizard() {
                   e.preventDefault()
                   const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/')).slice(0, 2)
                   if (files.length === 2) {
-                    if (uploadMode === 'batch') { setBatchFront(files[0]); setBatchBack(files[1]) }
-                    else { setSingleFront(files[0]); setSingleBack(files[1]) }
+                    setBatchFront(files[0])
+                    setBatchBack(files[1])
                   }
                 }}
                 onClick={() => document.getElementById('pair-upload')?.click()}
               >
                 <Upload className="w-6 h-6 text-brand/70 mb-2" />
-                {(uploadMode === 'batch' ? batchFront : singleFront) ? (
+                {batchFront ? (
                   <div className="text-center">
-                    <p className="text-xs font-bold text-brand">Front: {(uploadMode === 'batch' ? batchFront : singleFront)?.name}</p>
-                    <p className="text-xs font-bold text-brand">Back: {(uploadMode === 'batch' ? batchBack : singleBack)?.name || 'Not selected'}</p>
+                    <p className="text-xs font-bold text-brand">Front: {batchFront?.name}</p>
+                    <p className="text-xs font-bold text-brand">Back: {batchBack?.name || 'Not selected'}</p>
                   </div>
                 ) : (
                   <span className="text-sm font-bold text-brand">
-                    {uploadMode === 'batch' ? 'Select or drop 2 images (Front Matrix + Back Matrix)' : 'Select or drop 2 images (Front + Back)'}
+                    Select or drop 2 images (Front Matrix + Back Matrix)
                   </span>
                 )}
                 <input id="pair-upload" type="file" accept="image/*" multiple className="hidden"
                   onChange={e => {
                     const files = Array.from(e.target.files || []).slice(0, 2)
                     if (files.length >= 2) {
-                      if (uploadMode === 'batch') { setBatchFront(files[0]); setBatchBack(files[1]) }
-                      else { setSingleFront(files[0]); setSingleBack(files[1]) }
+                      setBatchFront(files[0])
+                      setBatchBack(files[1])
                     } else if (files.length === 1) {
-                      // First file = front, prompt for second
-                      if (uploadMode === 'batch') { setBatchFront(files[0]); setBatchBack(null) }
-                      else { setSingleFront(files[0]); setSingleBack(null) }
+                      setBatchFront(files[0])
+                      setBatchBack(null)
                     }
                     e.target.value = ''
                   }}
