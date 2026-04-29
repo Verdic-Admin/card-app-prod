@@ -362,13 +362,14 @@ export function BulkIngestionWizard() {
     setIsCroppingAll(false)
   }
 
-  const handleUpload = async () => {
-    if (!batchFront || !batchBack) return
+  const handleUpload = async (front: File, back: File) => {
+    setBatchFront(front)
+    setBatchBack(back)
     setIsUploading(true)
     try {
       const fd = new FormData()
-      fd.append('front', batchFront)
-      fd.append('back', batchBack)
+      fd.append('front', front)
+      fd.append('back', back)
       fd.append('kind', 'matrix')
       const row = await stagePairedUploadAction(fd)
       const card = rowToStagingCard(row as Record<string, unknown>)
@@ -380,6 +381,8 @@ export function BulkIngestionWizard() {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
       showToast('Upload failed: ' + msg, 'error')
+      setBatchFront(null)
+      setBatchBack(null)
     } finally {
       setIsUploading(false)
     }
@@ -696,20 +699,29 @@ export function BulkIngestionWizard() {
 
               {/* Single file picker — select 2 images (front matrix + back matrix) */}
               <div
-                className="border-2 border-dashed border-brand/30 bg-brand/5 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-surface-hover transition"
+                className={`border-2 border-dashed ${isUploading ? 'border-brand/50 bg-brand/10 opacity-70 pointer-events-none' : 'border-brand/30 bg-brand/5 hover:bg-surface-hover cursor-pointer'} rounded-xl p-4 flex flex-col items-center justify-center transition`}
                 onDragOver={e => e.preventDefault()}
                 onDrop={e => {
                   e.preventDefault()
+                  if (isUploading) return
                   const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/')).slice(0, 2)
                   if (files.length === 2) {
-                    setBatchFront(files[0])
-                    setBatchBack(files[1])
+                    handleUpload(files[0], files[1])
                   }
                 }}
-                onClick={() => document.getElementById('pair-upload')?.click()}
+                onClick={() => !isUploading && document.getElementById('pair-upload')?.click()}
               >
-                <Upload className="w-6 h-6 text-brand/70 mb-2" />
-                {batchFront ? (
+                {isUploading ? (
+                  <Loader2 className="w-8 h-8 text-brand animate-spin mb-2" />
+                ) : (
+                  <Upload className="w-6 h-6 text-brand/70 mb-2" />
+                )}
+                
+                {isUploading ? (
+                  <div className="text-center">
+                    <p className="text-sm font-bold text-brand">Uploading Batch...</p>
+                  </div>
+                ) : batchFront ? (
                   <div className="text-center">
                     <p className="text-xs font-bold text-brand">Front: {batchFront?.name}</p>
                     <p className="text-xs font-bold text-brand">Back: {batchBack?.name || 'Not selected'}</p>
@@ -721,10 +733,10 @@ export function BulkIngestionWizard() {
                 )}
                 <input id="pair-upload" type="file" accept="image/*" multiple className="hidden"
                   onChange={e => {
+                    if (isUploading) return
                     const files = Array.from(e.target.files || []).slice(0, 2)
                     if (files.length >= 2) {
-                      setBatchFront(files[0])
-                      setBatchBack(files[1])
+                      handleUpload(files[0], files[1])
                     } else if (files.length === 1) {
                       setBatchFront(files[0])
                       setBatchBack(null)
@@ -732,7 +744,9 @@ export function BulkIngestionWizard() {
                     e.target.value = ''
                   }}
                 />
-                <span className="text-[10px] text-muted mt-1">Select exactly 2 images — first is Front, second is Back</span>
+                {!isUploading && (
+                  <span className="text-[10px] text-muted mt-1">Select exactly 2 images — first is Front, second is Back</span>
+                )}
               </div>
 
               <div className="flex items-center gap-3">
@@ -745,14 +759,6 @@ export function BulkIngestionWizard() {
                     </label>
                   ))}
                 </div>
-                <button
-                  onClick={handleUpload}
-                  disabled={isUploading || !batchFront || !batchBack}
-                  className="ml-auto bg-brand text-brand-foreground font-black text-sm py-2 px-6 rounded-lg disabled:opacity-40 hover:bg-brand-hover transition flex items-center gap-2"
-                >
-                  {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                  {isUploading ? 'Uploading…' : 'Stage Batch'}
-                </button>
               </div>
             </div>
           )}
