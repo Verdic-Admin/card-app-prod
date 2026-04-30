@@ -114,7 +114,7 @@ export default async function AdminPage() {
       <div className="mb-4">
         <AutoUpdateReminder />
       </div>
-      <div className="flex justify-between items-center mb-10">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-extrabold tracking-tight text-foreground">Admin Platform</h1>
@@ -138,73 +138,77 @@ export default async function AdminPage() {
           </div>
           <p className="text-muted mt-1 font-medium">Manage inventory, perform massive bulk scans, and track sales.</p>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <Link
-            href="/admin/auction-studio"
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-500 text-slate-950 font-black rounded-lg hover:bg-amber-400 transition-colors shadow-md border border-amber-400/50 text-sm uppercase tracking-wide"
-          >
-            <Gavel className="w-4 h-4" />
-            Auction staging
-            {auctionPendingCount > 0 && (
-              <span className="ml-0.5 bg-slate-900 text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-full">
-                {auctionPendingCount} pending
-              </span>
-            )}
-          </Link>
-          <Link href="/admin/add-inventory" className="px-5 py-2 bg-brand text-background font-bold rounded-lg hover:bg-brand/90 transition-colors shadow-sm">
-            + Add Inventory
-          </Link>
-          <Link href="/admin/design" className="px-4 py-2 bg-violet-50 text-violet-700 font-bold rounded-lg hover:bg-violet-100 transition-colors">
-            Brand & Design
-          </Link>
-          <Link href="/admin/settings" className="px-4 py-2 bg-indigo-50 text-indigo-700 font-bold rounded-lg hover:bg-indigo-100 transition-colors">
-            Store Settings
-          </Link>
-          <a href="https://playerindexdata.com/master-operations-manual.pdf" target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-slate-900 text-white font-black rounded-lg hover:bg-slate-800 transition-colors shadow-lg border border-slate-700 text-sm">
-            Master Ops Manual
-          </a>
-          <a
-            href="https://help.railway.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white font-black rounded-lg hover:bg-teal-500 transition-colors shadow-md border border-teal-500/50 text-sm"
-          >
-            <MessageCircleQuestion className="w-4 h-4" />
-            Feedback & Questions
-          </a>
+        <div className="flex flex-col gap-3 lg:items-end">
+          <div className="flex items-center gap-3 flex-wrap justify-start lg:justify-end">
+            <Link
+              href="/admin/auction-studio"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-500 text-slate-950 font-black rounded-lg hover:bg-amber-400 transition-colors shadow-md border border-amber-400/50 text-sm uppercase tracking-wide"
+            >
+              <Gavel className="w-4 h-4" />
+              Auction staging
+              {auctionPendingCount > 0 && (
+                <span className="ml-0.5 bg-slate-900 text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-full">
+                  {auctionPendingCount} pending
+                </span>
+              )}
+            </Link>
+            <Link href="/admin/add-inventory" className="px-5 py-2.5 bg-brand text-background font-bold rounded-lg hover:bg-brand/90 transition-colors shadow-md text-sm">
+              + Add Inventory
+            </Link>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap justify-start lg:justify-end">
+            <Link href="/admin/design" className="px-4 py-2 bg-violet-50 text-violet-700 font-bold rounded-lg hover:bg-violet-100 transition-colors text-sm">
+              Brand & Design
+            </Link>
+            <Link href="/admin/settings" className="px-4 py-2 bg-indigo-50 text-indigo-700 font-bold rounded-lg hover:bg-indigo-100 transition-colors text-sm">
+              Store Settings
+            </Link>
+            <a href="https://playerindexdata.com/master-operations-manual.pdf" target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-slate-900 text-white font-black rounded-lg hover:bg-slate-800 transition-colors shadow-sm border border-slate-700 text-sm">
+              Master Ops Manual
+            </a>
+            <a
+              href="https://station.railway.com/templates/white-label-card-shop-b7550479"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white font-black rounded-lg hover:bg-teal-500 transition-colors shadow-sm border border-teal-500/50 text-sm"
+            >
+              <MessageCircleQuestion className="w-4 h-4" />
+              Feedback & Questions
+            </a>
+          </div>
         </div>
       </div>
 
       <div className="mb-10">
         <h2 className="text-lg font-bold text-foreground mb-4">Command Center</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-surface border border-border p-5 rounded-xl shadow-sm flex items-center justify-between">
+          <a href="#collector-requests" className="bg-surface border border-border p-5 rounded-xl shadow-sm hover:shadow-md hover:border-amber-500/50 hover:-translate-y-0.5 transition-all flex items-center justify-between group">
             <div>
-              <h3 className="text-sm font-bold text-muted uppercase tracking-wider mb-1">Orders Pending Payment</h3>
+              <h3 className="text-sm font-bold text-muted uppercase tracking-wider mb-1 group-hover:text-amber-500 transition-colors">Orders Pending Payment</h3>
               <p className="text-3xl font-black text-amber-500">{pendingPaymentsCount}</p>
             </div>
             <div className="w-12 h-12 bg-amber-500/10 flex items-center justify-center rounded-full">
               <span className="text-2xl" aria-hidden="true">⏳</span>
             </div>
-          </div>
-          <div className="bg-surface border border-border p-5 rounded-xl shadow-sm flex items-center justify-between">
+          </a>
+          <a href="#pending-approvals" className="bg-surface border border-border p-5 rounded-xl shadow-sm hover:shadow-md hover:border-indigo-500/50 hover:-translate-y-0.5 transition-all flex items-center justify-between group">
             <div>
-              <h3 className="text-sm font-bold text-muted uppercase tracking-wider mb-1">Pending Auctions</h3>
+              <h3 className="text-sm font-bold text-muted uppercase tracking-wider mb-1 group-hover:text-indigo-500 transition-colors">Pending Auctions</h3>
               <p className="text-3xl font-black text-indigo-500">{pendingAuctionsCount}</p>
             </div>
             <div className="w-12 h-12 bg-indigo-500/10 flex items-center justify-center rounded-full">
               <span className="text-2xl" aria-hidden="true">🔨</span>
             </div>
-          </div>
-          <div className="bg-surface border border-border p-5 rounded-xl shadow-sm flex items-center justify-between">
+          </a>
+          <Link href="/admin/add-inventory" className="bg-surface border border-border p-5 rounded-xl shadow-sm hover:shadow-md hover:border-emerald-500/50 hover:-translate-y-0.5 transition-all flex items-center justify-between group">
             <div>
-              <h3 className="text-sm font-bold text-muted uppercase tracking-wider mb-1">Draft Cards Awaiting</h3>
+              <h3 className="text-sm font-bold text-muted uppercase tracking-wider mb-1 group-hover:text-emerald-500 transition-colors">Draft Cards Awaiting</h3>
               <p className="text-3xl font-black text-emerald-500">{draftCardsCount}</p>
             </div>
             <div className="w-12 h-12 bg-emerald-500/10 flex items-center justify-center rounded-full">
               <span className="text-2xl" aria-hidden="true">📝</span>
             </div>
-          </div>
+          </Link>
         </div>
       </div>
 
@@ -253,10 +257,10 @@ export default async function AdminPage() {
         <div>
           <LedgerDashboard soldItems={soldItems} />
         </div>
-        <div>
+        <div id="collector-requests" className="scroll-mt-10">
           <CollectorRequestsCRM />
         </div>
-        <div>
+        <div id="pending-approvals" className="scroll-mt-10">
           <PendingApprovalsQueue />
         </div>
         <div className="bg-amber-950/20 border border-amber-700/40 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
