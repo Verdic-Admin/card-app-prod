@@ -146,10 +146,21 @@ function normalizeIdentifyResponse(raw: any): IdentifyCardResult {
   if (typeof rawPr === 'number' && Number.isFinite(rawPr)) {
     print_run = Math.trunc(rawPr);
   } else if (rawPr != null && String(rawPr).trim() !== '') {
-    const digits = String(rawPr).replace(/\D/g, '');
-    if (digits) {
-      const n = parseInt(digits, 10);
+    const s = String(rawPr).trim();
+    const parts = s.split('/');
+    const denominator = parts[parts.length - 1].replace(/\D/g, '');
+    if (denominator) {
+      const n = parseInt(denominator, 10);
       if (Number.isFinite(n)) print_run = n;
+    }
+  }
+
+  let parallel_name = cd.parallel_type ?? null;
+  if (parallel_name && print_run) {
+    // If parallel is "Gold /99" and print_run is 99, strip the "/99"
+    const prStr = `/${print_run}`;
+    if (parallel_name.endsWith(prStr)) {
+      parallel_name = parallel_name.slice(0, -prStr.length).trim();
     }
   }
 
@@ -160,7 +171,7 @@ function normalizeIdentifyResponse(raw: any): IdentifyCardResult {
     card_set:     cd.card_set        ?? null,
     card_number:  cd.card_number     ?? null,
     insert_name:  cd.insert_name     ?? null,
-    parallel_name: cd.parallel_type  ?? null,
+    parallel_name,
     team_name:    cd.team_name       ?? null,
     team_name_source,
     team_name_confidence,

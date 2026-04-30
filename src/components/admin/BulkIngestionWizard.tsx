@@ -247,8 +247,13 @@ export function BulkIngestionWizard() {
     }
     setIsIdentifyingAll(true)
 
-    const BATCH_SIZE = 4
-    const totalBatches = Math.ceil(visibleCards.length / BATCH_SIZE)
+    // 9 cards = 1 token (the billing unit). Full chunks go to /identify/batch (1 token each).
+    // Any remainder (1–8 cards) goes to individual /identify/card calls so they accumulate
+    // in the single_use_pool counter — no extra token is burned for the tail.
+    const BATCH_SIZE = 9
+    const fullBatches = Math.floor(visibleCards.length / BATCH_SIZE)
+    const remainder   = visibleCards.slice(fullBatches * BATCH_SIZE)   // 0–8 cards
+    const totalBatches = fullBatches + (remainder.length > 0 ? 1 : 0)
     let totalIdentified = 0
 
     // Mark all as queued
@@ -256,12 +261,70 @@ export function BulkIngestionWizard() {
       visibleCards.some(v => v.id === x.id) ? { ...x, ai_status: 'Queued...' } : x
     ))
 
-    try {
-      for (let i = 0; i < visibleCards.length; i += BATCH_SIZE) {
-        const batchNum = Math.floor(i / BATCH_SIZE) + 1
-        const chunk = visibleCards.slice(i, i + BATCH_SIZE)
+    // ── Helper: apply one API result to local state + queue a DB write ────────
+    const applyResult = (
+      r: BatchIdentifyResultItem,
+      card: StagingCard,
+      dbUpdates: Promise<any>[],
+    ) => {
+      if (r.status === 'error') {
+        setReviewCards(prev => prev.map(x =>
+          x.id === r.queue_id ? { ...x, ai_status: 'Failed — Retry', confidence: 0 } : x
+        ))
+        return
+      }
 
-        // Mark this chunk as actively identifying
+      const cd = r.card_details ?? {} as Record<string, unknown>
+      const rawPr = cd.print_run
+      let printRunParsed: number | null = null
+      if (typeof rawPr === 'number' && Number.isFinite(rawPr)) {
+        printRunParsed = Math.trunc(rawPr)
+      } else if (rawPr != null && String(rawPr).trim() !== '') {
+        const digits = String(rawPr).replace(/\D/g, '')
+        if (digits) { const n = parseInt(digits, 10); if (Number.isFinite(n)) printRunParsed = n }
+      }
+
+      const confidence  = r.confidence ?? 0
+      const aiStatus    = confidence >= 0.85 ? 'High Confidence' : 'Manual Correction'
+      const aiTeam      = ((cd.team_name as string) ?? '').trim()
+      const mergedTeam  = aiTeam || card.team_name
+      const mergedPrint = printRunParsed != null && Number.isFinite(Number(printRunParsed)) ? String(printRunParsed) : card.print_run
+      const rawCN       = cd.card_number as string
+      const mergedCardNum = normalizeCardNumberForPlayerIndex((rawCN && String(rawCN).trim()) ? rawCN : card.card_number) || card.card_number
+
+      const updates = {
+        player_name:          (cd.player_name as string)   || card.player_name,
+        team_name:            mergedTeam,
+        card_set:             (cd.card_set as string)       || card.card_set,
+        card_number:          mergedCardNum,
+        insert_name:          (cd.insert_name as string)    || card.insert_name,
+        parallel_name:        (cd.parallel_type as string)  || card.parallel_name,
+        print_run:            mergedPrint,
+        confidence,
+        ai_status:            aiStatus,
+        team_name_source:     (cd.team_name_source as 'ocr_back' | 'ocr_with_db_conflict' | 'catalog_db' | 'none' | null) ?? null,
+        team_name_confidence: typeof cd.team_name_confidence === 'number' ? cd.team_name_confidence : null,
+        team_name_verified:   typeof cd.team_name_verified === 'boolean' ? cd.team_name_verified : null,
+      }
+
+      setReviewCards(prev => prev.map(x => x.id === r.queue_id ? { ...x, ...updates } : x))
+
+      dbUpdates.push(
+        updateDraftCardAction(r.queue_id, {
+          ...updates,
+          print_run: (() => { const n = parseInt(String(mergedPrint ?? '').replace(/\D/g, ''), 10); return Number.isFinite(n) ? n : null })()
+        }).catch(() => {})
+      )
+
+      totalIdentified++
+    }
+
+    try {
+      // ── Phase 1: Full batches of 9 → /identify/batch (burns 1 token each) ───
+      for (let i = 0; i < fullBatches; i++) {
+        const batchNum = i + 1
+        const chunk    = visibleCards.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE)
+
         setReviewCards(prev => prev.map(x =>
           chunk.some(v => v.id === x.id) ? { ...x, ai_status: `Identifying… (batch ${batchNum}/${totalBatches})` } : x
         ))
@@ -269,16 +332,11 @@ export function BulkIngestionWizard() {
         let results: BatchIdentifyResultItem[]
         try {
           const resp = await identifyCardBatchAction(
-            chunk.map(c => ({
-              queue_id: c.id,
-              side_a_url: c.image_url!,
-              side_b_url: c.back_image_url || null,
-            }))
+            chunk.map(c => ({ queue_id: c.id, side_a_url: c.image_url!, side_b_url: c.back_image_url || null }))
           )
           results = resp.results
         } catch (batchErr: any) {
           if (batchErr.message === 'credits_exhausted') { creditsExhausted(); return }
-          // Mark this chunk as failed, continue to next batch
           setReviewCards(prev => prev.map(x =>
             chunk.some(v => v.id === x.id) ? { ...x, ai_status: 'Failed — Retry', confidence: 0 } : x
           ))
@@ -286,91 +344,64 @@ export function BulkIngestionWizard() {
           continue
         }
 
-        // Batch-persist all DB updates at once to avoid Next.js server action serialization
-        // (server actions serialize per-client — 9 individual calls would block the next batch)
         const dbUpdates: Promise<any>[] = []
-
-        // Process results immediately for this chunk
         for (const r of results) {
-          if (r.status === 'error') {
-            setReviewCards(prev => prev.map(x =>
-              x.id === r.queue_id ? { ...x, ai_status: 'Failed — Retry', confidence: 0 } : x
-            ))
-            continue
-          }
-
-          const cd = r.card_details ?? {} as Record<string, unknown>
-          const rawPr = cd.print_run
-          let printRunParsed: number | null = null
-          if (typeof rawPr === 'number' && Number.isFinite(rawPr)) {
-            printRunParsed = Math.trunc(rawPr)
-          } else if (rawPr != null && String(rawPr).trim() !== '') {
-            const digits = String(rawPr).replace(/\D/g, '')
-            if (digits) { const n = parseInt(digits, 10); if (Number.isFinite(n)) printRunParsed = n }
-          }
-
-          const res = {
-            status: r.status,
-            confidence: r.confidence ?? 0,
-            player_name: (cd.player_name as string) ?? null,
-            card_set: (cd.card_set as string) ?? null,
-            card_number: (cd.card_number as string) ?? null,
-            insert_name: (cd.insert_name as string) ?? null,
-            parallel_name: (cd.parallel_type as string) ?? null,
-            team_name: (cd.team_name as string) ?? null,
-            team_name_source: (cd.team_name_source as string) ?? null,
-            team_name_confidence: typeof cd.team_name_confidence === 'number' ? cd.team_name_confidence : null,
-            team_name_verified: typeof cd.team_name_verified === 'boolean' ? cd.team_name_verified : null,
-            print_run: printRunParsed,
-          }
-
           const card = chunk.find(c => c.id === r.queue_id)
-          if (!card) continue
-
-          const confidence = res.confidence ?? 0
-          const aiStatus = confidence >= 0.85 ? 'High Confidence' : 'Manual Correction'
-          const aiTeam = (res.team_name ?? '').trim()
-          const mergedTeam = aiTeam || card.team_name
-          const mergedPrint = res.print_run != null && Number.isFinite(Number(res.print_run)) ? String(res.print_run) : card.print_run
-          const mergedCardNum = normalizeCardNumberForPlayerIndex((res.card_number && String(res.card_number).trim()) ? res.card_number : card.card_number) || card.card_number
-
-          const updates = {
-            player_name:   res.player_name   || card.player_name,
-            team_name:     mergedTeam,
-            card_set:      res.card_set       || card.card_set,
-            card_number:   mergedCardNum,
-            insert_name:   res.insert_name    || card.insert_name,
-            parallel_name: res.parallel_name  || card.parallel_name,
-            print_run:     mergedPrint,
-            confidence,
-            ai_status: aiStatus,
-            team_name_source: res.team_name_source as 'ocr_back' | 'ocr_with_db_conflict' | 'catalog_db' | 'none' | null,
-            team_name_confidence: res.team_name_confidence,
-            team_name_verified: res.team_name_verified,
-          }
-
-          setReviewCards(prev => prev.map(x => x.id === r.queue_id ? { ...x, ...updates } : x))
-
-          // Queue DB persist (do NOT await individually — batch below)
-          dbUpdates.push(
-            updateDraftCardAction(r.queue_id, {
-              ...updates,
-              print_run: (() => { const n = parseInt(String(mergedPrint ?? '').replace(/\D/g, ''), 10); return Number.isFinite(n) ? n : null })()
-            }).catch(() => {})
-          )
-
-          totalIdentified++
+          if (card) applyResult(r, card, dbUpdates)
         }
-
-        // Await all DB writes at once BEFORE moving to the next batch
-        // This ensures the server action queue is drained before the next identifyCardBatchAction fires
         await Promise.all(dbUpdates)
-
         showToast(`Batch ${batchNum}/${totalBatches} complete — ${chunk.length} cards identified.`, 'success')
       }
 
-      const tokensUsed = Math.ceil(visibleCards.length / BATCH_SIZE)
-      showToast(`Done! Identified ${totalIdentified} card(s) using ${tokensUsed} token(s).`, 'success')
+      // ── Phase 2: Remainder (1–8 cards) → /identify/card individually ─────────
+      // Each call increments the single_use_pool counter in the DB.
+      // A token is only burned when that counter reaches 9 — so the tail
+      // cards from this run are banked, not charged immediately.
+      if (remainder.length > 0) {
+        const remLabel = `${fullBatches + 1}/${totalBatches}`
+        setReviewCards(prev => prev.map(x =>
+          remainder.some(v => v.id === x.id) ? { ...x, ai_status: `Identifying… (batch ${remLabel})` } : x
+        ))
+
+        const dbUpdates: Promise<any>[] = []
+        for (const card of remainder) {
+          try {
+            const raw = await identifyCardDirectAction(card.id, card.image_url!, card.back_image_url)
+            // Re-shape IdentifyCardResult into BatchIdentifyResultItem so applyResult can handle it uniformly
+            const asItem: BatchIdentifyResultItem = {
+              queue_id:    card.id,
+              status:      raw.status,
+              confidence:  raw.confidence,
+              card_details: {
+                player_name:          raw.player_name,
+                card_set:             raw.card_set,
+                card_number:          raw.card_number,
+                insert_name:          raw.insert_name,
+                parallel_type:        raw.parallel_name,
+                team_name:            raw.team_name,
+                team_name_source:     raw.team_name_source,
+                team_name_confidence: raw.team_name_confidence,
+                team_name_verified:   raw.team_name_verified,
+                print_run:            raw.print_run,
+              },
+            }
+            applyResult(asItem, card, dbUpdates)
+          } catch (singleErr: any) {
+            if (singleErr.message === 'credits_exhausted') { creditsExhausted(); return }
+            setReviewCards(prev => prev.map(x =>
+              x.id === card.id ? { ...x, ai_status: 'Failed — Retry', confidence: 0 } : x
+            ))
+          }
+        }
+        await Promise.all(dbUpdates)
+        showToast(`Remainder (${remainder.length} card${remainder.length !== 1 ? 's' : ''}) identified — pooled, no extra token used.`, 'success')
+      }
+
+      // fullBatches tokens were burned; remainder cards are pooled (not charged yet)
+      const summaryMsg = remainder.length > 0
+        ? `Done! ${totalIdentified} card(s) identified. ${fullBatches} token(s) used, ${remainder.length} card(s) banked in pool.`
+        : `Done! ${totalIdentified} card(s) identified using ${fullBatches} token(s).`
+      showToast(summaryMsg, 'success')
     } catch (e: any) {
       if (e.message === 'credits_exhausted') { creditsExhausted(); return }
       showToast('Batch identify failed: ' + e.message, 'error')

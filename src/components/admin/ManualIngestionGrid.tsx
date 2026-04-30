@@ -53,6 +53,26 @@ export function ManualIngestionGrid({ refreshKey = 0 }: ManualIngestionGridProps
   };
 
   const handleUpdate = async (id: string, field: string, value: any) => {
+    // Auto-split logic: if updating parallel_name and it contains a slash, try to split out print_run
+    if (field === 'parallel_name' && typeof value === 'string' && value.includes('/')) {
+      const parts = value.split('/');
+      const parallel = parts[0].trim();
+      const pr = parts[parts.length - 1].replace(/\D/g, '');
+      
+      if (pr) {
+        // Optimistic update for both
+        setDrafts(prev => prev.map(d => d.id === id ? { ...d, parallel_name: parallel, print_run: pr } : d));
+        try {
+          await updateDraftCardAction(id, { parallel_name: parallel, print_run: pr });
+          return;
+        } catch (e: any) {
+          showToast('Failed to save edit: ' + e.message, 'error');
+          loadDrafts();
+          return;
+        }
+      }
+    }
+
     // Optimistic update
     setDrafts(prev => prev.map(d => d.id === id ? { ...d, [field]: value } : d));
     try {
@@ -100,6 +120,19 @@ export function ManualIngestionGrid({ refreshKey = 0 }: ManualIngestionGridProps
     } finally {
       setIsDeleting(null);
     }
+  };
+
+  const extractPrintRun = (rawPr: any) => {
+    if (rawPr != null && String(rawPr).trim() !== '') {
+      const s = String(rawPr).trim();
+      const parts = s.split('/');
+      const denominator = parts[parts.length - 1].replace(/\D/g, '');
+      if (denominator) {
+        const n = parseInt(denominator, 10);
+        if (Number.isFinite(n)) return n;
+      }
+    }
+    return '';
   };
 
   if (loading) {
@@ -177,6 +210,7 @@ export function ManualIngestionGrid({ refreshKey = 0 }: ManualIngestionGridProps
                   <th className="px-4 py-3">Set</th>
                   <th className="px-4 py-3">Card #</th>
                   <th className="px-4 py-3">Parallel/Insert</th>
+                  <th className="px-4 py-3 w-16">PR</th>
                   <th className="px-4 py-3 w-24">Price ($)</th>
                   <th className="px-4 py-3 w-16"></th>
                 </tr>
@@ -241,6 +275,19 @@ export function ManualIngestionGrid({ refreshKey = 0 }: ManualIngestionGridProps
                         value={draft.parallel_name || draft.insert_name || ''}
                         onChange={(val) => handleUpdate(draft.id, 'parallel_name', val)}
                         className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none py-1 font-medium text-slate-700 transition-colors w-full"
+                      />
+                    </td>
+                    <td className="px-4 py-3 align-middle text-center">
+                      <input 
+                        type="text" 
+                        defaultValue={draft.print_run ? (String(draft.print_run).startsWith('/') ? draft.print_run : `/${draft.print_run}`) : ''}
+                        onBlur={(e) => {
+                          const val = extractPrintRun(e.target.value);
+                          handleUpdate(draft.id, 'print_run', val || null);
+                          e.target.value = val ? `/${val}` : '';
+                        }}
+                        className="w-16 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none py-1 font-medium text-indigo-600 transition-colors text-center"
+                        placeholder="/PR"
                       />
                     </td>
                     <td className="px-4 py-3 align-middle">

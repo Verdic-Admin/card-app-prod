@@ -80,11 +80,7 @@ const KNOWN_PARALLELS: string[] = [
   'Speckle', 'Spiral', 'Splash', 'Stained Glass', 'Starburst', 'Static', 'Stripes', 'Swirl',
   'Tie-Dye', 'Velocity', 'Wave', 'White Sparkle', 'Wood', 'Woodgrain',
 
-  // ── Numbered / Tiered Quantities ──
-  '/1', '/2', '/3', '/4', '/5', '/7', '/8', '/9', '/10', '/11', '/12', '/13', '/14', '/15',
-  '/20', '/23', '/24', '/25', '/30', '/35', '/40', '/49', '/50', '/60', '/75', '/99', '/100',
-  '/125', '/149', '/150', '/199', '/200', '/249', '/250', '/299', '/300', '/349', '/350',
-  '/399', '/400', '/499', '/500', '/799', '/999', '/2020', '/2021', '/2022', '/2023', '/2024', '/2025',
+  // Standalone print runs removed; now handled by dedicated PR column
   
   // ── Printing Plates & 1/1s ──
   '1/1', 'One of One', 'Masterpiece', 'Logoman', 'Shield', 'Laundry Tag', 'Button', 'Knob',
