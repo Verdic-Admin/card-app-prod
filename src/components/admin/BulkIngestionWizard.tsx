@@ -3,7 +3,7 @@ import { useState, useCallback, useEffect } from 'react'
 import ParallelTypeahead from '@/components/admin/ParallelTypeahead'
 import {
   Upload, Loader2, Play, CheckCircle2, Wand2,
-  RefreshCw, Trash2, Send, Scissors, DollarSign, Search
+  RefreshCw, Trash2, Send, Scissors, DollarSign, Search, AlertCircle
 } from 'lucide-react'
 import { pollScannerResult, identifyCardDirectAction, identifyCardBatchAction } from '@/app/actions/visionSync'
 import type { BatchIdentifyResultItem } from '@/app/actions/visionSync'
@@ -882,6 +882,12 @@ export function BulkIngestionWizard() {
           </div>
 
           {/* Phase-specific action bar (MOVED TO TOP) */}
+          {activeTab === 'identified' && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-3 mt-2 text-xs font-bold flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+              Please double-check the AI outputs below. The identifier occasionally makes mistakes and manual corrections may be required before pricing.
+            </div>
+          )}
           <div className="flex flex-col sm:flex-row gap-3 pt-2 pb-4">
             <button
               onClick={handleReviewDiscard}
