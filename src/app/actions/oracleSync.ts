@@ -19,7 +19,12 @@ function toTitleCase(str: string) {
   if (!str) return "";
   return str.replace(
     /\w\S*/g,
-    (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase()
+    (txt) => {
+      const upper = txt.toUpperCase();
+      // Preserve common card acronyms in all caps
+      if (['RC', 'SP', 'SSP', '1ST', 'TV'].includes(upper)) return upper;
+      return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+    }
   );
 }
 

@@ -61,6 +61,7 @@ export async function requestPricingAction(imageUrl: string): Promise<{
   insert_name: string;
   parallel_name: string;
   card_number: string;
+  is_rookie: boolean;
   confidence: number;
   status: string;
   pricing: {
@@ -87,7 +88,14 @@ export async function requestPricingAction(imageUrl: string): Promise<{
     throw new Error(`Pricing request failed (${response.status}): ${body}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  const is_rookie = 
+    Boolean(data.is_rookie) || 
+    (data.player_name?.toLowerCase().includes(' rc')) ||
+    (data.insert_name?.toLowerCase().includes('rc')) ||
+    (data.parallel_name?.toLowerCase().includes('rc'));
+
+  return { ...data, is_rookie };
 }
 
 // Team-name provenance surfaced by the identifier's OCR-preferred resolver.
@@ -115,6 +123,7 @@ export interface IdentifyCardResult {
   team_name_confidence: number | null; // 0.0 - 1.0
   team_name_verified: boolean | null;  // true when OCR agrees with DB
   print_run: number | null;
+  is_rookie: boolean;
 }
 
 function normalizeIdentifyResponse(raw: any): IdentifyCardResult {
@@ -140,6 +149,24 @@ function normalizeIdentifyResponse(raw: any): IdentifyCardResult {
   const rawVerified = cd.team_name_verified;
   const team_name_verified =
     typeof rawVerified === 'boolean' ? rawVerified : null;
+
+  // Extract is_rookie from card_details or common attributes
+  let is_rookie = 
+    Boolean(cd.is_rookie) || 
+    Boolean(raw?.is_rookie) || 
+    (cd.player_name?.toLowerCase().includes(' rc')) ||
+    (cd.insert_name?.toLowerCase().includes('rc')) ||
+    (cd.parallel_type?.toLowerCase().includes('rc'));
+
+  // Year-based rookie verification: if card year matches player's rookie year
+  const cardYearMatch = cd.card_set?.match(/\b(19|20)\d{2}\b/);
+  const cardYear = cardYearMatch ? parseInt(cardYearMatch[0], 10) : null;
+  const playerRookieYear = cd.player_rookie_year ? parseInt(cd.player_rookie_year, 10) : null;
+
+  if (cardYear && playerRookieYear && cardYear === playerRookieYear) {
+    is_rookie = true;
+  }
+
 
   let print_run: number | null = null;
   const rawPr = cd.print_run ?? raw?.print_run;
@@ -181,6 +208,7 @@ function normalizeIdentifyResponse(raw: any): IdentifyCardResult {
     team_name_confidence,
     team_name_verified,
     print_run,
+    is_rookie,
   };
 }
 

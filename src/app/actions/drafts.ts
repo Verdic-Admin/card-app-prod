@@ -49,7 +49,11 @@ function parsePrintRun(raw: unknown): number | null {
 
 function toTitleCase(str: string) {
   if (!str) return '';
-  return str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+  return str.replace(/\w\S*/g, (txt) => {
+    const upper = txt.toUpperCase();
+    if (['RC', 'SP', 'SSP', '1ST', 'TV'].includes(upper)) return upper;
+    return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+  });
 }
 
 async function getOracleDiscountRate(): Promise<number> {
@@ -240,6 +244,7 @@ export type ApplyStagingDraftPricingResult =
       parallel_name: string;
       confidence?: number;
       ai_status?: string;
+      is_rookie?: boolean;
     }
   | { success: false; error: string };
 
@@ -330,6 +335,7 @@ export async function applyStagingDraftFieldPricingAction(
     card_number: String(row.card_number ?? ''),
     insert_name: String(row.insert_name ?? ''),
     parallel_name: String(row.parallel_name ?? ''),
+    is_rookie: Boolean(row.is_rookie),
   };
 }
 
@@ -393,8 +399,9 @@ export async function applyStagingDraftImagePricingAction(
        oracle_projection = $8,
        oracle_trend_percentage = NULL,
        trend_data = $9::jsonb,
-       player_index_url = $10
-     WHERE id = $11::uuid`,
+       player_index_url = $10,
+       is_rookie = $11
+     WHERE id = $12::uuid`,
     [
       player_name,
       card_set,
@@ -406,6 +413,7 @@ export async function applyStagingDraftImagePricingAction(
       afv,
       JSON.stringify(trendPoints),
       playerIndexUrl || null,
+      Boolean(result.is_rookie),
       id,
     ],
   );
@@ -422,6 +430,7 @@ export async function applyStagingDraftImagePricingAction(
     parallel_name,
     confidence: result.confidence,
     ai_status: result.status,
+    is_rookie: Boolean(result.is_rookie),
   };
 }
 
