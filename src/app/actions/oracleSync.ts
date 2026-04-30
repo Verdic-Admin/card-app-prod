@@ -250,7 +250,11 @@ export async function syncSingleItemWithOracle(id: string) {
       return { success: false, message: `Oracle returned invalid projected target for item ${(item as any).id}.` };
     }
 
-    const new_price = projection * (1 - (discountRate / 100));
+    const currentPrice = data.current_price != null && Number(data.current_price) > 0 
+      ? Number(data.current_price) 
+      : projection;
+
+    const new_price = currentPrice * (1 - (discountRate / 100));
     const trend = data.trend_percentage != null ? Number(data.trend_percentage) : null;
     const trendPoints = Array.isArray(data.trend_points) ? data.trend_points : [];
     const playerIndexUrl = String(data.player_index_url || '');
@@ -264,15 +268,15 @@ export async function syncSingleItemWithOracle(id: string) {
            trend_data = $5::jsonb,
            player_index_url = $6
        WHERE id = $7`,
-      [new_price, projection, projection, trend, JSON.stringify(trendPoints), playerIndexUrl, item.id]
+      [new_price, currentPrice, projection, trend, JSON.stringify(trendPoints), playerIndexUrl, item.id]
     );
 
     return {
       success: true,
-      message: `Repriced to $${new_price.toFixed(2)} (Player Index $${projection.toFixed(2)}${discountRate > 0 ? `, ${discountRate}% store discount applied to listed price` : ''}).`,
+      message: `Repriced to $${new_price.toFixed(2)} (Market $${currentPrice.toFixed(2)}, Oracle Target $${projection.toFixed(2)}${discountRate > 0 ? `, ${discountRate}% store discount applied` : ''}).`,
       new_price,
       listed_price: new_price,
-      market_price: projection,
+      market_price: currentPrice,
       oracle_projection: projection,
       oracle_trend_percentage: trend,
       trend_data: trendPoints,
