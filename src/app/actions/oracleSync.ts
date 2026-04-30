@@ -28,7 +28,7 @@ export async function syncInventoryWithOracle() {
   const { rows: inventory } = await pool.query(
     `SELECT id, player_name, card_set, card_number, insert_name, parallel_name,
             parallel_insert_type,
-            is_auto, is_relic, is_rookie, print_run
+            is_auto, is_relic, is_rookie, print_run, grading_company, grade
      FROM inventory WHERE status = 'available'`
   );
 
@@ -86,6 +86,10 @@ export async function syncInventoryWithOracle() {
         String(row.parallel_name || ''),
         String(row.parallel_insert_type || ''),
       ].filter(Boolean).join(' ');
+      const gradeStr = row.grading_company && row.grade 
+        ? `${String(row.grading_company)} ${String(row.grade)}` 
+        : (row.grade ? String(row.grade) : null);
+        
       return {
         player_name: toTitleCase(String(row.player_name || '')),
         card_set:    String(row.card_set || ''),
@@ -96,6 +100,7 @@ export async function syncInventoryWithOracle() {
         is_auto:   Boolean(row.is_auto),
         is_relic:  Boolean(row.is_relic),
         is_rookie: Boolean(row.is_rookie),
+        grade:     gradeStr,
       };
     });
 
@@ -215,6 +220,10 @@ export async function syncSingleItemWithOracle(id: string) {
   }
 
   try {
+    const gradeStr = (item as any).grading_company && (item as any).grade 
+      ? `${String((item as any).grading_company)} ${String((item as any).grade)}` 
+      : ((item as any).grade ? String((item as any).grade) : null);
+
     const res = await calculatePricingAction({
       player_name: toTitleCase(String((item as any).player_name || "")),
       card_set: String((item as any).card_set || ""),
@@ -225,6 +234,7 @@ export async function syncSingleItemWithOracle(id: string) {
       is_relic: Boolean((item as any).is_relic || false),
       is_rookie: Boolean((item as any).is_rookie || false),
       print_run: (item as any).print_run ? Number((item as any).print_run) : null,
+      grade: gradeStr,
     });
 
     if (!res || typeof res !== 'object' || !('success' in res) || !res.success) {
@@ -296,6 +306,7 @@ export async function evaluateItemWithOracle(payload: any) {
       is_relic: Boolean(payload.is_relic || false),
       is_rookie: Boolean(payload.is_rookie || false),
       print_run: payload.print_run ? Number(payload.print_run) : undefined,
+      grade: payload.grade ? String(payload.grade) : undefined,
       discount_rate: discountRate,
       skip_fuzzy: true
     }
@@ -352,6 +363,7 @@ export async function getSingleOraclePrice(payload: {
       is_relic: Boolean(payload.is_relic || false),
       is_rookie: Boolean(payload.is_rookie || false),
       print_run: payload.print_run ? Number(payload.print_run) : undefined,
+      grade: payload.grade ? String(payload.grade) : undefined,
       skip_fuzzy: true
     };
 
@@ -394,6 +406,10 @@ export async function getBatchOraclePrices(cards: any[]) {
         c.attributes
       ].filter(Boolean).join(" ");
       
+      const gradeStr = c.grading_company && c.grade 
+        ? `${String(c.grading_company)} ${String(c.grade)}` 
+        : (c.grade ? String(c.grade) : undefined);
+        
       return {
         player_name: toTitleCase(String(c.player_name || "")),
         card_set: String(c.card_set || ""),
@@ -404,6 +420,7 @@ export async function getBatchOraclePrices(cards: any[]) {
         is_auto: Boolean(c.is_auto),
         is_relic: Boolean(c.is_relic),
         is_rookie: Boolean(c.is_rookie),
+        grade: gradeStr,
       };
     });
 
