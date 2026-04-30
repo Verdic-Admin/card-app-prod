@@ -828,7 +828,76 @@ export function BulkIngestionWizard() {
             <span className="ml-auto text-xs text-muted font-medium">{reviewSelected.size} selected</span>
           </div>
 
-          <div className="space-y-3 max-h-[72vh] overflow-y-auto pr-1">
+          {/* Phase-specific action bar (MOVED TO TOP) */}
+          <div className="flex flex-col sm:flex-row gap-3 pt-2 pb-4">
+            <button
+              onClick={handleReviewDiscard}
+              disabled={reviewSelected.size === 0 || isDiscarding}
+              className="bg-surface border border-border text-muted font-bold py-3 px-6 rounded-xl disabled:opacity-40 hover:bg-surface-hover hover:text-foreground transition flex items-center justify-center gap-2"
+            >
+              {isDiscarding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              Discard Selected
+            </button>
+
+            {/* Staging: Crop All */}
+            {activeTab === 'staging' && (
+              <button
+                onClick={handleCropAll}
+                disabled={isCroppingAll || isPublishing}
+                className="flex-1 bg-orange-600 text-white font-black py-3 rounded-xl disabled:opacity-40 hover:bg-orange-500 transition flex items-center justify-center gap-2"
+              >
+                {isCroppingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scissors className="w-4 h-4" />}
+                Crop & Rotate All
+              </button>
+            )}
+
+            {/* Cropped: Identify All */}
+            {activeTab === 'cropped' && (
+              <button
+                onClick={handleIdentifyAll}
+                disabled={isIdentifyingAll || isPublishing}
+                className="flex-1 bg-brand text-brand-foreground font-black py-3 rounded-xl disabled:opacity-40 hover:bg-brand-hover transition flex items-center justify-center gap-2"
+              >
+                {isIdentifyingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                Identify All with AI
+              </button>
+            )}
+
+            {/* Identified: Price All + Move to Priced */}
+            {activeTab === 'identified' && (
+              <>
+                <button
+                  onClick={handlePriceAll}
+                  disabled={isPricingAll || isPublishing}
+                  className="flex-1 bg-emerald-700 text-white font-black py-3 rounded-xl disabled:opacity-40 hover:bg-emerald-600 transition flex items-center justify-center gap-2"
+                >
+                  {isPricingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <DollarSign className="w-4 h-4" />}
+                  Price All on Tab
+                </button>
+                <button
+                  onClick={handleMoveToPriced}
+                  className="flex-1 bg-slate-800 text-white font-black py-3 rounded-xl hover:bg-slate-700 transition flex items-center justify-center gap-2"
+                >
+                  <Send className="w-4 h-4" />
+                  Move Selected to Priced
+                </button>
+              </>
+            )}
+
+            {/* Priced: Publish */}
+            {activeTab === 'priced' && (
+              <button
+                onClick={handlePublish}
+                disabled={reviewSelected.size === 0 || isPublishing}
+                className="flex-[2] bg-slate-900 text-white font-black text-lg py-4 rounded-xl disabled:opacity-40 hover:bg-brand transition flex items-center justify-center gap-3 drop-shadow-md"
+              >
+                {isPublishing ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+                Publish {reviewSelected.size > 0 ? `${reviewSelected.size} Cards` : 'Selected'} to Inventory
+              </button>
+            )}
+          </div>
+
+          <div className="space-y-3 pb-12">
             {reviewCards
               .filter(phaseFilter)
               .map(card => (
@@ -1078,76 +1147,6 @@ export function BulkIngestionWizard() {
                   </div>
                 </div>
               ))}
-          </div>
-
-          {/* Phase-specific action bar */}
-          <div className="flex flex-col sm:flex-row gap-3 pt-2">
-            <button
-              onClick={handleReviewDiscard}
-              disabled={reviewSelected.size === 0 || isDiscarding}
-              className="bg-surface border border-border text-muted font-bold py-3 px-6 rounded-xl disabled:opacity-40 hover:bg-surface-hover hover:text-foreground transition flex items-center justify-center gap-2"
-            >
-              {isDiscarding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-              Discard Selected
-            </button>
-
-            {/* Staging: Crop All */}
-            {activeTab === 'staging' && (
-              <button
-                onClick={handleCropAll}
-                disabled={isCroppingAll || isPublishing}
-                className="flex-1 bg-orange-600 text-white font-black py-3 rounded-xl disabled:opacity-40 hover:bg-orange-500 transition flex items-center justify-center gap-2"
-              >
-                {isCroppingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scissors className="w-4 h-4" />}
-                Crop & Rotate All
-              </button>
-            )}
-
-            {/* Cropped: Identify All */}
-            {activeTab === 'cropped' && (
-              <button
-                onClick={handleIdentifyAll}
-                disabled={isIdentifyingAll || isPublishing}
-                className="flex-1 bg-brand text-brand-foreground font-black py-3 rounded-xl disabled:opacity-40 hover:bg-brand-hover transition flex items-center justify-center gap-2"
-              >
-                {isIdentifyingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
-                Identify All with AI
-              </button>
-            )}
-
-            {/* Identified: Price All + Move to Priced */}
-            {activeTab === 'identified' && (
-              <>
-                <button
-                  onClick={handlePriceAll}
-                  disabled={isPricingAll || isPublishing}
-                  className="flex-1 bg-emerald-700 text-white font-black py-3 rounded-xl disabled:opacity-40 hover:bg-emerald-600 transition flex items-center justify-center gap-2"
-                >
-                  {isPricingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <DollarSign className="w-4 h-4" />}
-                  Price All on Tab
-                </button>
-                <button
-                  onClick={handleMoveToPriced}
-                  className="flex-1 bg-slate-800 text-white font-black py-3 rounded-xl hover:bg-slate-700 transition flex items-center justify-center gap-2"
-                >
-                  <Send className="w-4 h-4" />
-                  Move Selected to Priced
-                </button>
-              </>
-            )}
-
-            {/* Priced: Publish */}
-            {activeTab === 'priced' && (
-              <button
-                onClick={handlePublish}
-                disabled={reviewSelected.size === 0 || isPublishing}
-                className="flex-[2] bg-slate-900 text-white font-black text-lg py-4 rounded-xl disabled:opacity-40 hover:bg-brand transition flex items-center justify-center gap-3 drop-shadow-md"
-              >
-                {isPublishing ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
-                Publish {reviewSelected.size > 0 ? `${reviewSelected.size} Cards` : 'Selected'} to Inventory
-              </button>
-            )}
-          </div>
         </div>
       )}
 

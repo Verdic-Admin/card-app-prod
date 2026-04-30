@@ -64,16 +64,20 @@ export function Navbar({ settings }: { settings: StoreSettings }) {
       <nav className="border-b border-border bg-surface/80 backdrop-blur-md relative z-50">
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
-            <Link href="/" className="flex flex-col justify-center">
-              <span className="font-black text-xl tracking-tight text-foreground leading-tight">
-                {settings.site_name}
-              </span>
+            <div className="flex flex-col justify-center">
+              <div className="flex items-baseline gap-1">
+                <Link href="/" className="font-black text-xl tracking-tight text-foreground leading-tight hover:opacity-80 transition-opacity">
+                  {settings.site_name}
+                </Link>
+                {/* Discreet admin entry point: invisible 8x8 block that turns brand color on hover */}
+                <Link href="/admin" className="w-2 h-2 rounded-full opacity-0 hover:opacity-100 transition-opacity bg-brand cursor-pointer" title="Admin Access" />
+              </div>
               {settings.site_author && (
                 <span className="text-xs text-muted tracking-wide leading-tight">
                   by {settings.site_author}
                 </span>
               )}
-            </Link>
+            </div>
             <div className="flex items-center gap-4 sm:gap-6">
               <Link href="/" className="text-sm font-bold text-muted hover:text-foreground transition-colors">
                 Shop
