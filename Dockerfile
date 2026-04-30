@@ -33,11 +33,13 @@ COPY . .
 ARG GIT_SHA=unknown
 ENV NEXT_PUBLIC_GIT_SHA=${GIT_SHA}
 
+# Set production environment for the build
+ENV NODE_ENV=production
+
 # Disable telemetry during build
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# DB init runs at container startup (see docker-entrypoint.sh), not at build time.
-# We run `next build` directly.
+# Run the build
 RUN npx next build
 
 # ── Stage 3: Runner ──────────────────────────────────────────────────────────
@@ -52,9 +54,10 @@ RUN apk add --no-cache curl
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy the standalone output
-COPY --from=builder /app/public ./public
+# Copy the standalone output first
 COPY --from=builder /app/.next/standalone ./
+# Then copy public and static assets into the standalone directory structure
+COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/static ./.next/static
 
 # Copy the DB init script (runs at startup to migrate schema)
