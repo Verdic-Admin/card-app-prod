@@ -409,43 +409,6 @@ export default async function ItemPage({ params }: PageProps) {
             </div>
           )}
 
-          {/* Market Comps — reassurance block showing eBay listings used for pricing */}
-          {(item as any).oracle_comps && Array.isArray((item as any).oracle_comps) && (item as any).oracle_comps.length > 0 && (
-            <div className="border-t border-border pt-4 mt-2">
-              <div className="rounded-xl border border-zinc-700/60 bg-zinc-900/50 px-4 py-4">
-                <p className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-1">
-                  Market Comps
-                </p>
-                <p className="text-[11px] text-zinc-500 mb-3 border-b border-zinc-800 pb-3">
-                  Active listings our pricing engine used to derive the market floor.
-                </p>
-                <div className="space-y-1.5">
-                  {(item as any).oracle_comps.map((comp: { price: number; url: string }, idx: number) => (
-                    <div key={idx} className="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-zinc-800/50 border border-zinc-700/40 hover:border-zinc-600 transition-all group">
-                      <div className="flex items-center gap-2.5">
-                        <span className="text-[10px] font-black text-zinc-500 bg-zinc-800 w-5 h-5 rounded-full flex items-center justify-center border border-zinc-700">{idx + 1}</span>
-                        <span className="text-sm font-bold text-zinc-200">
-                          ${Number(comp.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                      <a
-                        href={comp.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs font-bold text-brand hover:text-brand-hover transition-colors flex items-center gap-1 group-hover:underline underline-offset-2"
-                      >
-                        View on eBay <span className="text-[10px]">↗</span>
-                      </a>
-                    </div>
-                  ))}
-                </div>
-                <p className="text-[10px] text-zinc-600 mt-2 italic">
-                  Comp links may include affiliate tracking. Prices reflect current Buy-It-Now listings at time of last sync.
-                </p>
-              </div>
-            </div>
-          )}
-
           {/* Add to Cart / PayPal */}
           <div className="mt-2">
             <ItemDetailClient item={item as any} />
