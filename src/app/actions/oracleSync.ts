@@ -33,7 +33,7 @@ export async function syncInventoryWithOracle() {
   const { rows: inventory } = await pool.query(
     `SELECT id, player_name, card_set, card_number, insert_name, parallel_name,
             parallel_insert_type,
-            is_auto, is_relic, is_rookie, is_1st, is_short_print, print_run, grading_company, grade
+            is_auto, is_relic, is_rookie, is_1st, is_short_print, is_ssp, print_run, grading_company, grade
      FROM inventory WHERE status = 'available'`
   );
 
@@ -107,6 +107,7 @@ export async function syncInventoryWithOracle() {
         is_rookie: Boolean(row.is_rookie),
         is_1st:    Boolean(row.is_1st),
         is_short_print: Boolean(row.is_short_print),
+        is_ssp:    Boolean(row.is_ssp),
         grade:     gradeStr,
       };
     });
@@ -242,6 +243,7 @@ export async function syncSingleItemWithOracle(id: string) {
       is_rookie: Boolean((item as any).is_rookie || false),
       is_1st: Boolean((item as any).is_1st || false),
       is_short_print: Boolean((item as any).is_short_print || false),
+      is_ssp: Boolean((item as any).is_ssp || false),
       print_run: (item as any).print_run ? Number((item as any).print_run) : null,
       grade: gradeStr,
     });
@@ -360,10 +362,11 @@ export async function getSingleOraclePrice(payload: {
   card_number?: string; 
   insert_name?: string; 
   parallel_name?: string; 
-  is_auto?: boolean; 
-  is_relic?: boolean; 
-  is_rookie?: boolean; 
-  print_run?: number;
+  is_rookie?: boolean;
+  is_1st?: boolean;
+  is_short_print?: boolean;
+  is_ssp?: boolean;
+  is_auto?: boolean;
   grade?: string | null;
 }) {
   try {

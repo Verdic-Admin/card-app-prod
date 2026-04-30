@@ -117,9 +117,11 @@ ALTER TABLE inventory ADD COLUMN IF NOT EXISTS filename TEXT;
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS show_forecast BOOLEAN DEFAULT false;
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS is_1st BOOLEAN DEFAULT false;
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS is_short_print BOOLEAN DEFAULT false;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS is_ssp BOOLEAN DEFAULT false;
 
 ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS is_1st BOOLEAN DEFAULT false;
 ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS is_short_print BOOLEAN DEFAULT false;
+ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS is_ssp BOOLEAN DEFAULT false;
 `;
 
 async function runIdempotentAlters(client) {

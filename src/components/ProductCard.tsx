@@ -144,21 +144,13 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
                 {item.parallel_insert_type}
               </span>
             )}
-            {(item as any).is_rookie && (
-              <span className="text-[9px] font-black bg-yellow-400/20 text-yellow-400 border border-yellow-400/40 px-2 py-0.5 rounded-full uppercase tracking-wider">RC</span>
-            )}
-            {(item as any).is_1st && (
-              <span className="text-[9px] font-black bg-sky-400/20 text-sky-400 border border-sky-400/40 px-2 py-0.5 rounded-full uppercase tracking-wider">1st</span>
-            )}
-            {(item as any).is_short_print && (
-              <span className="text-[9px] font-black bg-red-400/20 text-red-400 border border-red-400/40 px-2 py-0.5 rounded-full uppercase tracking-wider">SP</span>
-            )}
-            {(item as any).is_auto && (
-              <span className="text-[9px] font-black bg-blue-400/20 text-blue-400 border border-blue-400/40 px-2 py-0.5 rounded-full uppercase tracking-wider">Auto</span>
-            )}
-            {(item as any).is_relic && (
-              <span className="text-[9px] font-black bg-purple-400/20 text-purple-400 border border-purple-400/40 px-2 py-0.5 rounded-full uppercase tracking-wider">Relic</span>
-            )}
+            {attributeMap.map(({ key, label, class: className }) => (
+              (item as any)[key] && (
+                <span key={key} className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider border ${className}`}>
+                  {label}
+                </span>
+              )
+            ))}
             {(item as any).grading_company && (item as any).grade && (
               <span className="text-[9px] font-black bg-emerald-400/20 text-emerald-400 border border-emerald-400/40 px-2 py-0.5 rounded-full uppercase tracking-wider">
                 {(item as any).grading_company} {(item as any).grade}

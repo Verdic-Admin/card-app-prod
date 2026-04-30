@@ -64,6 +64,7 @@ export async function requestPricingAction(imageUrl: string): Promise<{
   is_rookie: boolean;
   is_1st: boolean;
   is_short_print: boolean;
+  is_ssp: boolean;
   confidence: number;
   status: string;
   pricing: {
@@ -102,13 +103,19 @@ export async function requestPricingAction(imageUrl: string): Promise<{
     (data.insert_name?.toLowerCase().includes('1st')) ||
     (data.parallel_name?.toLowerCase().includes('1st'));
 
-  const is_short_print = 
-    (data.player_name?.toLowerCase().includes(' sp')) ||
+  const is_ssp = 
     (data.player_name?.toLowerCase().includes(' ssp')) ||
-    (data.parallel_name?.toLowerCase().includes(' sp')) ||
+    (data.insert_name?.toLowerCase().includes(' ssp')) ||
     (data.parallel_name?.toLowerCase().includes(' ssp'));
 
-  return { ...data, is_rookie, is_1st, is_short_print };
+  const is_short_print = 
+    !is_ssp && (
+      (data.player_name?.toLowerCase().includes(' sp')) ||
+      (data.insert_name?.toLowerCase().includes(' sp')) ||
+      (data.parallel_name?.toLowerCase().includes(' sp'))
+    );
+
+  return { ...data, is_rookie, is_1st, is_short_print, is_ssp };
 }
 
 // Team-name provenance surfaced by the identifier's OCR-preferred resolver.
@@ -139,6 +146,7 @@ export interface IdentifyCardResult {
   is_rookie: boolean;
   is_1st: boolean;
   is_short_print: boolean;
+  is_ssp: boolean;
 }
 
 function normalizeIdentifyResponse(raw: any): IdentifyCardResult {
@@ -188,15 +196,20 @@ function normalizeIdentifyResponse(raw: any): IdentifyCardResult {
     (cd.insert_name?.toLowerCase().includes('1st')) ||
     (cd.parallel_type?.toLowerCase().includes('1st'));
 
-  // Detect SP / SSP
-  const is_short_print = 
-    (cd.player_name?.toLowerCase().includes(' sp')) ||
+  // Detect SP / SSP separately
+  const is_ssp = 
     (cd.player_name?.toLowerCase().includes(' ssp')) ||
-    (cd.insert_name?.toLowerCase().includes(' sp')) ||
     (cd.insert_name?.toLowerCase().includes(' ssp')) ||
-    (cd.parallel_type?.toLowerCase().includes(' sp')) ||
     (cd.parallel_type?.toLowerCase().includes(' ssp')) ||
-    (cd.parallel_type?.toLowerCase().includes('short print'));
+    (cd.parallel_type?.toLowerCase().includes('super short print'));
+
+  const is_short_print = 
+    !is_ssp && (
+      (cd.player_name?.toLowerCase().includes(' sp')) ||
+      (cd.insert_name?.toLowerCase().includes(' sp')) ||
+      (cd.parallel_type?.toLowerCase().includes(' sp')) ||
+      (cd.parallel_type?.toLowerCase().includes('short print'))
+    );
 
 
   let print_run: number | null = null;
@@ -242,6 +255,7 @@ function normalizeIdentifyResponse(raw: any): IdentifyCardResult {
     is_rookie,
     is_1st,
     is_short_print,
+    is_ssp,
   };
 }
 
