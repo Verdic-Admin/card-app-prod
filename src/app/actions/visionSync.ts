@@ -242,7 +242,7 @@ export async function identifyCardBatchAction(items: {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
     body: JSON.stringify({ items }),
-    signal: AbortSignal.timeout(180_000),
+    signal: AbortSignal.timeout(290_000), // Increased to 290s to better align with Cloud Run's 300s max timeout
   });
 
   if (response.status === 402) throw new Error('credits_exhausted');

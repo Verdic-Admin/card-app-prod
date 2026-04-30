@@ -247,7 +247,7 @@ export function BulkIngestionWizard() {
     }
     setIsIdentifyingAll(true)
 
-    const BATCH_SIZE = 9
+    const BATCH_SIZE = 4
     const totalBatches = Math.ceil(visibleCards.length / BATCH_SIZE)
     let totalIdentified = 0
 

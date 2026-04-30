@@ -745,8 +745,15 @@ export async function applyStagingDraftBatchPricingAction(
     const id = String(row.id);
     const priceResult = batchRes.results[i];
 
-    if (!priceResult || priceResult.status !== 'accepted' || priceResult.projected_target == null) {
+    // The oracle /v1/b2b/calculate-batch response has no per-item `status` field —
+    // only the top-level envelope has { status: "success" }. Per-item failures are
+    // signalled by projected_target == 0 or the presence of an `error` key.
+    if (!priceResult || priceResult.projected_target == null) {
       output.push({ id, success: false, error: priceResult?.message || 'No price returned.' });
+      continue;
+    }
+    if ('error' in priceResult && priceResult.error) {
+      output.push({ id, success: false, error: String(priceResult.error) });
       continue;
     }
 
