@@ -70,7 +70,7 @@ export function Navbar({ settings }: { settings: StoreSettings }) {
                   {settings.site_name}
                 </Link>
                 {/* Discreet admin entry point: invisible 8x8 block that turns brand color on hover */}
-                <Link href="/admin" className="w-2 h-2 rounded-full opacity-0 hover:opacity-100 transition-opacity bg-brand cursor-pointer" title="Admin Access" />
+                <Link href="/admin" className="w-3 h-3 rounded-full opacity-5 hover:opacity-100 transition-opacity bg-brand cursor-pointer" title="Admin Access" />
               </div>
               {settings.site_author && (
                 <span className="text-xs text-muted tracking-wide leading-tight">
