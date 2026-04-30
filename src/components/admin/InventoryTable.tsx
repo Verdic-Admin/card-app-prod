@@ -1512,16 +1512,31 @@ export function InventoryTable({
                         </div>
                       )}
                       {pricing.hasManualOverride && (
-                        <div className="text-[10px] text-amber-600 font-bold mt-0.5">Manual override active</div>
+                        <div className="flex items-center gap-2 mt-1.5">
+                           <div className="text-[10px] text-amber-600 font-black uppercase tracking-tight flex items-center gap-1">
+                             <AlertCircle className="w-3 h-3" />
+                             Manual Override
+                           </div>
+                           <button 
+                             onClick={() => handleApplyOracleDiscount(item)}
+                             disabled={applyingId === item.id}
+                             className="text-[10px] font-black text-white bg-amber-500 hover:bg-amber-600 px-2 py-0.5 rounded shadow-sm transition-colors flex items-center gap-1"
+                           >
+                             {applyingId === item.id ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <RefreshCw className="w-2.5 h-2.5" />}
+                             Apply Sync Results?
+                           </button>
+                        </div>
                       )}
-                      <button
-                        onClick={() => handleApplyOracleDiscount(item)}
-                        disabled={applyingId === item.id}
-                        className="mt-1.5 w-full text-[11px] font-bold py-1.5 rounded-md bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center gap-1 transition-colors disabled:opacity-50 shadow-sm"
-                      >
-                        {applyingId === item.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <DollarSign className="w-3 h-3" />}
-                        Apply {discountRate}% Below Player Index
-                      </button>
+                      {!pricing.hasManualOverride && (
+                        <button
+                          onClick={() => handleApplyOracleDiscount(item)}
+                          disabled={applyingId === item.id}
+                          className="mt-1.5 w-full text-[11px] font-bold py-1.5 rounded-md bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center gap-1 transition-colors disabled:opacity-50 shadow-sm"
+                        >
+                          {applyingId === item.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <DollarSign className="w-3 h-3" />}
+                          Apply {discountRate}% Below Player Index
+                        </button>
+                      )}
                     </div>
                   )}
 

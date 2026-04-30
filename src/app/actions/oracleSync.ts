@@ -33,7 +33,8 @@ export async function syncInventoryWithOracle() {
   const { rows: inventory } = await pool.query(
     `SELECT id, player_name, card_set, card_number, insert_name, parallel_name,
             parallel_insert_type,
-            is_auto, is_relic, is_rookie, is_1st, is_short_print, is_ssp, print_run, grading_company, grade
+            is_auto, is_relic, is_rookie, is_1st, is_short_print, is_ssp, print_run, grading_company, grade,
+            listed_price, oracle_projection
      FROM inventory WHERE status = 'available'`
   );
 
@@ -70,7 +71,7 @@ export async function syncInventoryWithOracle() {
     id: string;
     listed_price: number;
     market_price: number;
-    trend_data: number[];
+    trend_data: any;
     player_index_url: string;
     oracle_projection: number;
     oracle_trend_percentage: number | null;
@@ -142,7 +143,22 @@ export async function syncInventoryWithOracle() {
         const projection = Number(r?.projected_target ?? r?.target_price ?? 0);
         if (!Number.isFinite(projection) || projection <= 0) continue;
 
-        const listed = projection * (1 - discountRate / 100);
+        const computedPrice = projection * (1 - discountRate / 100);
+        
+        // Manual Override Detection Logic (matches src/utils/pricing.ts)
+        const currentListed = Number(row.listed_price || 0);
+        const currentProjection = Number(row.oracle_projection || 0);
+        const currentComputed = currentProjection > 0 ? currentProjection * (1 - discountRate / 100) : 0;
+        
+        const isManualOverride = 
+          currentProjection > 0 && 
+          currentListed > 0 && 
+          Math.abs(currentListed - currentComputed) > 0.01;
+
+        // If manual override exists, preserve the current listed_price.
+        // Otherwise, update to the new computed price.
+        const finalListed = isManualOverride ? currentListed : computedPrice;
+
         const trendPayload = {
           days_ago: r?.last_search_days_ago,
           delta: r?.last_search_delta_price
@@ -150,9 +166,9 @@ export async function syncInventoryWithOracle() {
 
         updates.push({
           id: String(row.id),
-          listed_price: listed,
+          listed_price: finalListed,
           market_price: projection,
-          trend_data: trendPayload as any,
+          trend_data: trendPayload,
           player_index_url: String(r?.player_index_url || ''),
           oracle_projection: projection,
           oracle_trend_percentage: r?.trend_percentage != null ? Number(r.trend_percentage) : null,
