@@ -3,7 +3,7 @@ import { useState, useCallback, useEffect } from 'react'
 import ParallelTypeahead from '@/components/admin/ParallelTypeahead'
 import {
   Upload, Loader2, Play, CheckCircle2, Wand2,
-  RefreshCw, Trash2, Send, Scissors, DollarSign
+  RefreshCw, Trash2, Send, Scissors, DollarSign, Search
 } from 'lucide-react'
 import { pollScannerResult, identifyCardDirectAction, identifyCardBatchAction } from '@/app/actions/visionSync'
 import type { BatchIdentifyResultItem } from '@/app/actions/visionSync'
@@ -1177,6 +1177,16 @@ export function BulkIngestionWizard() {
                             : <DollarSign className="w-3.5 h-3.5" />}
                           Send to Pricing
                         </button>
+                        <a 
+                          href={`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent([card.player_name, card.card_set, card.insert_name, card.parallel_name, card.card_number].filter((v: any) => v && String(v).toLowerCase() !== 'base').join(' '))}&LH_Sold=1&LH_Complete=1`} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="flex items-center gap-1 text-xs font-bold text-sky-600 hover:text-sky-700 transition" 
+                          title="Check eBay Completed Listings"
+                        >
+                          <Search className="w-3.5 h-3.5" />
+                          Check Comps
+                        </a>
                         {activeTab === 'identified' && parseFloat(String(card.listed_price)) > 0 && (
                           <button
                             onClick={() => { setPricedIds(prev => { const n = new Set(prev); n.add(card.id); return n }); showToast('Moved to Priced.', 'success') }}

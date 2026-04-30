@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Loader2, Trash2, Send, Image as ImageIcon, Wand2 } from 'lucide-react';
+import { Loader2, Trash2, Send, Image as ImageIcon, Wand2, Search } from 'lucide-react';
 import { listScanStagingAction, updateDraftCardAction, publishDraftCardsAction, promoteToPremiumTrackAction } from '@/app/actions/drafts';
 import { deleteStagingCardsAction } from '@/app/actions/inventory';
 import { useToastContext } from '@/components/admin/ToastProvider';
@@ -232,7 +232,7 @@ export function ManualIngestionGrid({ refreshKey = 0 }: ManualIngestionGridProps
                   <th className="px-4 py-3">Flags</th>
                   <th className="px-4 py-3 w-16">PR</th>
                   <th className="px-4 py-3 w-24">Price ($)</th>
-                  <th className="px-4 py-3 w-16"></th>
+                  <th className="px-4 py-3 w-28 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -335,11 +335,21 @@ export function ManualIngestionGrid({ refreshKey = 0 }: ManualIngestionGridProps
                         />
                       </div>
                     </td>
-                    <td className="px-4 py-3 align-middle text-right">
+                    <td className="px-4 py-3 align-middle text-right whitespace-nowrap">
+                      <a 
+                        href={`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent([draft.player_name, draft.card_set, draft.insert_name, draft.parallel_name, draft.card_number].filter((v: any) => v && String(v).toLowerCase() !== 'base').join(' '))}&LH_Sold=1&LH_Complete=1`} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="inline-flex items-center gap-1 text-[10px] font-bold text-sky-600 hover:text-sky-700 hover:bg-sky-50 px-2 py-1.5 rounded transition-colors mr-1" 
+                        title="Check eBay Completed Listings"
+                      >
+                        <Search className="w-3.5 h-3.5" />
+                        Comps
+                      </a>
                       <button 
                         onClick={() => handleDelete(draft.id)}
                         disabled={isDeleting === draft.id}
-                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
                         title="Delete Draft"
                       >
                         {isDeleting === draft.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
