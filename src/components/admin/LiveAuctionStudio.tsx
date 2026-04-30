@@ -37,6 +37,30 @@ const EMPTY_DRAFT: ItemStagingDraft = {
   bidIncrement: '',
 }
 
+const TIMEZONES = [
+  { label: 'ET', value: 'America/New_York' },
+  { label: 'CT', value: 'America/Chicago' },
+  { label: 'MT', value: 'America/Denver' },
+  { label: 'PT', value: 'America/Los_Angeles' },
+  { label: 'UTC', value: 'UTC' },
+]
+
+function combineDateTimeWithTz(dt: string, tz: string): string {
+  if (!dt) return ''
+  try {
+    // Get the offset for the target timezone on the selected date
+    const offset = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      timeZoneName: 'longOffset'
+    }).formatToParts(new Date(dt)).find(p => p.type === 'timeZoneName')?.value || 'GMT'
+    
+    const cleanOffset = offset.replace('GMT', '') || 'Z'
+    return `${dt}:00${cleanOffset}`
+  } catch (e) {
+    return dt
+  }
+}
+
 function itemSearchHaystack(item: any): string {
   const pr = item.print_run != null ? String(item.print_run) : ''
   return [
@@ -74,11 +98,13 @@ export function LiveAuctionStudio({
   const [stageDrafts, setStageDrafts] = useState<Record<string, ItemStagingDraft>>({})
   const [stageGlobalEnd, setStageGlobalEnd] = useState('')
   const [stageGlobalDesc, setStageGlobalDesc] = useState('')
+  const [stageGlobalTz, setStageGlobalTz] = useState('America/New_York')
   const [stageCommitting, setStageCommitting] = useState(false)
   const [stageError, setStageError] = useState<string | null>(null)
   const [stageSuccess, setStageSuccess] = useState<number | null>(null)
 
   const [globalPendingEndTime, setGlobalPendingEndTime] = useState('')
+  const [globalPendingTz, setGlobalPendingTz] = useState('America/New_York')
 
   const [coinFileLabel, setCoinFileLabel] = useState<Record<string, string>>({})
 
@@ -169,11 +195,16 @@ export function LiveAuctionStudio({
       const d = stageDrafts[id] ?? EMPTY_DRAFT
       const reservePriceNum = d.reservePrice ? Number(d.reservePrice) : null
       const bidIncrementNum = d.bidIncrement ? Number(d.bidIncrement) : null
+      
+      const normalizedEndTime = d.endTime 
+        ? combineDateTimeWithTz(d.endTime, stageGlobalTz)
+        : (stageGlobalEnd ? combineDateTimeWithTz(stageGlobalEnd, stageGlobalTz) : null)
+
       return {
         id,
         reservePrice:
           reservePriceNum != null && Number.isFinite(reservePriceNum) ? reservePriceNum : null,
-        endTime: d.endTime || null,
+        endTime: normalizedEndTime,
         description: d.description || null,
         bidIncrement:
           bidIncrementNum != null && Number.isFinite(bidIncrementNum) && bidIncrementNum > 0
@@ -510,12 +541,23 @@ export function LiveAuctionStudio({
                   <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block mb-1">
                     Default end time
                   </label>
-                  <input
-                    type="datetime-local"
-                    value={stageGlobalEnd}
-                    onChange={e => setStageGlobalEnd(e.target.value)}
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900"
-                  />
+                  <div className="flex gap-1">
+                    <input
+                      type="datetime-local"
+                      value={stageGlobalEnd}
+                      onChange={e => setStageGlobalEnd(e.target.value)}
+                      className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900"
+                    />
+                    <select
+                      value={stageGlobalTz}
+                      onChange={e => setStageGlobalTz(e.target.value)}
+                      className="border border-slate-300 rounded-lg px-2 py-2 text-xs font-bold bg-white"
+                    >
+                      {TIMEZONES.map(tz => (
+                        <option key={tz.value} value={tz.value}>{tz.label}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 <div>
                   <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block mb-1">
@@ -630,22 +672,38 @@ export function LiveAuctionStudio({
           </div>
           <div className="flex flex-wrap items-center justify-end gap-3">
             <div className="flex items-center gap-2 border border-slate-200 bg-slate-50 rounded-lg p-1.5 shrink-0">
-              <input
-                type="datetime-local"
-                value={globalPendingEndTime}
-                onChange={e => setGlobalPendingEndTime(e.target.value)}
-                className="border border-slate-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-indigo-500"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  if (globalPendingEndTime) {
-                    document.querySelectorAll('input[name="endTime"]').forEach(el => {
-                      (el as HTMLInputElement).value = globalPendingEndTime;
-                    });
-                    showToast('success', 'End time applied to all rows. Remember to Save each row.');
-                  }
-                }}
+                <div className="flex gap-1">
+                  <input
+                    type="datetime-local"
+                    value={globalPendingEndTime}
+                    onChange={e => setGlobalPendingEndTime(e.target.value)}
+                    className="border border-slate-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                  <select
+                    value={globalPendingTz}
+                    onChange={e => setGlobalPendingTz(e.target.value)}
+                    className="border border-slate-300 rounded px-1 py-1 text-[10px] font-bold bg-white"
+                  >
+                    {TIMEZONES.map(tz => (
+                      <option key={tz.value} value={tz.value}>{tz.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (globalPendingEndTime) {
+                      const normalized = combineDateTimeWithTz(globalPendingEndTime, globalPendingTz)
+                      // Find all endTime inputs in the pending list and update them
+                      const rows = document.querySelectorAll('#auction-staging form')
+                      rows.forEach(row => {
+                        const input = row.querySelector('input[name="endTime"]') as HTMLInputElement
+                        if (input) input.value = globalPendingEndTime // UI keeps local for editing
+                        // We also need to trigger the save logic or just rely on the form submit
+                      })
+                      showToast('success', `End time (${globalPendingTz}) applied to all rows. Remember to Save each row.`);
+                    }
+                  }}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded text-xs font-bold transition-colors disabled:opacity-50"
                 disabled={!globalPendingEndTime}
               >
@@ -783,6 +841,14 @@ export function LiveAuctionStudio({
                   onSubmit={async e => {
                     e.preventDefault()
                     const fd = new FormData(e.currentTarget)
+                    
+                    // Normalize the time with the selected timezone before sending
+                    const rawEnd = fd.get('endTime') as string
+                    if (rawEnd) {
+                      const normalized = combineDateTimeWithTz(rawEnd, globalPendingTz)
+                      fd.set('endTime', normalized)
+                    }
+
                     try {
                       const res = await updateStagedAuction(item.id, fd)
                       setItems(prev =>
