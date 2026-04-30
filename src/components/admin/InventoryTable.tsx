@@ -7,6 +7,8 @@ import { useToastContext } from '@/components/admin/ToastProvider'
 import { toggleCardStatus, editCardAction, deleteCardAction, bulkDeleteCardsAction, bulkUpdateMetricsAction, rotateCardImageAction, removeFromAuctionBlock, updateProjectionTimeframe, createLotAction, breakLotAction, updateLotChildren, duplicateInventoryItem, toggleForecastStatus, bulkPublishForecasts } from '@/app/actions/inventory'
 import { AuctionBidLogButton } from '@/components/admin/AuctionBidLogButton'
 import { syncSingleItemWithOracle, syncInventoryWithOracle, applyOracleDiscount, applyOracleDiscountAll, applyCorrection, approvePriceOnly, denyCorrection } from '@/app/actions/oracleSync'
+import ParallelTypeahead from '@/components/admin/ParallelTypeahead';
+import PrintRunTypeahead from '@/components/admin/PrintRunTypeahead';
 import { Loader2, Trash2, Edit2, Check, X, Search, Download, RotateCw, RefreshCw, DollarSign, Save, AlertCircle, Gavel, Package, Share2, CopyPlus, MoreHorizontal, Eye } from 'lucide-react'
 import { price } from '@/utils/math'
 import { deriveDisplayPricing } from '@/utils/pricing'
@@ -1332,9 +1334,17 @@ export function InventoryTable({
                   </div>
                   <div className="flex gap-1.5">
                     <input type="text" value={editForm.card_number || ''} onChange={e => setEditForm({...editForm, card_number: e.target.value})} className="w-1/4 p-1.5 text-xs font-bold text-slate-900 bg-white border border-indigo-100 rounded focus:border-indigo-500 outline-none" placeholder="#No" />
-                    <input type="number" value={editForm.print_run || ''} onChange={e => setEditForm({...editForm, print_run: parseInt(e.target.value) || null})} className="w-1/4 p-1.5 text-xs font-bold text-slate-900 bg-white border border-indigo-100 rounded focus:border-indigo-500 outline-none" placeholder="/99 (Print)" />
+                    <PrintRunTypeahead
+                      value={editForm.print_run ? Number(editForm.print_run) : null}
+                      onChange={val => setEditForm({...editForm, print_run: val})}
+                      className="w-1/4 p-1.5 text-xs font-bold text-slate-900 bg-white border border-indigo-100 rounded focus:border-indigo-500 outline-none"
+                    />
                     <input type="text" value={editForm.insert_name || ''} onChange={e => setEditForm({...editForm, insert_name: e.target.value})} className="w-1/4 p-1.5 text-xs font-bold text-slate-900 bg-white border border-indigo-100 rounded focus:border-indigo-500 outline-none" placeholder="Insert" />
-                    <input type="text" value={editForm.parallel_name || ''} onChange={e => setEditForm({...editForm, parallel_name: e.target.value})} className="w-1/4 p-1.5 text-xs font-bold text-slate-900 bg-white border border-indigo-100 rounded focus:border-indigo-500 outline-none" placeholder="Parallel" />
+                    <ParallelTypeahead
+                      value={editForm.parallel_name || ''}
+                      onChange={val => setEditForm({...editForm, parallel_name: val})}
+                      className="w-1/4 p-1.5 text-xs font-bold text-slate-900 bg-white border border-indigo-100 rounded focus:border-indigo-500 outline-none"
+                    />
                   </div>
                   <div className="flex gap-1.5">
                     <div className="flex items-center w-1/2">
