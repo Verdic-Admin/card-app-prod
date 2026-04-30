@@ -1487,7 +1487,8 @@ export function InventoryTable({
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-[10px] font-bold text-purple-700 uppercase tracking-wider flex items-center gap-1">🔮 Player Index Value</span>
                         {(item as any).oracle_trend_percentage != null && (
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${price((item as any).oracle_trend_percentage) >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-1 ${price((item as any).oracle_trend_percentage) >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                            <span className="opacity-75 uppercase text-[8px]">Momentum:</span>
                             {price((item as any).oracle_trend_percentage) >= 0 ? '↑' : '↓'} {Math.abs(price((item as any).oracle_trend_percentage)).toFixed(1)}%
                           </span>
                         )}
@@ -1506,9 +1507,13 @@ export function InventoryTable({
                           Your price: ${pricing.effectiveStorePrice.toFixed(2)} ({pricing.percentBelowPlayerIndex.toFixed(0)}% below)
                         </div>
                       )}
-                      {(item as any).trend_data && typeof (item as any).trend_data === 'object' && !Array.isArray((item as any).trend_data) && (item as any).trend_data.days_ago > 0 && (
+                      {(item as any).trend_data && typeof (item as any).trend_data === 'object' && !Array.isArray((item as any).trend_data) && (item as any).trend_data.days_ago > 0 ? (
                         <div className="text-[10px] text-purple-600/80 font-medium mt-1 pt-1 border-t border-purple-100/50">
-                          Vol: {(item as any).trend_data.delta >= 0 ? '+' : ''}${(item as any).trend_data.delta?.toFixed(2) || '0.00'} since {(item as any).trend_data.days_ago} days ago
+                          Historical Volatility: {(item as any).trend_data.delta >= 0 ? '+' : ''}${(item as any).trend_data.delta?.toFixed(2) || '0.00'} since {(item as any).trend_data.days_ago} days ago
+                        </div>
+                      ) : (
+                        <div className="text-[10px] text-purple-400 font-medium mt-1 pt-1 border-t border-purple-100/50">
+                          Historical Volatility: No Data
                         </div>
                       )}
                       {pricing.hasManualOverride && (
