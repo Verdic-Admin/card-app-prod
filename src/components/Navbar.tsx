@@ -69,15 +69,17 @@ export function Navbar({ settings }: { settings: StoreSettings }) {
                 <Link href="/" className="font-black text-xl tracking-tight text-foreground leading-tight hover:opacity-80 transition-opacity">
                   {settings.site_name}
                 </Link>
+              </div>
+              <div className="flex items-center gap-1 mt-0.5">
+                {settings.site_author && (
+                  <span className="text-xs text-muted tracking-wide leading-tight">
+                    by {settings.site_author}
+                  </span>
+                )}
                 <Link href="/admin" className="opacity-20 hover:opacity-100 transition-opacity text-foreground cursor-pointer" title="Admin Access">
                   <Settings className="w-3 h-3" />
                 </Link>
               </div>
-              {settings.site_author && (
-                <span className="text-xs text-muted tracking-wide leading-tight">
-                  by {settings.site_author}
-                </span>
-              )}
             </div>
             <div className="flex items-center gap-4 sm:gap-6">
               <Link href="/" className="text-sm font-bold text-muted hover:text-foreground transition-colors">
