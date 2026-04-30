@@ -6,7 +6,7 @@ import { LedgerDashboard } from '@/components/admin/LedgerDashboard'
 import { CollectorRequestsCRM } from '@/components/admin/CollectorRequestsCRM'
 import { PendingApprovalsQueue } from '@/components/admin/PendingApprovalsQueue'
 import Link from 'next/link'
-import { Gavel } from 'lucide-react'
+import { Gavel, MessageCircleQuestion } from 'lucide-react'
 import { InstructionTrigger } from '@/components/admin/DraggableGuide'
 import { AutoUpdateReminder } from '@/components/admin/AutoUpdateReminder'
 
@@ -162,6 +162,15 @@ export default async function AdminPage() {
           </Link>
           <a href="https://playerindexdata.com/master-operations-manual.pdf" target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-slate-900 text-white font-black rounded-lg hover:bg-slate-800 transition-colors shadow-lg border border-slate-700 text-sm">
             Master Ops Manual
+          </a>
+          <a
+            href="https://help.railway.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white font-black rounded-lg hover:bg-teal-500 transition-colors shadow-md border border-teal-500/50 text-sm"
+          >
+            <MessageCircleQuestion className="w-4 h-4" />
+            Feedback & Questions
           </a>
         </div>
       </div>
