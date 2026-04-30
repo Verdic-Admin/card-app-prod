@@ -91,6 +91,7 @@ export function BulkIngestionWizard() {
   const [batchFront, setBatchFront] = useState<File | null>(null)
   const [batchBack, setBatchBack] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
 
   // Step 2 — scanning spinner
   const [scanJobId, setScanJobId] = useState<string | null>(null)
@@ -738,14 +739,27 @@ export function BulkIngestionWizard() {
 
               {/* Single file picker — select 2 images (front matrix + back matrix) */}
               <div
-                className={`border-2 border-dashed ${isUploading ? 'border-brand/50 bg-brand/10 opacity-70 pointer-events-none' : 'border-brand/30 bg-brand/5 hover:bg-surface-hover cursor-pointer'} rounded-xl p-4 flex flex-col items-center justify-center transition`}
-                onDragOver={e => e.preventDefault()}
+                className={`border-2 border-dashed transition-all ${
+                  isUploading 
+                    ? 'border-brand/50 bg-brand/10 opacity-70 pointer-events-none' 
+                    : isDragging 
+                      ? 'border-brand bg-brand/10 scale-[1.01]' 
+                      : 'border-brand/30 bg-brand/5 hover:bg-surface-hover cursor-pointer'
+                } rounded-xl p-6 flex flex-col items-center justify-center`}
+                onDragOver={e => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
+                onDragEnter={e => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
+                onDragLeave={e => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
                 onDrop={e => {
                   e.preventDefault()
+                  e.stopPropagation()
+                  setIsDragging(false)
                   if (isUploading) return
-                  const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/')).slice(0, 2)
+                  const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/') || f.name.match(/\.(jpg|jpeg|png|webp|heic)$/i)).slice(0, 2)
                   if (files.length === 2) {
                     handleUpload(files[0], files[1])
+                  } else if (files.length === 1) {
+                    setBatchFront(files[0])
+                    setBatchBack(null)
                   }
                 }}
                 onClick={() => !isUploading && document.getElementById('pair-upload')?.click()}
