@@ -111,6 +111,7 @@ export function LiveAuctionStudio({
   const [editingLiveId, setEditingLiveId] = useState<string | null>(null)
   const [savingLiveId, setSavingLiveId] = useState<string | null>(null)
   const [goingLive, setGoingLive] = useState(false)
+  const [removingStaged, setRemovingStaged] = useState(false)
   const [toastMsg, setToastMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const showToast = (type: 'success' | 'error', text: string) => {
@@ -710,6 +711,36 @@ export function LiveAuctionStudio({
                 Apply to All
               </button>
             </div>
+            <button
+              type="button"
+              disabled={removingStaged || pendingItems.length === 0}
+              onClick={async () => {
+                const checked = document.querySelectorAll('input[name="stagedItemRadio"]:checked');
+                let ids: string[];
+                if (checked.length > 0) {
+                  ids = Array.from(checked).map(i => (i as HTMLInputElement).value);
+                } else {
+                  showToast('error', 'Select at least one staged item to remove.');
+                  return;
+                }
+                setRemovingStaged(true);
+                try {
+                  await import('@/app/actions/inventory').then(m => m.bulkRemoveFromAuctionBlock(ids));
+                  setItems(prev => prev.map(i => ids.includes(i.id) ? { ...i, is_auction: false, auction_status: 'pending' } : i));
+                  showToast('success', `Removed ${ids.length} item(s) from staging.`);
+                  router.refresh();
+                } catch (e: unknown) {
+                  const msg = e instanceof Error ? e.message : String(e);
+                  showToast('error', `Could not remove items: ${msg}`);
+                } finally {
+                  setRemovingStaged(false);
+                }
+              }}
+              className="bg-rose-100 hover:bg-rose-200 text-rose-800 px-4 py-2 rounded-lg font-bold transition-colors disabled:opacity-50 text-sm shrink-0 flex items-center gap-2"
+            >
+              {removingStaged ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              Discard Selected
+            </button>
             <button
               type="button"
               onClick={handleGenBatch}

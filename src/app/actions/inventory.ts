@@ -1137,6 +1137,21 @@ export async function removeFromAuctionBlock(id: string) {
   revalidatePath('/auction')
 }
 
+export async function bulkRemoveFromAuctionBlock(ids: string[]) {
+  await checkAuth();
+  if (ids.length === 0) return { success: true };
+  try {
+    await pool.query(`UPDATE inventory SET is_auction = false, auction_status = 'pending' WHERE id = ANY($1::uuid[])`, [ids]);
+    revalidatePath('/admin');
+    revalidatePath('/auction');
+    return { success: true };
+  } catch (e: unknown) {
+    const errorMsg = e instanceof Error ? e.message : String(e);
+    console.error('Failed to remove from auction block:', errorMsg);
+    return { success: false, error: errorMsg };
+  }
+}
+
 export async function setAuctionStatus(id: string, status: 'pending' | 'live' | 'ended') {
   await checkAuth();
     await pool.query(`UPDATE inventory SET auction_status = $1 WHERE id = $2`, [status, id]);
