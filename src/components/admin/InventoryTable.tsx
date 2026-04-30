@@ -1264,7 +1264,7 @@ export function InventoryTable({
         {filteredItems.map(item => (
           <div
             key={item.id}
-            className={`relative rounded-xl border bg-white shadow-sm flex flex-col overflow-hidden transition-all group ${selectedIds.has(item.id) ? 'ring-2 ring-indigo-400 border-indigo-300' : 'border-slate-200 hover:border-slate-300'}`}
+            className={`relative rounded-xl border bg-white shadow-sm flex flex-col transition-all group ${selectedIds.has(item.id) ? 'ring-2 ring-indigo-400 border-indigo-300' : 'border-slate-200 hover:border-slate-300'} ${editingId === item.id ? '' : 'overflow-hidden'}`}
           >
             {/* Select checkbox */}
             <div className="absolute top-2 left-2 z-10">
