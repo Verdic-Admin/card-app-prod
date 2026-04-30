@@ -607,7 +607,7 @@ export async function publishDraftCardsAction(ids: string[]): Promise<PublishDra
               image_url, back_image_url, raw_front_url, raw_back_url,
               listed_price, market_price,
               trend_data, player_index_url, oracle_projection, oracle_trend_percentage,
-              is_rookie, is_auto, is_relic, grading_company, grade
+              is_rookie, is_1st, is_short_print, is_ssp, is_auto, is_relic, grading_company, grade
        FROM scan_staging WHERE id = ANY($1::uuid[])`,
       [ids as string[]],
     );
@@ -677,9 +677,9 @@ export async function publishDraftCardsAction(ids: string[]): Promise<PublishDra
                player_name, team_name, card_set, card_number, insert_name, parallel_name, parallel_insert_type,
                print_run, image_url, back_image_url, listed_price, market_price,
                trend_data, player_index_url, oracle_projection, oracle_trend_percentage,
-               is_rookie, is_auto, is_relic, grading_company, grade, status
+               is_rookie, is_1st, is_short_print, is_ssp, is_auto, is_relic, grading_company, grade, status
              )
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14, $15, $16, $17, $18, $19, $20, $21, 'available')
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, 'available')
           `,
         [
           sqlText(s.player_name),
@@ -699,6 +699,9 @@ export async function publishDraftCardsAction(ids: string[]): Promise<PublishDra
           oracleProj,
           oracleTrend,
           Boolean(s.is_rookie),
+          Boolean(s.is_1st),
+          Boolean(s.is_short_print),
+          Boolean(s.is_ssp),
           Boolean(s.is_auto),
           Boolean(s.is_relic),
           sqlNullableText(s.grading_company),
@@ -736,6 +739,7 @@ export interface BatchPricingResult {
   success: boolean;
   listed_price?: number;
   market_price?: number;
+  ebay_comps?: { price: number; url: string }[];
   error?: string;
 }
 
@@ -834,7 +838,7 @@ export async function applyStagingDraftBatchPricingAction(
          WHERE id = $6::uuid`,
         [listed, projection, projection, trend, playerIndexUrl || null, id],
       );
-      output.push({ id, success: true, listed_price: listed, market_price: projection });
+      output.push({ id, success: true, listed_price: listed, market_price: projection, ebay_comps: priceResult.ebay_comps || [] });
     } catch (e: unknown) {
       output.push({ id, success: false, error: e instanceof Error ? e.message : String(e) });
     }

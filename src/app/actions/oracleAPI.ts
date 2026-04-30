@@ -185,6 +185,7 @@ export interface BatchPricingResultItem {
   trend_percentage?: number;
   source?: string;
   url?: string | null;
+  ebay_comps?: { price: number; url: string }[];
   did_you_mean?: Record<string, string>;
   status?: string;
   message?: string;

@@ -56,6 +56,7 @@ interface StagingCard {
   team_name_source?: 'ocr_back' | 'ocr_with_db_conflict' | 'catalog_db' | 'none' | null
   team_name_confidence?: number | null
   team_name_verified?: boolean | null
+  ebay_comps?: { price: number; url: string }[]
 }
 
 function isPendingScan(c: StagingCard): boolean {
@@ -585,7 +586,7 @@ export function BulkIngestionWizard() {
       for (const r of batchRes.results) {
         if (r.success && r.listed_price != null) {
           setReviewCards(prev => prev.map(c =>
-            c.id === r.id ? { ...c, repricing: false, listed_price: String(r.listed_price) } : c
+            c.id === r.id ? { ...c, repricing: false, listed_price: String(r.listed_price), ebay_comps: r.ebay_comps || [] } : c
           ))
         } else {
           setReviewCards(prev => prev.map(c =>
@@ -1197,6 +1198,28 @@ export function BulkIngestionWizard() {
                           </button>
                         )}
                       </div>
+
+                      {/* Comps Used — visible on Priced tab */}
+                      {activeTab === 'priced' && card.ebay_comps && card.ebay_comps.length > 0 && (
+                        <div className="mt-1.5 border border-border rounded-lg p-2 bg-surface-hover/50">
+                          <span className="text-[10px] font-black text-muted uppercase tracking-wide">Comps Used</span>
+                          <div className="mt-1 space-y-1">
+                            {card.ebay_comps.map((comp, idx) => (
+                              <div key={idx} className="flex items-center justify-between text-xs">
+                                <span className="text-foreground font-bold">${Number(comp.price).toFixed(2)}</span>
+                                <a
+                                  href={comp.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-brand hover:text-brand-hover font-bold transition"
+                                >
+                                  View on eBay ↗
+                                </a>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       </>
                     )}
                     </div>

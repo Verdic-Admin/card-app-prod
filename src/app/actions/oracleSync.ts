@@ -74,6 +74,7 @@ export async function syncInventoryWithOracle() {
     player_index_url: string;
     oracle_projection: number;
     oracle_trend_percentage: number | null;
+    oracle_comps: any[] | null;
   }> = [];
   let pricedCount = 0;
 
@@ -150,6 +151,7 @@ export async function syncInventoryWithOracle() {
           player_index_url: String(r?.player_index_url || ''),
           oracle_projection: projection,
           oracle_trend_percentage: r?.trend_percentage != null ? Number(r.trend_percentage) : null,
+          oracle_comps: Array.isArray(r?.ebay_comps) && r.ebay_comps.length > 0 ? r.ebay_comps : null,
         });
         pricedCount++;
       }
@@ -177,8 +179,8 @@ export async function syncInventoryWithOracle() {
 
     for (const u of updates) {
       await pool.query(
-        `UPDATE inventory SET oracle_projection = $1, oracle_trend_percentage = $2 WHERE id = $3`,
-        [u.oracle_projection, u.oracle_trend_percentage, u.id]
+        `UPDATE inventory SET oracle_projection = $1, oracle_trend_percentage = $2, oracle_comps = $3::jsonb WHERE id = $4`,
+        [u.oracle_projection, u.oracle_trend_percentage, u.oracle_comps ? JSON.stringify(u.oracle_comps) : null, u.id]
       );
     }
   } catch (err: any) {
@@ -270,6 +272,8 @@ export async function syncSingleItemWithOracle(id: string) {
     const trendPoints = Array.isArray(data.trend_points) ? data.trend_points : [];
     const playerIndexUrl = String(data.player_index_url || '');
 
+    const comps = Array.isArray(data.ebay_comps) && data.ebay_comps.length > 0 ? data.ebay_comps : null;
+
     await pool.query(
       `UPDATE inventory
        SET listed_price = $1,
@@ -277,9 +281,10 @@ export async function syncSingleItemWithOracle(id: string) {
            oracle_projection = $3,
            oracle_trend_percentage = $4,
            trend_data = $5::jsonb,
-           player_index_url = $6
-       WHERE id = $7`,
-      [new_price, currentPrice, projection, trend, JSON.stringify(trendPoints), playerIndexUrl, item.id]
+           player_index_url = $6,
+           oracle_comps = $7::jsonb
+       WHERE id = $8`,
+      [new_price, currentPrice, projection, trend, JSON.stringify(trendPoints), playerIndexUrl, comps ? JSON.stringify(comps) : null, item.id]
     );
 
     return {

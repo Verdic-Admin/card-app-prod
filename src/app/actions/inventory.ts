@@ -155,21 +155,26 @@ export async function addCardAction(formData: FormData): Promise<AddCardResult> 
     const avg = n(payload.avg_price);
     const listed = n(payload.listed_price, avg);
 
+    const printRunRaw = payload.print_run;
+    const printRun = printRunRaw != null && String(printRunRaw).trim() !== ''
+      ? parseInt(String(printRunRaw).replace(/\D/g, ''), 10) || null
+      : null;
+
     await pool.query(
       `
     INSERT INTO inventory (
       player_name, team_name, card_set, insert_name, parallel_name, card_number, 
       high_price, low_price, avg_price, listed_price, cost_basis, accepts_offers, 
       image_url, back_image_url,
-      is_rookie, is_auto, is_relic, grading_company, grade,
-      status
+      is_rookie, is_1st, is_short_print, is_auto, is_relic, grading_company, grade,
+      print_run, status
     ) VALUES (
       $1, $2, $3, $4,
       $5, $6, $7, $8,
       $9, $10, $11, $12,
       $13, $14,
-      $15, $16, $17, $18, $19,
-      'available'
+      $15, $16, $17, $18, $19, $20, $21,
+      $22, 'available'
     )
   `,
       [
@@ -188,10 +193,13 @@ export async function addCardAction(formData: FormData): Promise<AddCardResult> 
         blob.url,
         backImageUrl,
         Boolean(payload.is_rookie),
+        Boolean(payload.is_1st),
+        Boolean(payload.is_short_print),
         Boolean(payload.is_auto),
         Boolean(payload.is_relic),
         payload.grading_company != null ? String(payload.grading_company) : null,
         payload.grade != null ? String(payload.grade) : null,
+        printRun,
       ],
     );
 
@@ -213,12 +221,12 @@ export async function batchCommitAction(items: BulkInventoryItem[]) {
       await pool.query(`
         INSERT INTO inventory (
           player_name, card_set, insert_name, parallel_name, parallel_insert_type,
-          listed_price, avg_price, cost_basis, accepts_offers, image_url, back_image_url, status
+          listed_price, avg_price, cost_basis, accepts_offers, image_url, back_image_url, print_run, status
         ) VALUES (
           $1, $2, $3, $4, $5,
-          $6, $7, 0, true, $8, $9, 'available'
+          $6, $7, 0, true, $8, $9, $10, 'available'
         )
-      `, [item.player_name, item.card_set, item.insert_name, item.parallel_name, parallel_insert_type, item.price || 0, item.price || 0, item.side_a_url, item.side_b_url]);
+      `, [item.player_name, item.card_set, item.insert_name, item.parallel_name, parallel_insert_type, item.price || 0, item.price || 0, item.side_a_url, item.side_b_url, (item as any).print_run != null ? Number((item as any).print_run) || null : null]);
 
     } catch (err) {
        console.error("Insertion failed:", err)
@@ -510,7 +518,8 @@ export async function editCardAction(id: string, payload: EditCardPayload): Prom
          market_price = NULL,
          oracle_trend_percentage = NULL,
          trend_data = NULL,
-         player_index_url = NULL
+         player_index_url = NULL,
+         oracle_comps = NULL
        WHERE id = $2::uuid`,
       [newListed, id],
     );
@@ -527,6 +536,7 @@ export async function editCardAction(id: string, payload: EditCardPayload): Prom
         oracle_trend_percentage: null,
         trend_data: null,
         player_index_url: null,
+        oracle_comps: null,
       },
     };
   }
@@ -583,7 +593,7 @@ export async function duplicateInventoryItem(id: string): Promise<DuplicateInven
         high_price, low_price, avg_price, listed_price, market_price, cost_basis, accepts_offers,
         is_lot, lot_id,
         image_url, back_image_url, coined_image_url,
-        status, trend_data, player_index_url, oracle_projection, oracle_trend_percentage,
+        status, trend_data, player_index_url, oracle_projection, oracle_trend_percentage, oracle_comps,
         needs_correction, needs_price_approval,
         sold_at, checkout_expires_at,
         is_auction, auction_status, auction_reserve_price, auction_end_time, auction_description,
@@ -597,7 +607,7 @@ export async function duplicateInventoryItem(id: string): Promise<DuplicateInven
         high_price, low_price, avg_price, listed_price, market_price, cost_basis, accepts_offers,
         false, NULL,
         image_url, back_image_url, coined_image_url,
-        'available', trend_data, player_index_url, oracle_projection, oracle_trend_percentage,
+        'available', trend_data, player_index_url, oracle_projection, oracle_trend_percentage, oracle_comps,
         false, false,
         NULL, NULL,
         false, 'pending', NULL, NULL, NULL,
