@@ -139,7 +139,9 @@ export default function ParallelTypeahead({ value, onChange, onBlur, className }
   const listRef = useRef<HTMLUListElement>(null)
 
   const suggestions = useMemo(() => {
-    if (!value?.trim()) return KNOWN_PARALLELS.slice(0, 30)
+    if (!value?.trim()) {
+      return KNOWN_PARALLELS.slice(0, 30).map(p => ({ label: p, match: true, score: 0 }))
+    }
     return KNOWN_PARALLELS
       .map(p => ({ label: p, ...fuzzyMatch(value, p) }))
       .filter(s => s.match)
@@ -207,7 +209,7 @@ export default function ParallelTypeahead({ value, onChange, onBlur, className }
         }}
         onKeyDown={handleKeyDown}
         placeholder="Parallel"
-        className={className}
+        className={`w-full ${className || ''}`}
       />
 
       {open && suggestions.length > 0 && (

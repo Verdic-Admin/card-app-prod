@@ -1148,6 +1148,8 @@ export function BulkIngestionWizard() {
                 </div>
               ))}
         </div>
+
+      </div>
       )}
 
       {/* ── Image zoom lightbox ─────────────────────────────────────────────── */}
