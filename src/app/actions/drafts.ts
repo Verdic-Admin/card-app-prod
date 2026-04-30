@@ -745,7 +745,7 @@ export async function applyStagingDraftBatchPricingAction(
     const id = String(row.id);
     const priceResult = batchRes.results[i];
 
-    if (!priceResult || priceResult.status === 'accepted' || priceResult.projected_target == null) {
+    if (!priceResult || priceResult.status !== 'accepted' || priceResult.projected_target == null) {
       output.push({ id, success: false, error: priceResult?.message || 'No price returned.' });
       continue;
     }

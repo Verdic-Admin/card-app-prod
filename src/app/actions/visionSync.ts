@@ -75,7 +75,7 @@ export async function requestPricingAction(imageUrl: string): Promise<{
   const response = await fetch(`${base}/orchestrator/process-asset`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
-    body: JSON.stringify({ image_url: imageUrl, shop_id: 'local_shop' }),
+    body: JSON.stringify({ image_url: imageUrl, shop_id: apiKey }),
   });
 
   if (response.status === 402) {
@@ -83,7 +83,8 @@ export async function requestPricingAction(imageUrl: string): Promise<{
   }
 
   if (!response.ok) {
-    throw new Error(`Pricing request failed: ${response.statusText}`);
+    const body = await response.text().catch(() => response.statusText);
+    throw new Error(`Pricing request failed (${response.status}): ${body}`);
   }
 
   return response.json();
