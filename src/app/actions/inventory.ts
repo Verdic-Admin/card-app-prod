@@ -771,6 +771,7 @@ export interface AuctionStageItemInput {
   reservePrice?: number | null;
   endTime?: string | null;
   description?: string | null;
+  bidIncrement?: number | null;
 }
 
 export interface AuctionStageGlobals {
@@ -825,6 +826,11 @@ export async function stageAuctionItems(
           ? String(raw.description)
           : globalDesc;
 
+      const bidIncrement =
+        raw.bidIncrement != null && !Number.isNaN(Number(raw.bidIncrement)) && Number(raw.bidIncrement) > 0
+          ? Number(raw.bidIncrement)
+          : null;
+
       await pool.query(
         `
         UPDATE inventory
@@ -832,10 +838,11 @@ export async function stageAuctionItems(
             auction_status = 'pending',
             auction_reserve_price = COALESCE($1, auction_reserve_price),
             auction_end_time = COALESCE($2, auction_end_time),
-            auction_description = COALESCE($3, auction_description)
+            auction_description = COALESCE($3, auction_description),
+            auction_bid_increment = COALESCE($5, auction_bid_increment)
         WHERE id = $4
       `,
-        [reservePrice, endTime, description, raw.id],
+        [reservePrice, endTime, description, raw.id, bidIncrement],
       );
 
       if (item.is_lot) {
@@ -860,9 +867,32 @@ export async function stageAuctionItems(
 
 
 export async function placeBidAction(itemId: string, bidderEmail: string, bidAmount: number) {
-  // Using an atomic transaction ensures no race conditions on read/write of current_bid
-  // Standard Postgres atomicity: UPDATE ... RETURNING handles single-row consistency.
-  // Actually, standard UPDATE ... RETURNING handles atomicity for single rows.
+  // Read current state atomically so we can validate the increment before writing
+  const { rows: currentRows } = await pool.query<{
+    current_bid: string | number | null;
+    auction_bid_increment: string | number | null;
+    is_auction: boolean;
+    auction_status: string;
+  }>(
+    `SELECT current_bid, auction_bid_increment, is_auction, auction_status
+     FROM inventory WHERE id = $1`,
+    [itemId],
+  );
+
+  if (!currentRows.length) throw new Error('Auction item not found.');
+  const row = currentRows[0];
+
+  if (!row.is_auction || row.auction_status !== 'live') {
+    throw new Error('409 Conflict: Auction is not live.');
+  }
+
+  const currentBid = row.current_bid != null ? parseFloat(String(row.current_bid)) : 0;
+  const increment = row.auction_bid_increment != null ? parseFloat(String(row.auction_bid_increment)) : 1.00;
+  const minimumBid = parseFloat((currentBid + increment).toFixed(2));
+
+  if (bidAmount < minimumBid) {
+    throw new Error(`409 Conflict: Minimum bid is $${minimumBid.toFixed(2)} (current $${currentBid.toFixed(2)} + $${increment.toFixed(2)} increment).`);
+  }
 
   const { rows } = await pool.query(`
      UPDATE inventory 
@@ -877,7 +907,7 @@ export async function placeBidAction(itemId: string, bidderEmail: string, bidAmo
   `, [bidAmount, itemId]);
 
   if (rows.length === 0) {
-     throw new Error("409 Conflict: Bid is too low or auction has ended.");
+     throw new Error('409 Conflict: Bid is too low or auction has ended.');
   }
 
   // Insert the bid log
@@ -999,6 +1029,7 @@ export async function updateStagedAuction(
   const reservePrice = formData.get('reservePrice') as string;
   const endTime = formData.get('endTime') as string;
   const description = formData.get('description') as string;
+  const bidIncrement = formData.get('bidIncrement') as string;
   // Next.js can supply File, Blob, or a string for empty file inputs; accept any Blob.
   const file = formData.get('coinedImage');
   if (reservePrice) {
@@ -1013,6 +1044,12 @@ export async function updateStagedAuction(
   if (description) {
     await pool.query(`UPDATE inventory SET auction_description = $1 WHERE id = $2::uuid`, [
       description,
+      itemId,
+    ]);
+  }
+  if (bidIncrement && Number(bidIncrement) > 0) {
+    await pool.query(`UPDATE inventory SET auction_bid_increment = $1 WHERE id = $2::uuid`, [
+      Number(bidIncrement),
       itemId,
     ]);
   }

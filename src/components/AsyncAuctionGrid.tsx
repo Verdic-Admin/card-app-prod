@@ -24,6 +24,7 @@ interface AsyncItem {
   is_relic?: boolean
   grading_company?: string | null
   grade?: string | null
+  auction_bid_increment?: number | null
   [key: string]: unknown
 }
 
@@ -63,18 +64,30 @@ function CountdownTimer({ endTime }: { endTime: string }) {
   )
 }
 
-function AsyncBidInput({ itemId, currentBid, endTime, onBidPlaced }: {
+function AsyncBidInput({ itemId, currentBid, bidIncrement, endTime, onBidPlaced }: {
   itemId: string
   currentBid: number
+  bidIncrement: number
   endTime: string
   onBidPlaced: () => void
 }) {
   const isExpired = new Date(endTime).getTime() <= Date.now()
   const [handle, setHandle] = useState('')
-  const [amount, setAmount] = useState('')
   const [hasStored, setHasStored] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+
+  // The minimum valid bid is always currentBid + 1 increment (rounded to cents)
+  const minBid = parseFloat((currentBid + bidIncrement).toFixed(2))
+  const [amount, setAmount] = useState(minBid)
+
+  // Keep the stepper in sync if currentBid updates from polling
+  useEffect(() => {
+    setAmount(prev => {
+      const newMin = parseFloat((currentBid + bidIncrement).toFixed(2))
+      return prev < newMin ? newMin : prev
+    })
+  }, [currentBid, bidIncrement])
 
   useEffect(() => {
     const saved = getSavedHandle()
@@ -90,20 +103,31 @@ function AsyncBidInput({ itemId, currentBid, endTime, onBidPlaced }: {
     )
   }
 
+  const step = (dir: 1 | -1) => {
+    setAmount(prev => {
+      const next = parseFloat((prev + dir * bidIncrement).toFixed(2))
+      const floor = parseFloat((currentBid + bidIncrement).toFixed(2))
+      return next < floor ? floor : next
+    })
+  }
+
   const submit = async () => {
     const trimmed = handle.trim()
     if (!trimmed) { setFeedback({ type: 'error', msg: 'Enter your handle' }); return }
-    const n = Number(amount)
-    if (!n || n <= currentBid) { setFeedback({ type: 'error', msg: `Must be above $${currentBid.toFixed(2)}` }); return }
+    const floor = parseFloat((currentBid + bidIncrement).toFixed(2))
+    if (amount < floor) {
+      setFeedback({ type: 'error', msg: `Minimum bid is $${floor.toFixed(2)}` })
+      return
+    }
     setSubmitting(true); setFeedback(null)
     try {
       const { placeBidAction } = await import('@/app/actions/inventory')
-      await placeBidAction(itemId, trimmed, n)
-      saveHandle(trimmed); setHasStored(true); setAmount('')
-      setFeedback({ type: 'success', msg: 'Bid placed!' })
+      await placeBidAction(itemId, trimmed, amount)
+      saveHandle(trimmed); setHasStored(true)
+      setFeedback({ type: 'success', msg: 'Bid placed! 🎉' })
       onBidPlaced()
     } catch (e: unknown) {
-      setFeedback({ type: 'error', msg: e instanceof Error ? e.message : String(e) })
+      setFeedback({ type: 'error', msg: e instanceof Error ? e.message.replace(/^409 Conflict: /, '') : String(e) })
     } finally { setSubmitting(false) }
   }
 
@@ -117,19 +141,46 @@ function AsyncBidInput({ itemId, currentBid, endTime, onBidPlaced }: {
       ) : (
         <input type="text" value={handle} onChange={e => setHandle(e.target.value)} placeholder="Your handle (@twitter, FB name)" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-500 focus:ring-2 focus:ring-cyan-500 outline-none" />
       )}
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-bold text-sm">$</span>
-          <input type="number" step="0.01" min={currentBid + 0.01} value={amount} onChange={e => setAmount(e.target.value)} placeholder={(currentBid + 1).toFixed(2)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg pl-7 pr-3 py-2.5 text-sm text-white font-mono placeholder-zinc-600 focus:ring-2 focus:ring-emerald-500 outline-none" onKeyDown={e => { if (e.key === 'Enter') submit() }} />
+
+      {/* Stepper */}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => step(-1)}
+          disabled={submitting}
+          className="w-10 h-10 rounded-lg bg-zinc-800 border border-zinc-700 text-white font-black text-xl hover:bg-zinc-700 disabled:opacity-40 flex items-center justify-center leading-none"
+          aria-label="Decrease bid"
+        >−</button>
+        <div className="flex-1 text-center bg-zinc-800 border border-zinc-700 rounded-lg py-2 px-3">
+          <span className="text-zinc-500 font-bold text-sm">$</span>
+          <span className="font-mono font-black text-xl text-white ml-0.5">{amount.toFixed(2)}</span>
         </div>
-        <button type="button" onClick={submit} disabled={submitting} className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black px-5 py-2.5 rounded-lg text-sm transition-colors shadow-lg whitespace-nowrap">
-          {submitting ? '...' : 'BID'}
-        </button>
+        <button
+          type="button"
+          onClick={() => step(1)}
+          disabled={submitting}
+          className="w-10 h-10 rounded-lg bg-zinc-800 border border-zinc-700 text-white font-black text-xl hover:bg-zinc-700 disabled:opacity-40 flex items-center justify-center leading-none"
+          aria-label="Increase bid"
+        >+</button>
       </div>
-      {feedback && <p className={`text-xs font-bold ${feedback.type === 'success' ? 'text-emerald-400' : 'text-red-400'}`}>{feedback.msg}</p>}
+      <p className="text-[10px] text-zinc-600 text-center">
+        Min bid: ${minBid.toFixed(2)} · Increment: ${bidIncrement.toFixed(2)}
+      </p>
+
+      <button
+        type="button"
+        onClick={submit}
+        disabled={submitting}
+        className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black py-2.5 rounded-lg text-sm transition-colors shadow-lg"
+      >
+        {submitting ? 'Submitting…' : `Place Bid — $${amount.toFixed(2)}`}
+      </button>
+
+      {feedback && <p className={`text-xs font-bold text-center ${feedback.type === 'success' ? 'text-emerald-400' : 'text-red-400'}`}>{feedback.msg}</p>}
     </div>
   )
 }
+
 
 export function AsyncAuctionGrid({ initialItems }: { initialItems: AsyncItem[] }) {
   const [items, setItems] = useState<AsyncItem[]>(initialItems)
@@ -217,7 +268,13 @@ export function AsyncAuctionGrid({ initialItems }: { initialItems: AsyncItem[] }
               </div>
 
               {/* Bid input with auto-lock on expiry */}
-              <AsyncBidInput itemId={item.id} currentBid={currentBid} endTime={item.auction_end_time} onBidPlaced={() => {}} />
+              <AsyncBidInput
+                itemId={item.id}
+                currentBid={currentBid}
+                bidIncrement={item.auction_bid_increment != null ? parseFloat(String(item.auction_bid_increment)) : 1.00}
+                endTime={item.auction_end_time}
+                onBidPlaced={() => {}}
+              />
             </div>
           </div>
         )

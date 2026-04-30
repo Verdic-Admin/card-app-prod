@@ -27,12 +27,14 @@ interface ItemStagingDraft {
   reservePrice: string
   endTime: string
   description: string
+  bidIncrement: string
 }
 
 const EMPTY_DRAFT: ItemStagingDraft = {
   reservePrice: '',
   endTime: '',
   description: '',
+  bidIncrement: '',
 }
 
 function itemSearchHaystack(item: any): string {
@@ -164,12 +166,17 @@ export function LiveAuctionStudio({
     const payload: AuctionStageItemInput[] = Array.from(stageSelection).map(id => {
       const d = stageDrafts[id] ?? EMPTY_DRAFT
       const reservePriceNum = d.reservePrice ? Number(d.reservePrice) : null
+      const bidIncrementNum = d.bidIncrement ? Number(d.bidIncrement) : null
       return {
         id,
         reservePrice:
           reservePriceNum != null && Number.isFinite(reservePriceNum) ? reservePriceNum : null,
         endTime: d.endTime || null,
         description: d.description || null,
+        bidIncrement:
+          bidIncrementNum != null && Number.isFinite(bidIncrementNum) && bidIncrementNum > 0
+            ? bidIncrementNum
+            : null,
       }
     })
 
@@ -231,6 +238,9 @@ export function LiveAuctionStudio({
                   : i.auction_reserve_price,
                 auction_end_time: (formData.get('endTime') as string) || i.auction_end_time,
                 auction_description: (formData.get('description') as string) || i.auction_description,
+                auction_bid_increment: formData.get('bidIncrement')
+                  ? Number(formData.get('bidIncrement'))
+                  : i.auction_bid_increment,
               }
             : i,
         ),
@@ -549,7 +559,7 @@ export function LiveAuctionStudio({
                         </button>
                       </div>
                     </div>
-                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-4 gap-2">
                       <div>
                         <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Reserve ($)</label>
                         <input
@@ -559,6 +569,18 @@ export function LiveAuctionStudio({
                           onChange={e => updateStageDraft(item.id, 'reservePrice', e.target.value)}
                           className="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"
                           placeholder="0.00"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Bid Increment ($)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0.01"
+                          value={draft.bidIncrement}
+                          onChange={e => updateStageDraft(item.id, 'bidIncrement', e.target.value)}
+                          className="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"
+                          placeholder="1.00"
                         />
                       </div>
                       <div>
@@ -757,13 +779,22 @@ export function LiveAuctionStudio({
                     }
                   }}
                 >
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <input
                       type="number"
                       step="0.01"
                       name="reservePrice"
                       defaultValue={item.auction_reserve_price || ''}
                       placeholder="Reserve ($)"
+                      className="border border-slate-300 rounded px-2 py-1.5 text-sm"
+                    />
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      name="bidIncrement"
+                      defaultValue={item.auction_bid_increment || ''}
+                      placeholder="Bid Increment ($)"
                       className="border border-slate-300 rounded px-2 py-1.5 text-sm"
                     />
                     <input
@@ -891,12 +922,22 @@ export function LiveAuctionStudio({
                   }}
                   className="bg-white border border-red-100 rounded-lg p-3 flex flex-col gap-2"
                 >
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                     <input
                       type="number"
                       step="0.01"
                       name="reservePrice"
                       defaultValue={item.auction_reserve_price || ''}
+                      placeholder="Reserve ($)"
+                      className="border border-slate-300 rounded px-2 py-1.5 text-sm"
+                    />
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      name="bidIncrement"
+                      defaultValue={item.auction_bid_increment || ''}
+                      placeholder="Increment ($)"
                       className="border border-slate-300 rounded px-2 py-1.5 text-sm"
                     />
                     <input

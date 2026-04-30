@@ -72,6 +72,8 @@ ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS player_index_url TEXT;
 ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS oracle_projection NUMERIC(10, 2);
 ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS oracle_trend_percentage NUMERIC(10, 4);
 ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS upload_kind TEXT DEFAULT 'single_pair';
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS auction_bid_increment NUMERIC(12, 2) DEFAULT 1.00;
+
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS is_rookie BOOLEAN DEFAULT false;
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS is_auto BOOLEAN DEFAULT false;
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS is_relic BOOLEAN DEFAULT false;
