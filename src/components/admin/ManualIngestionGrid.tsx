@@ -5,6 +5,7 @@ import { Loader2, Trash2, Send, Image as ImageIcon, Wand2 } from 'lucide-react';
 import { listScanStagingAction, updateDraftCardAction, publishDraftCardsAction, promoteToPremiumTrackAction } from '@/app/actions/drafts';
 import { deleteStagingCardsAction } from '@/app/actions/inventory';
 import { useToastContext } from '@/components/admin/ToastProvider';
+import ParallelTypeahead from '@/components/admin/ParallelTypeahead';
 
 type DraftCard = any;
 
@@ -236,12 +237,10 @@ export function ManualIngestionGrid({ refreshKey = 0 }: ManualIngestionGridProps
                       />
                     </td>
                     <td className="px-4 py-3 align-middle">
-                      <input 
-                        type="text" 
-                        defaultValue={draft.parallel_name || draft.insert_name || ''}
-                        onBlur={(e) => handleUpdate(draft.id, 'parallel_name', e.target.value)}
-                        className="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none py-1 font-medium text-slate-700 transition-colors"
-                        placeholder="Parallel/Insert"
+                      <ParallelTypeahead
+                        value={draft.parallel_name || draft.insert_name || ''}
+                        onChange={(val) => handleUpdate(draft.id, 'parallel_name', val)}
+                        className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none py-1 font-medium text-slate-700 transition-colors w-full"
                       />
                     </td>
                     <td className="px-4 py-3 align-middle">
