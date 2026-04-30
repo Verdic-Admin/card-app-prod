@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link';
-import { ShoppingCart } from 'lucide-react';
+import { ShoppingCart, Settings } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import type { StoreSettings } from '@/lib/store-settings';
 
@@ -69,8 +69,9 @@ export function Navbar({ settings }: { settings: StoreSettings }) {
                 <Link href="/" className="font-black text-xl tracking-tight text-foreground leading-tight hover:opacity-80 transition-opacity">
                   {settings.site_name}
                 </Link>
-                {/* Discreet admin entry point: invisible 8x8 block that turns brand color on hover */}
-                <Link href="/admin" className="w-3 h-3 rounded-full opacity-5 hover:opacity-100 transition-opacity bg-brand cursor-pointer" title="Admin Access" />
+                <Link href="/admin" className="opacity-20 hover:opacity-100 transition-opacity text-foreground cursor-pointer" title="Admin Access">
+                  <Settings className="w-3 h-3" />
+                </Link>
               </div>
               {settings.site_author && (
                 <span className="text-xs text-muted tracking-wide leading-tight">
