@@ -1219,6 +1219,9 @@ export function BulkIngestionWizard() {
                               </div>
                             ))}
                           </div>
+                          <p className="text-[9px] text-muted-foreground mt-2 italic leading-tight">
+                            * Comp links may include affiliate tracking. Prices reflect current Buy-It-Now listings at time of sync.
+                          </p>
                         </div>
                       )}
                       </>
