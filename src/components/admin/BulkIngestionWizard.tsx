@@ -1,5 +1,6 @@
 'use client'
 import { useState, useCallback, useEffect } from 'react'
+import ParallelTypeahead from '@/components/admin/ParallelTypeahead'
 import {
   Upload, Loader2, Play, CheckCircle2, Wand2,
   RefreshCw, Trash2, Send, Scissors, DollarSign
@@ -932,7 +933,6 @@ export function BulkIngestionWizard() {
                           { field: 'card_set', placeholder: 'Card Set' },
                           { field: 'card_number', placeholder: 'Card #' },
                           { field: 'insert_name', placeholder: 'Insert' },
-                          { field: 'parallel_name', placeholder: 'Parallel' },
                           { field: 'print_run', placeholder: 'Print Run' },
                         ].map(({ field, placeholder }) => (
                           <input key={field}
@@ -943,6 +943,13 @@ export function BulkIngestionWizard() {
                             className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
                           />
                         ))}
+                        {/* Parallel — fuzzy typeahead with known parallels */}
+                        <ParallelTypeahead
+                          value={(card as any).parallel_name || ''}
+                          onChange={val => updateReviewField(card.id, 'parallel_name' as keyof StagingCard, val)}
+                          onBlur={val => saveReviewField(card.id, 'parallel_name', val)}
+                          className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
+                        />
                       </div>
                       {card.team_name_source && card.team_name_source !== 'none' && (
                         <div className="text-[10px] text-muted font-medium bg-surface-hover border border-border rounded-md px-2 py-1">
