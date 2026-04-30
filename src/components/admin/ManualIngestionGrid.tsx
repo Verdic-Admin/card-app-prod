@@ -229,6 +229,7 @@ export function ManualIngestionGrid({ refreshKey = 0 }: ManualIngestionGridProps
                   <th className="px-4 py-3">Set</th>
                   <th className="px-4 py-3">Card #</th>
                   <th className="px-4 py-3">Parallel/Insert</th>
+                  <th className="px-4 py-3">Flags</th>
                   <th className="px-4 py-3 w-16">PR</th>
                   <th className="px-4 py-3 w-24">Price ($)</th>
                   <th className="px-4 py-3 w-16"></th>
@@ -295,6 +296,25 @@ export function ManualIngestionGrid({ refreshKey = 0 }: ManualIngestionGridProps
                         onChange={(val) => handleUpdate(draft.id, 'parallel_name', val)}
                         className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none py-1 font-medium text-slate-700 transition-colors w-full"
                       />
+                    </td>
+                    <td className="px-4 py-3 align-middle">
+                      <div className="flex items-center gap-2">
+                        {[
+                          { key: 'is_rookie', label: 'RC' },
+                          { key: 'is_1st', label: '1st' },
+                          { key: 'is_short_print', label: 'SP' },
+                        ].map((f) => (
+                          <label key={f.key} className="flex items-center gap-1 cursor-pointer select-none group">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(draft[f.key])}
+                              onChange={(e) => handleUpdate(draft.id, f.key, e.target.checked)}
+                              className="w-3.5 h-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 accent-indigo-600"
+                            />
+                            <span className="text-[10px] font-bold text-slate-400 group-hover:text-slate-600 uppercase tracking-tighter">{f.label}</span>
+                          </label>
+                        ))}
+                      </div>
                     </td>
                     <td className="px-4 py-3 align-middle text-center">
                       <PrintRunTypeahead

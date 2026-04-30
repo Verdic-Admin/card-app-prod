@@ -21,7 +21,7 @@ DO $$ BEGIN
     UPDATE inventory SET print_run =
       CASE
         WHEN print_run ~ '^[0-9]+$' THEN print_run
-        WHEN print_run ~ '/([0-9]+)' THEN regexp_replace(print_run, '^.*\/([0-9]+).*$', '\1')
+        WHEN print_run ~ '/([0-9]+)' THEN regexp_replace(print_run, '^.*\\/([0-9]+).*$', '\\1')
         ELSE NULL
       END
     WHERE print_run IS NOT NULL;
@@ -115,6 +115,11 @@ ALTER TABLE inventory ADD COLUMN IF NOT EXISTS needs_correction BOOLEAN DEFAULT 
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS needs_price_approval BOOLEAN DEFAULT false;
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS filename TEXT;
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS show_forecast BOOLEAN DEFAULT false;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS is_1st BOOLEAN DEFAULT false;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS is_short_print BOOLEAN DEFAULT false;
+
+ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS is_1st BOOLEAN DEFAULT false;
+ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS is_short_print BOOLEAN DEFAULT false;
 `;
 
 async function runIdempotentAlters(client) {

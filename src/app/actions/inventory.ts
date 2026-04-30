@@ -42,6 +42,8 @@ const EDITABLE_INVENTORY_FIELDS = [
   'cost_basis',
   'accepts_offers',
   'is_rookie',
+  'is_1st',
+  'is_short_print',
   'is_auto',
   'is_relic',
   'grading_company',

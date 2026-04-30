@@ -94,6 +94,8 @@ export async function calculatePricingAction(fields: {
   card_number?: string;
   print_run?: number | null;
   is_rookie?: boolean;
+  is_1st?: boolean;
+  is_short_print?: boolean;
   is_auto?: boolean;
   is_relic?: boolean;
   grade?: string | null;

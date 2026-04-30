@@ -1338,9 +1338,11 @@ export function InventoryTable({
                   {/* Attribute flags */}
                   <div className="flex items-center gap-3 flex-wrap">
                     {([
-                      { key: 'is_rookie' as const, label: 'RC' },
-                      { key: 'is_auto'   as const, label: 'Auto' },
-                      { key: 'is_relic'  as const, label: 'Relic' },
+                      { key: 'is_rookie'      as const, label: 'RC' },
+                      { key: 'is_1st'         as const, label: '1st' },
+                      { key: 'is_short_print' as const, label: 'SP' },
+                      { key: 'is_auto'        as const, label: 'Auto' },
+                      { key: 'is_relic'       as const, label: 'Relic' },
                     ]).map(({ key, label }) => (
                       <label key={key} className="flex items-center gap-1 cursor-pointer">
                         <input

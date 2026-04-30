@@ -147,6 +147,12 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
             {(item as any).is_rookie && (
               <span className="text-[9px] font-black bg-yellow-400/20 text-yellow-400 border border-yellow-400/40 px-2 py-0.5 rounded-full uppercase tracking-wider">RC</span>
             )}
+            {(item as any).is_1st && (
+              <span className="text-[9px] font-black bg-sky-400/20 text-sky-400 border border-sky-400/40 px-2 py-0.5 rounded-full uppercase tracking-wider">1st</span>
+            )}
+            {(item as any).is_short_print && (
+              <span className="text-[9px] font-black bg-red-400/20 text-red-400 border border-red-400/40 px-2 py-0.5 rounded-full uppercase tracking-wider">SP</span>
+            )}
             {(item as any).is_auto && (
               <span className="text-[9px] font-black bg-blue-400/20 text-blue-400 border border-blue-400/40 px-2 py-0.5 rounded-full uppercase tracking-wider">Auto</span>
             )}

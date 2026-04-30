@@ -33,7 +33,7 @@ export async function syncInventoryWithOracle() {
   const { rows: inventory } = await pool.query(
     `SELECT id, player_name, card_set, card_number, insert_name, parallel_name,
             parallel_insert_type,
-            is_auto, is_relic, is_rookie, print_run, grading_company, grade
+            is_auto, is_relic, is_rookie, is_1st, is_short_print, print_run, grading_company, grade
      FROM inventory WHERE status = 'available'`
   );
 
@@ -105,6 +105,8 @@ export async function syncInventoryWithOracle() {
         is_auto:   Boolean(row.is_auto),
         is_relic:  Boolean(row.is_relic),
         is_rookie: Boolean(row.is_rookie),
+        is_1st:    Boolean(row.is_1st),
+        is_short_print: Boolean(row.is_short_print),
         grade:     gradeStr,
       };
     });
@@ -238,6 +240,8 @@ export async function syncSingleItemWithOracle(id: string) {
       is_auto: Boolean((item as any).is_auto || false),
       is_relic: Boolean((item as any).is_relic || false),
       is_rookie: Boolean((item as any).is_rookie || false),
+      is_1st: Boolean((item as any).is_1st || false),
+      is_short_print: Boolean((item as any).is_short_print || false),
       print_run: (item as any).print_run ? Number((item as any).print_run) : null,
       grade: gradeStr,
     });

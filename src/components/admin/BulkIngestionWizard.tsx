@@ -43,6 +43,8 @@ interface StagingCard {
   raw_front_url?: string | null
   raw_back_url?: string | null
   is_rookie: boolean
+  is_1st: boolean
+  is_short_print: boolean
   is_auto: boolean
   is_relic: boolean
   grading_company: string
@@ -75,6 +77,8 @@ function rowToStagingCard(row: Record<string, unknown>): StagingCard {
     raw_front_url:    (row.raw_front_url as string) ?? null,
     raw_back_url:     (row.raw_back_url as string) ?? null,
     is_rookie:        Boolean(row.is_rookie ?? false),
+    is_1st:           Boolean(row.is_1st ?? false),
+    is_short_print:   Boolean(row.is_short_print ?? false),
     is_auto:          Boolean(row.is_auto ?? false),
     is_relic:         Boolean(row.is_relic ?? false),
     grading_company:  String(row.grading_company ?? ''),
@@ -1080,9 +1084,11 @@ export function BulkIngestionWizard() {
                       {/* Attribute flags */}
                       <div className="flex items-center gap-3 flex-wrap pt-0.5">
                         {([
-                          { key: 'is_rookie', label: 'RC' },
-                          { key: 'is_auto',   label: 'Auto' },
-                          { key: 'is_relic',  label: 'Relic' },
+                          { key: 'is_rookie',      label: 'RC' },
+                          { key: 'is_1st',         label: '1st' },
+                          { key: 'is_short_print', label: 'SP' },
+                          { key: 'is_auto',        label: 'Auto' },
+                          { key: 'is_relic',       label: 'Relic' },
                         ] as const).map(({ key, label }) => (
                           <label key={key} className="flex items-center gap-1 cursor-pointer select-none">
                             <input

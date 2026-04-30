@@ -62,6 +62,8 @@ export async function requestPricingAction(imageUrl: string): Promise<{
   parallel_name: string;
   card_number: string;
   is_rookie: boolean;
+  is_1st: boolean;
+  is_short_print: boolean;
   confidence: number;
   status: string;
   pricing: {
@@ -95,7 +97,18 @@ export async function requestPricingAction(imageUrl: string): Promise<{
     (data.insert_name?.toLowerCase().includes('rc')) ||
     (data.parallel_name?.toLowerCase().includes('rc'));
 
-  return { ...data, is_rookie };
+  const is_1st = 
+    (data.player_name?.toLowerCase().includes('1st')) ||
+    (data.insert_name?.toLowerCase().includes('1st')) ||
+    (data.parallel_name?.toLowerCase().includes('1st'));
+
+  const is_short_print = 
+    (data.player_name?.toLowerCase().includes(' sp')) ||
+    (data.player_name?.toLowerCase().includes(' ssp')) ||
+    (data.parallel_name?.toLowerCase().includes(' sp')) ||
+    (data.parallel_name?.toLowerCase().includes(' ssp'));
+
+  return { ...data, is_rookie, is_1st, is_short_print };
 }
 
 // Team-name provenance surfaced by the identifier's OCR-preferred resolver.
@@ -124,6 +137,8 @@ export interface IdentifyCardResult {
   team_name_verified: boolean | null;  // true when OCR agrees with DB
   print_run: number | null;
   is_rookie: boolean;
+  is_1st: boolean;
+  is_short_print: boolean;
 }
 
 function normalizeIdentifyResponse(raw: any): IdentifyCardResult {
@@ -167,6 +182,22 @@ function normalizeIdentifyResponse(raw: any): IdentifyCardResult {
     is_rookie = true;
   }
 
+  // Detect 1st Bowman
+  const is_1st = 
+    (cd.player_name?.toLowerCase().includes('1st')) ||
+    (cd.insert_name?.toLowerCase().includes('1st')) ||
+    (cd.parallel_type?.toLowerCase().includes('1st'));
+
+  // Detect SP / SSP
+  const is_short_print = 
+    (cd.player_name?.toLowerCase().includes(' sp')) ||
+    (cd.player_name?.toLowerCase().includes(' ssp')) ||
+    (cd.insert_name?.toLowerCase().includes(' sp')) ||
+    (cd.insert_name?.toLowerCase().includes(' ssp')) ||
+    (cd.parallel_type?.toLowerCase().includes(' sp')) ||
+    (cd.parallel_type?.toLowerCase().includes(' ssp')) ||
+    (cd.parallel_type?.toLowerCase().includes('short print'));
+
 
   let print_run: number | null = null;
   const rawPr = cd.print_run ?? raw?.print_run;
@@ -209,6 +240,8 @@ function normalizeIdentifyResponse(raw: any): IdentifyCardResult {
     team_name_verified,
     print_run,
     is_rookie,
+    is_1st,
+    is_short_print,
   };
 }
 

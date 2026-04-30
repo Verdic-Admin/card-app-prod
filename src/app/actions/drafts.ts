@@ -182,6 +182,8 @@ export async function createDraftCardsAction(cards: any[]) {
     listed_price: c.price || 0,
     market_price: c.market_price || c.price || 0,
     is_rookie: c.is_rookie || false,
+    is_1st: c.is_1st || false,
+    is_short_print: c.is_short_print || false,
     is_auto: c.is_auto || false,
     is_relic: c.is_relic || false,
     grading_company: c.grading_company || null,
@@ -192,10 +194,10 @@ export async function createDraftCardsAction(cards: any[]) {
   try {
      for (const item of payload) {
         const { rows } = await pool.query(`
-            INSERT INTO scan_staging (player_name, team_name, card_set, card_number, insert_name, parallel_name, print_run, image_url, back_image_url, listed_price, market_price, is_rookie, is_auto, is_relic, grading_company, grade, upload_kind)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'matrix')
-            RETURNING id, player_name, team_name, card_set, card_number, insert_name, parallel_name, print_run, image_url, back_image_url, listed_price, market_price, is_rookie, is_auto, is_relic, grading_company, grade, upload_kind
-        `, [item.player_name, item.team_name, item.card_set, item.card_number, item.insert_name, item.parallel_name, item.print_run, item.image_url, item.back_image_url, item.listed_price, item.market_price, item.is_rookie, item.is_auto, item.is_relic, item.grading_company, item.grade]);
+            INSERT INTO scan_staging (player_name, team_name, card_set, card_number, insert_name, parallel_name, print_run, image_url, back_image_url, listed_price, market_price, is_rookie, is_1st, is_short_print, is_auto, is_relic, grading_company, grade, upload_kind)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, 'matrix')
+            RETURNING id, player_name, team_name, card_set, card_number, insert_name, parallel_name, print_run, image_url, back_image_url, listed_price, market_price, is_rookie, is_1st, is_short_print, is_auto, is_relic, grading_company, grade, upload_kind
+        `, [item.player_name, item.team_name, item.card_set, item.card_number, item.insert_name, item.parallel_name, item.print_run, item.image_url, item.back_image_url, item.listed_price, item.market_price, item.is_rookie, item.is_1st, item.is_short_print, item.is_auto, item.is_relic, item.grading_company, item.grade]);
         if (rows.length > 0) results.push(rows[0]);
      }
   } catch (error) {
@@ -222,7 +224,7 @@ export async function listScanStagingAction(uploadKind?: 'single_pair' | 'matrix
             parallel_name, print_run, raw_front_url, raw_back_url,
             image_url, back_image_url, listed_price, market_price,
             trend_data, player_index_url, oracle_projection, oracle_trend_percentage,
-            is_rookie, is_auto, is_relic, grading_company, grade, upload_kind
+            is_rookie, is_1st, is_short_print, is_auto, is_relic, grading_company, grade, upload_kind
      FROM scan_staging
      ${filter}
      ORDER BY id DESC`,
@@ -245,6 +247,8 @@ export type ApplyStagingDraftPricingResult =
       confidence?: number;
       ai_status?: string;
       is_rookie?: boolean;
+      is_1st?: boolean;
+      is_short_print?: boolean;
     }
   | { success: false; error: string };
 
@@ -288,6 +292,8 @@ export async function applyStagingDraftFieldPricingAction(
     card_number: String(row.card_number ?? ''),
     print_run: printRun != null && Number.isFinite(printRun) ? printRun : null,
     is_rookie: Boolean(row.is_rookie),
+    is_1st: Boolean(row.is_1st),
+    is_short_print: Boolean(row.is_short_print),
     is_auto: Boolean(row.is_auto),
     is_relic: Boolean(row.is_relic),
     grade: gradeStr,
@@ -336,6 +342,8 @@ export async function applyStagingDraftFieldPricingAction(
     insert_name: String(row.insert_name ?? ''),
     parallel_name: String(row.parallel_name ?? ''),
     is_rookie: Boolean(row.is_rookie),
+    is_1st: Boolean(row.is_1st),
+    is_short_print: Boolean(row.is_short_print),
   };
 }
 
@@ -400,8 +408,10 @@ export async function applyStagingDraftImagePricingAction(
        oracle_trend_percentage = NULL,
        trend_data = $9::jsonb,
        player_index_url = $10,
-       is_rookie = $11
-     WHERE id = $12::uuid`,
+       is_rookie = $11,
+       is_1st = $12,
+       is_short_print = $13
+     WHERE id = $14::uuid`,
     [
       player_name,
       card_set,
@@ -414,6 +424,8 @@ export async function applyStagingDraftImagePricingAction(
       JSON.stringify(trendPoints),
       playerIndexUrl || null,
       Boolean(result.is_rookie),
+      Boolean(result.is_1st),
+      Boolean(result.is_short_print),
       id,
     ],
   );
@@ -431,6 +443,8 @@ export async function applyStagingDraftImagePricingAction(
     confidence: result.confidence,
     ai_status: result.status,
     is_rookie: Boolean(result.is_rookie),
+    is_1st: Boolean(result.is_1st),
+    is_short_print: Boolean(result.is_short_print),
   };
 }
 
