@@ -27,6 +27,11 @@ export const metadata: Metadata = {
   title: "Card Shop",
   description: "Zero-fee sports card storefront — buy, sell and trade cards.",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
