@@ -351,6 +351,7 @@ export async function getSingleOraclePrice(payload: {
   is_relic?: boolean; 
   is_rookie?: boolean; 
   print_run?: number;
+  grade?: string | null;
 }) {
   try {
     const formattedPayload = {
