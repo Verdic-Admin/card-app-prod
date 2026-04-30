@@ -1172,6 +1172,21 @@ export function InventoryTable({
                Review Results ({pendingCorrections.length})
              </button>
            )}
+           <div className="relative flex items-center shrink-0">
+            <select
+               value={projectionTimeframe}
+               onChange={e => handleSaveTimeframe(e.target.value)}
+               disabled={isSavingTimeframe}
+               className="appearance-none bg-slate-100 hover:bg-slate-200 border border-slate-200 outline-none text-slate-700 text-sm font-bold pl-3 pr-8 py-2.5 rounded-lg cursor-pointer disabled:opacity-50 transition-colors h-full"
+            >
+               <option value="30-Day">30-Day Forecast</option>
+               <option value="90-Day">90-Day Forecast</option>
+               <option value="6-Month">6-Month Forecast</option>
+               <option value="12-Month">12-Month Forecast</option>
+            </select>
+            {isSavingTimeframe && <Loader2 className="w-4 h-4 text-slate-400 animate-spin absolute right-2 pointer-events-none" />}
+            {!isSavingTimeframe && <div className="absolute right-3 text-slate-400 pointer-events-none text-xs">▼</div>}
+          </div>
            <button onClick={handleMasterSync} disabled={isMasterSyncing} className="whitespace-nowrap bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer disabled:opacity-50">
              {isMasterSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
              Sync All Inventory
