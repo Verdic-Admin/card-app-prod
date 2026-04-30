@@ -367,6 +367,8 @@ export async function getSingleOraclePrice(payload: {
   is_short_print?: boolean;
   is_ssp?: boolean;
   is_auto?: boolean;
+  is_relic?: boolean;
+  print_run?: number | string | null;
   grade?: string | null;
 }) {
   try {

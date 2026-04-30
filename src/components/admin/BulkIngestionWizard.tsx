@@ -45,6 +45,7 @@ interface StagingCard {
   is_rookie: boolean
   is_1st: boolean
   is_short_print: boolean
+  is_ssp: boolean
   is_auto: boolean
   is_relic: boolean
   grading_company: string
@@ -79,6 +80,7 @@ function rowToStagingCard(row: Record<string, unknown>): StagingCard {
     is_rookie:        Boolean(row.is_rookie ?? false),
     is_1st:           Boolean(row.is_1st ?? false),
     is_short_print:   Boolean(row.is_short_print ?? false),
+    is_ssp:           Boolean(row.is_ssp ?? false),
     is_auto:          Boolean(row.is_auto ?? false),
     is_relic:         Boolean(row.is_relic ?? false),
     grading_company:  String(row.grading_company ?? ''),

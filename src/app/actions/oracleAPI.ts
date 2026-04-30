@@ -96,6 +96,7 @@ export async function calculatePricingAction(fields: {
   is_rookie?: boolean;
   is_1st?: boolean;
   is_short_print?: boolean;
+  is_ssp?: boolean;
   is_auto?: boolean;
   is_relic?: boolean;
   grade?: string | null;
@@ -109,6 +110,9 @@ export async function calculatePricingAction(fields: {
     card_number: fields.card_number || '',
     print_run: fields.print_run ?? null,
     is_rookie: fields.is_rookie ?? false,
+    is_1st: fields.is_1st ?? false,
+    is_short_print: fields.is_short_print ?? false,
+    is_ssp: fields.is_ssp ?? false,
     is_auto: fields.is_auto ?? false,
     is_relic: fields.is_relic ?? false,
     grade: fields.grade || null,
@@ -126,6 +130,9 @@ export async function calculatePricingAction(fields: {
     (payload.parallel_name || '').toLowerCase(),
     payload.print_run ?? '',
     payload.is_rookie ? '1' : '0',
+    fields.is_1st ? '1' : '0',
+    fields.is_short_print ? '1' : '0',
+    fields.is_ssp ? '1' : '0',
     payload.is_auto ? '1' : '0',
     payload.is_relic ? '1' : '0',
     payload.grade || '',

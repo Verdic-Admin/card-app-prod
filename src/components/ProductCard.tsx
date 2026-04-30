@@ -55,6 +55,15 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
       // User canceled or clipboard unavailable.
     }
   };
+  
+  const attributeMap = [
+    { key: 'is_rookie',      label: 'RC',    class: 'bg-yellow-400/20 text-yellow-400 border-yellow-400/40' },
+    { key: 'is_1st',         label: '1st',   class: 'bg-sky-400/20 text-sky-400 border-sky-400/40' },
+    { key: 'is_short_print', label: 'SP',    class: 'bg-red-400/20 text-red-400 border-red-400/40' },
+    { key: 'is_ssp',         label: 'SSP',   class: 'bg-amber-400/30 text-amber-300 border-amber-500/50 shadow-[0_0_8px_rgba(251,191,36,0.3)]' },
+    { key: 'is_auto',        label: 'Auto',  class: 'bg-blue-400/20 text-blue-400 border-blue-400/40' },
+    { key: 'is_relic',       label: 'Relic', class: 'bg-purple-400/20 text-purple-400 border-purple-400/40' },
+  ];
 
   return (
     <>
