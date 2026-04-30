@@ -78,6 +78,8 @@ export function LiveAuctionStudio({
   const [stageError, setStageError] = useState<string | null>(null)
   const [stageSuccess, setStageSuccess] = useState<number | null>(null)
 
+  const [globalPendingEndTime, setGlobalPendingEndTime] = useState('')
+
   const [coinFileLabel, setCoinFileLabel] = useState<Record<string, string>>({})
 
   const [editingLiveId, setEditingLiveId] = useState<string | null>(null)
@@ -626,11 +628,34 @@ export function LiveAuctionStudio({
               <strong> GO LIVE</strong> so bidders see the card on /auction.
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <div className="flex items-center gap-2 border border-slate-200 bg-slate-50 rounded-lg p-1.5 shrink-0">
+              <input
+                type="datetime-local"
+                value={globalPendingEndTime}
+                onChange={e => setGlobalPendingEndTime(e.target.value)}
+                className="border border-slate-300 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (globalPendingEndTime) {
+                    document.querySelectorAll('input[name="endTime"]').forEach(el => {
+                      (el as HTMLInputElement).value = globalPendingEndTime;
+                    });
+                    showToast('success', 'End time applied to all rows. Remember to Save each row.');
+                  }
+                }}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded text-xs font-bold transition-colors disabled:opacity-50"
+                disabled={!globalPendingEndTime}
+              >
+                Apply to All
+              </button>
+            </div>
             <button
               type="button"
               onClick={handleGenBatch}
-              className="bg-slate-100 hover:bg-slate-200 text-slate-800 px-4 py-2 rounded-lg font-bold transition-colors disabled:opacity-50 text-sm"
+              className="bg-slate-100 hover:bg-slate-200 text-slate-800 px-4 py-2 rounded-lg font-bold transition-colors disabled:opacity-50 text-sm shrink-0"
               disabled={pendingItems.length === 0}
             >
               Generate batch codes
@@ -733,13 +758,18 @@ export function LiveAuctionStudio({
                           <span className="text-slate-600">Listed ${priceNum(item.listed_price).toFixed(2)}</span>
                         )}
                       </div>
-                      {item.verification_code ? (
-                        <div className="text-emerald-600 font-mono font-bold mt-2 inline-block text-sm bg-emerald-100 px-2 py-0.5 rounded">
-                          {item.verification_code}
-                        </div>
-                      ) : (
-                        <div className="text-slate-400 text-sm mt-1 font-mono">No ID generated</div>
-                      )}
+                      <div className="mt-2 flex flex-wrap items-center gap-3">
+                        {item.verification_code ? (
+                          <div className="text-emerald-600 font-mono font-bold inline-block text-sm bg-emerald-100 px-2 py-0.5 rounded">
+                            {item.verification_code}
+                          </div>
+                        ) : (
+                          <div className="text-slate-400 text-sm font-mono">No ID generated</div>
+                        )}
+                        <a href={`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent([item.player_name, item.card_set, item.insert_name, item.parallel_name, item.parallel_insert_type, item.card_number].filter((v: any) => v && String(v).toLowerCase() !== 'base').join(' '))}&LH_Sold=1&LH_Complete=1`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded transition-colors" title="Check eBay Completed Listings">
+                          <Search className="w-3 h-3" /> Check Comps
+                        </a>
+                      </div>
                       {item.coined_image_url && (
                         <div className="text-indigo-600 text-xs font-bold mt-1">Coin photo attached</div>
                       )}
