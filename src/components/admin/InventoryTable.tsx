@@ -4,10 +4,10 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Database } from '@/types/database.types'
 import { useToastContext } from '@/components/admin/ToastProvider'
-import { toggleCardStatus, editCardAction, deleteCardAction, bulkDeleteCardsAction, bulkUpdateMetricsAction, rotateCardImageAction, removeFromAuctionBlock, updateProjectionTimeframe, createLotAction, breakLotAction, updateLotChildren, duplicateInventoryItem } from '@/app/actions/inventory'
+import { toggleCardStatus, editCardAction, deleteCardAction, bulkDeleteCardsAction, bulkUpdateMetricsAction, rotateCardImageAction, removeFromAuctionBlock, updateProjectionTimeframe, createLotAction, breakLotAction, updateLotChildren, duplicateInventoryItem, toggleForecastStatus, bulkPublishForecasts } from '@/app/actions/inventory'
 import { AuctionBidLogButton } from '@/components/admin/AuctionBidLogButton'
 import { syncSingleItemWithOracle, syncInventoryWithOracle, applyOracleDiscount, applyOracleDiscountAll, applyCorrection, approvePriceOnly, denyCorrection } from '@/app/actions/oracleSync'
-import { Loader2, Trash2, Edit2, Check, X, Search, Download, RotateCw, RefreshCw, DollarSign, Save, AlertCircle, Gavel, Package, Share2, CopyPlus, MoreHorizontal } from 'lucide-react'
+import { Loader2, Trash2, Edit2, Check, X, Search, Download, RotateCw, RefreshCw, DollarSign, Save, AlertCircle, Gavel, Package, Share2, CopyPlus, MoreHorizontal, Eye } from 'lucide-react'
 import { price } from '@/utils/math'
 import { deriveDisplayPricing } from '@/utils/pricing'
 import { InstructionTrigger } from '@/components/admin/DraggableGuide'
@@ -40,6 +40,7 @@ export function InventoryTable({
   
   const [isBulkDeleting, setIsBulkDeleting] = useState(false)
   const [isBulkUpdating, setIsBulkUpdating] = useState(false)
+  const [isBulkPublishing, setIsBulkPublishing] = useState(false)
   const [bulkCostBasis, setBulkCostBasis] = useState<string>('0')
   const [bulkAcceptsOffers, setBulkAcceptsOffers] = useState(false)
   const [inlineSaving, setInlineSaving] = useState<Record<string, 'price' | 'cost' | null>>({});
@@ -252,6 +253,41 @@ export function InventoryTable({
         }
       }
     })
+  }
+
+  const handleBulkPublish = async () => {
+    if (selectedIds.size === 0) return
+    showConfirm({
+      title: 'Publish Forecasts',
+      message: `Push Player Index forecasts to the public storefront for ${selectedIds.size} selected items?`,
+      confirmText: 'Publish',
+      onConfirm: async () => {
+        setIsBulkPublishing(true)
+        try {
+          const ids = Array.from(selectedIds)
+          await bulkPublishForecasts(ids, true)
+          setItems(prev => prev.map(item => 
+            selectedIds.has(item.id) ? { ...item, show_forecast: true } as any : item
+          ))
+          setSelectedIds(new Set())
+          showToast(`Successfully published forecasts for ${ids.length} items.`, 'success')
+        } catch (e: any) {
+          showToast("Failed to publish: " + e.message, 'error')
+        } finally {
+          setIsBulkPublishing(false)
+        }
+      }
+    })
+  }
+
+  const handleToggleForecast = async (item: InventoryItem) => {
+    try {
+      const current = !!(item as any).show_forecast
+      await toggleForecastStatus(item.id, current)
+      setItems(items.map(i => i.id === item.id ? { ...i, show_forecast: !current } as any : i))
+    } catch (err: any) {
+      showToast("Failed to toggle forecast visibility: " + err.message, 'error')
+    }
   }
 
   // ── Lot handlers ──────────────────────────────────────────────────────────
@@ -1191,6 +1227,11 @@ export function InventoryTable({
             Bundle Lot
           </button>
           <div className="h-8 w-px bg-slate-200 mx-1"></div>
+          <button onClick={handleBulkPublish} disabled={isBulkPublishing} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-50 shadow-sm">
+            {isBulkPublishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
+            Publish Forecasts
+          </button>
+          <div className="h-8 w-px bg-slate-200 mx-1"></div>
           <button onClick={handleBulkDelete} disabled={isBulkDeleting} className="bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-50 shadow-sm">
             {isBulkDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
             Delete
@@ -1508,6 +1549,21 @@ export function InventoryTable({
                         {loadingId === item.id && <Loader2 className="h-3 w-3 animate-spin" />}
                         {item.status === 'available' ? 'Available' : 'Sold'}
                       </button>
+                      
+                      {/* Public Forecast Toggle */}
+                      <button
+                        onClick={() => handleToggleForecast(item)}
+                        className={`px-2.5 py-1 text-xs font-semibold rounded-full border flex items-center gap-1 transition-colors ${
+                          (item as any).show_forecast
+                            ? 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+                            : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
+                        }`}
+                        title={(item as any).show_forecast ? "Forecast is public on storefront" : "Forecast is hidden"}
+                      >
+                        <Eye className="w-3 h-3" />
+                        {(item as any).show_forecast ? 'Public Forecast' : 'Hidden'}
+                      </button>
+
                       {errorId === item.id && <div className="text-[10px] text-red-500 font-medium">Failed</div>}
                       <div className="flex gap-1.5 opacity-100 transition-opacity flex-wrap justify-end relative">
                         <button

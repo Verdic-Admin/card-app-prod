@@ -114,6 +114,7 @@ ALTER TABLE inventory ADD COLUMN IF NOT EXISTS oracle_trend_percentage NUMERIC(1
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS needs_correction BOOLEAN DEFAULT false;
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS needs_price_approval BOOLEAN DEFAULT false;
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS filename TEXT;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS show_forecast BOOLEAN DEFAULT false;
 `;
 
 async function runIdempotentAlters(client) {
@@ -192,6 +193,7 @@ async function init() {
       verification_code TEXT,
       video_url TEXT,
       is_verified_flip BOOLEAN DEFAULT false,
+      show_forecast BOOLEAN DEFAULT false,
       created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
   `);

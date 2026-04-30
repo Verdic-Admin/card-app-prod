@@ -389,6 +389,26 @@ export default async function ItemPage({ params }: PageProps) {
             )}
           </div>
 
+          {/* Public Analytics & Forecasting Block */}
+          {item.show_forecast && (
+            <div className="border-t border-border pt-4 mt-2">
+              <div className="rounded-xl border border-indigo-500/40 bg-indigo-950/30 px-4 py-4 shadow-lg">
+                <p className="text-xs font-black uppercase tracking-widest text-indigo-300 mb-2">
+                  Analytics &amp; Forecasting
+                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-zinc-300 font-semibold">Player Index Projection ({settings.projection_timeframe || '90-Day'})</p>
+                  <p className={`text-xl font-mono font-black ${Number(item.oracle_projection) < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                    ${Number(item.oracle_projection).toFixed(2)}
+                  </p>
+                </div>
+                <p className="text-xs text-zinc-500 mt-2 leading-relaxed">
+                  This represents the algorithm's raw mathematical forecast of the asset's trajectory over the selected timeframe, accounting for player performance and market momentum.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Add to Cart / PayPal */}
           <div className="mt-2">
             <ItemDetailClient item={item as any} />

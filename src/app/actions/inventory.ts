@@ -413,6 +413,24 @@ export async function toggleCardStatus(id: string, currentStatus: string) {
   revalidatePath('/sold')
 }
 
+export async function toggleForecastStatus(id: string, currentStatus: boolean) {
+  await checkAuth();
+  await pool.query(`UPDATE inventory SET show_forecast = $1 WHERE id = $2`, [!currentStatus, id]);
+  revalidatePath('/');
+  revalidatePath('/admin');
+  revalidatePath('/sold');
+}
+
+export async function bulkPublishForecasts(ids: string[], show: boolean) {
+  await checkAuth();
+  if (ids.length > 0) {
+    await pool.query(`UPDATE inventory SET show_forecast = $1 WHERE id = ANY($2::uuid[])`, [show, ids]);
+  }
+  revalidatePath('/');
+  revalidatePath('/admin');
+  revalidatePath('/sold');
+}
+
 export async function editCardAction(id: string, payload: EditCardPayload): Promise<EditCardActionResult> {
   await checkAuth();
 

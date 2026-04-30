@@ -246,13 +246,13 @@ export async function syncSingleItemWithOracle(id: string) {
 
     const data = (res as any).data || {};
     const projection = Number(data.projected_target ?? data.target_price ?? 0);
-    if (!Number.isFinite(projection) || projection <= 0) {
+    if (!Number.isFinite(projection)) {
       return { success: false, message: `Oracle returned invalid projected target for item ${(item as any).id}.` };
     }
 
     const currentPrice = data.current_price != null && Number(data.current_price) > 0 
       ? Number(data.current_price) 
-      : projection;
+      : Math.max(0.99, projection);
 
     const new_price = currentPrice * (1 - (discountRate / 100));
     const trend = data.trend_percentage != null ? Number(data.trend_percentage) : null;
