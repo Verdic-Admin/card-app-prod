@@ -1506,6 +1506,11 @@ export function InventoryTable({
                           Your price: ${pricing.effectiveStorePrice.toFixed(2)} ({pricing.percentBelowPlayerIndex.toFixed(0)}% below)
                         </div>
                       )}
+                      {(item as any).trend_data && typeof (item as any).trend_data === 'object' && !Array.isArray((item as any).trend_data) && (item as any).trend_data.days_ago > 0 && (
+                        <div className="text-[10px] text-purple-600/80 font-medium mt-1 pt-1 border-t border-purple-100/50">
+                          Vol: {(item as any).trend_data.delta >= 0 ? '+' : ''}${(item as any).trend_data.delta?.toFixed(2) || '0.00'} since {(item as any).trend_data.days_ago} days ago
+                        </div>
+                      )}
                       {pricing.hasManualOverride && (
                         <div className="text-[10px] text-amber-600 font-bold mt-0.5">Manual override active</div>
                       )}

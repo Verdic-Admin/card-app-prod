@@ -143,11 +143,16 @@ export async function syncInventoryWithOracle() {
         if (!Number.isFinite(projection) || projection <= 0) continue;
 
         const listed = projection * (1 - discountRate / 100);
+        const trendPayload = {
+          days_ago: r?.last_search_days_ago,
+          delta: r?.last_search_delta_price
+        };
+
         updates.push({
           id: String(row.id),
           listed_price: listed,
           market_price: projection,
-          trend_data: Array.isArray(r?.trend_points) ? r.trend_points : [],
+          trend_data: trendPayload as any,
           player_index_url: String(r?.player_index_url || ''),
           oracle_projection: projection,
           oracle_trend_percentage: r?.trend_percentage != null ? Number(r.trend_percentage) : null,
@@ -269,7 +274,10 @@ export async function syncSingleItemWithOracle(id: string) {
 
     const new_price = currentPrice * (1 - (discountRate / 100));
     const trend = data.trend_percentage != null ? Number(data.trend_percentage) : null;
-    const trendPoints = Array.isArray(data.trend_points) ? data.trend_points : [];
+    const trendPayload = {
+      days_ago: data.last_search_days_ago,
+      delta: data.last_search_delta_price
+    };
     const playerIndexUrl = String(data.player_index_url || '');
 
     const comps = Array.isArray(data.ebay_comps) && data.ebay_comps.length > 0 ? data.ebay_comps : null;
@@ -284,7 +292,7 @@ export async function syncSingleItemWithOracle(id: string) {
            player_index_url = $6,
            oracle_comps = $7::jsonb
        WHERE id = $8`,
-      [new_price, currentPrice, projection, trend, JSON.stringify(trendPoints), playerIndexUrl, comps ? JSON.stringify(comps) : null, item.id]
+      [new_price, currentPrice, projection, trend, JSON.stringify(trendPayload), playerIndexUrl, comps ? JSON.stringify(comps) : null, item.id]
     );
 
     return {
@@ -295,7 +303,7 @@ export async function syncSingleItemWithOracle(id: string) {
       market_price: currentPrice,
       oracle_projection: projection,
       oracle_trend_percentage: trend,
-      trend_data: trendPoints,
+      trend_data: trendPayload,
       player_index_url: playerIndexUrl,
     };
   } catch (err: any) {
