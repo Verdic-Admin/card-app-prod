@@ -1492,7 +1492,7 @@ export function InventoryTable({
                   </div>
 
                   {/* Oracle Pricing Section */}
-                  {(item as any).oracle_projection && (item as any).oracle_projection > 0 && (
+                  {(item as any).oracle_projection && (item as any).oracle_projection > 0 ? (
                     <div className="bg-purple-50 border border-purple-100 rounded-lg p-2 mb-1">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-[10px] font-bold text-purple-700 uppercase tracking-wider flex items-center gap-1">🔮 Player Index Value</span>
@@ -1551,6 +1551,11 @@ export function InventoryTable({
                           Apply {discountRate}% Below Player Index
                         </button>
                       )}
+                    </div>
+                  ) : (
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2 mb-1 flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">🔮 Player Index</span>
+                      <span className="text-[10px] font-bold text-slate-400">No Market Data Found</span>
                     </div>
                   )}
 
