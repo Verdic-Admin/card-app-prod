@@ -6,8 +6,28 @@ import { listScanStagingAction, updateDraftCardAction, publishDraftCardsAction, 
 import { deleteStagingCardsAction } from '@/app/actions/inventory';
 import { useToastContext } from '@/components/admin/ToastProvider';
 import ParallelTypeahead from '@/components/admin/ParallelTypeahead';
+import PrintRunTypeahead from '@/components/admin/PrintRunTypeahead';
 
 type DraftCard = any;
+
+/**
+ * Extract the print run denominator from any user input.
+ * "45/99" → 99 | "/99" → 99 | "99" → 99 | "Gold /99" → 99 | "" → null
+ */
+function extractPrintRun(raw: string): number | null {
+  const s = raw.trim();
+  const slashMatch = s.match(/\/\s*(\d+)/);
+  if (slashMatch) {
+    const n = parseInt(slashMatch[1], 10);
+    return n > 0 ? n : null;
+  }
+  const plainMatch = s.match(/^(\d+)$/);
+  if (plainMatch) {
+    const n = parseInt(plainMatch[1], 10);
+    return n > 0 ? n : null;
+  }
+  return null;
+}
 
 interface ManualIngestionGridProps {
   /** Increment this to trigger a re-fetch without lifting state globally. */
@@ -53,17 +73,16 @@ export function ManualIngestionGrid({ refreshKey = 0 }: ManualIngestionGridProps
   };
 
   const handleUpdate = async (id: string, field: string, value: any) => {
-    // Auto-split logic: if updating parallel_name and it contains a slash, try to split out print_run
+    // Auto-split: if parallel_name contains "/", extract denominator as print_run
     if (field === 'parallel_name' && typeof value === 'string' && value.includes('/')) {
-      const parts = value.split('/');
-      const parallel = parts[0].trim();
-      const pr = parts[parts.length - 1].replace(/\D/g, '');
-      
+      const pr = extractPrintRun(value);
+      // Everything before the first slash (or /digits) is the parallel name
+      const parallel = value.replace(/\s*\/\s*\d+.*$/, '').trim();
+
       if (pr) {
-        // Optimistic update for both
-        setDrafts(prev => prev.map(d => d.id === id ? { ...d, parallel_name: parallel, print_run: pr } : d));
+        setDrafts(prev => prev.map(d => d.id === id ? { ...d, parallel_name: parallel || d.parallel_name, print_run: pr } : d));
         try {
-          await updateDraftCardAction(id, { parallel_name: parallel, print_run: pr });
+          await updateDraftCardAction(id, { parallel_name: parallel || null, print_run: pr });
           return;
         } catch (e: any) {
           showToast('Failed to save edit: ' + e.message, 'error');
@@ -278,16 +297,10 @@ export function ManualIngestionGrid({ refreshKey = 0 }: ManualIngestionGridProps
                       />
                     </td>
                     <td className="px-4 py-3 align-middle text-center">
-                      <input 
-                        type="text" 
-                        defaultValue={draft.print_run ? (String(draft.print_run).startsWith('/') ? draft.print_run : `/${draft.print_run}`) : ''}
-                        onBlur={(e) => {
-                          const val = extractPrintRun(e.target.value);
-                          handleUpdate(draft.id, 'print_run', val || null);
-                          e.target.value = val ? `/${val}` : '';
-                        }}
-                        className="w-16 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none py-1 font-medium text-indigo-600 transition-colors text-center"
-                        placeholder="/PR"
+                      <PrintRunTypeahead
+                        value={draft.print_run ? Number(draft.print_run) : null}
+                        onChange={(val) => handleUpdate(draft.id, 'print_run', val)}
+                        className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none py-1 font-medium text-indigo-600 transition-colors"
                       />
                     </td>
                     <td className="px-4 py-3 align-middle">

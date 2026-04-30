@@ -19,6 +19,34 @@ function safeNumeric(v: unknown, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+/**
+ * Normalise any print-run input to a clean integer (the denominator / edition size).
+ * Rules:
+ *   "45/99"  → 99   (take denominator — edition size, not serial #)
+ *   "/99"    → 99
+ *   "99"     → 99   (plain number)
+ *   "Gold /99" → 99 (strip non-numeric prefix)
+ *   "1/1"    → 1
+ *   null/""  → null
+ */
+function parsePrintRun(raw: unknown): number | null {
+  if (raw == null || raw === '') return null;
+  const s = String(raw).trim();
+  // Extract digits after a slash (denominator/edition-size)
+  const slashMatch = s.match(/\/\s*(\d+)/);
+  if (slashMatch) {
+    const n = parseInt(slashMatch[1], 10);
+    return n > 0 ? n : null;
+  }
+  // Plain digits only
+  const plainMatch = s.match(/^(\d+)$/);
+  if (plainMatch) {
+    const n = parseInt(plainMatch[1], 10);
+    return n > 0 ? n : null;
+  }
+  return null;
+}
+
 function toTitleCase(str: string) {
   if (!str) return '';
   return str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
@@ -144,7 +172,7 @@ export async function createDraftCardsAction(cards: any[]) {
     card_number: c.card_number || '',
     insert_name: c.insert_name || '',
     parallel_name: c.parallel_name || '',
-    print_run: c.print_run || null,
+    print_run: parsePrintRun(c.print_run),
     image_url: c.side_a_url,
     back_image_url: c.side_b_url,
     listed_price: c.price || 0,
@@ -487,7 +515,7 @@ export async function updateDraftCardAction(id: string, updates: any) {
   if (updates.card_number !== undefined) payload.card_number = updates.card_number
   if (updates.insert_name !== undefined) payload.insert_name = updates.insert_name
   if (updates.parallel_name !== undefined) payload.parallel_name = updates.parallel_name
-  if (updates.print_run !== undefined) payload.print_run = updates.print_run
+  if (updates.print_run !== undefined) payload.print_run = parsePrintRun(updates.print_run)
   if (updates.is_rookie !== undefined) payload.is_rookie = updates.is_rookie
   if (updates.is_auto !== undefined) payload.is_auto = updates.is_auto
   if (updates.is_relic !== undefined) payload.is_relic = updates.is_relic
@@ -595,8 +623,7 @@ export async function publishDraftCardsAction(ids: string[]): Promise<PublishDra
       const backUrl = pickStagingUrl(s, 'back_image_url', 'raw_back_url')!;
       const listed = safeNumeric(s.listed_price, 0);
       const market = safeNumeric(s.market_price, listed);
-      const printRun =
-        s.print_run == null || s.print_run === '' ? null : String(s.print_run);
+      const printRun = parsePrintRun(s.print_run);
       const pit = parallelInsertType(
         sqlNullableText(s.insert_name),
         sqlNullableText(s.parallel_name),

@@ -9,7 +9,26 @@ const { Client } = require('pg');
 /** Run after CREATE TABLE IF NOT EXISTS — safe on existing DBs (PG 9.1+). */
 const IDEMPOTENT_ALTER = `
 -- inventory: columns referenced by app but missing on older templates
-ALTER TABLE inventory ADD COLUMN IF NOT EXISTS print_run TEXT;
+-- print_run is INTEGER: stores edition size denominator (e.g. 99 for a /99 card)
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS print_run INTEGER;
+-- Migrate legacy TEXT values to INTEGER: extract denominator from "/99" or "45/99" formats
+DO $$ BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name='inventory' AND column_name='print_run' AND data_type='text'
+  ) THEN
+    -- First extract denominator from any slash-format values
+    UPDATE inventory SET print_run =
+      CASE
+        WHEN print_run ~ '^[0-9]+$' THEN print_run
+        WHEN print_run ~ '/([0-9]+)' THEN regexp_replace(print_run, '^.*\/([0-9]+).*$', '\1')
+        ELSE NULL
+      END
+    WHERE print_run IS NOT NULL;
+    -- Then change the column type
+    ALTER TABLE inventory ALTER COLUMN print_run TYPE INTEGER USING print_run::INTEGER;
+  END IF;
+END $$;
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS sold_at TIMESTAMPTZ;
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS checkout_expires_at TIMESTAMPTZ;
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS is_auction BOOLEAN DEFAULT false;
@@ -141,7 +160,7 @@ async function init() {
       parallel_name TEXT,
       parallel_insert_type TEXT,
       card_number TEXT,
-      print_run TEXT,
+      print_run INTEGER,
       high_price NUMERIC(10, 2),
       low_price NUMERIC(10, 2),
       avg_price NUMERIC(10, 2),
@@ -306,7 +325,7 @@ async function init() {
       card_number TEXT DEFAULT '',
       insert_name TEXT DEFAULT '',
       parallel_name TEXT DEFAULT '',
-      print_run TEXT,
+      print_run INTEGER,
       raw_front_url TEXT,
       raw_back_url TEXT,
       image_url TEXT,

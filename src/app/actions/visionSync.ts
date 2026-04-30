@@ -143,26 +143,30 @@ function normalizeIdentifyResponse(raw: any): IdentifyCardResult {
 
   let print_run: number | null = null;
   const rawPr = cd.print_run ?? raw?.print_run;
-  if (typeof rawPr === 'number' && Number.isFinite(rawPr)) {
+  if (typeof rawPr === 'number' && Number.isFinite(rawPr) && rawPr > 0) {
     print_run = Math.trunc(rawPr);
   } else if (rawPr != null && String(rawPr).trim() !== '') {
     const s = String(rawPr).trim();
-    const parts = s.split('/');
-    const denominator = parts[parts.length - 1].replace(/\D/g, '');
-    if (denominator) {
-      const n = parseInt(denominator, 10);
-      if (Number.isFinite(n)) print_run = n;
+    // Take the denominator (edition size): "45/99" → 99, "/99" → 99, "99" → 99
+    const slashMatch = s.match(/\/\s*(\d+)/);
+    if (slashMatch) {
+      const n = parseInt(slashMatch[1], 10);
+      if (n > 0) print_run = n;
+    } else {
+      const plainMatch = s.match(/^(\d+)$/);
+      if (plainMatch) {
+        const n = parseInt(plainMatch[1], 10);
+        if (n > 0) print_run = n;
+      }
     }
   }
 
   let parallel_name = cd.parallel_type ?? null;
   if (parallel_name && print_run) {
-    // If parallel is "Gold /99" and print_run is 99, strip the "/99"
-    const prStr = `/${print_run}`;
-    if (parallel_name.endsWith(prStr)) {
-      parallel_name = parallel_name.slice(0, -prStr.length).trim();
-    }
+    // Strip any trailing "/####" suffix from parallel_name if print_run was extracted from it
+    parallel_name = parallel_name.replace(/\s*\/\s*\d+\s*$/, '').trim() || null;
   }
+
 
   return {
     status:       raw?.status        ?? 'unknown',
