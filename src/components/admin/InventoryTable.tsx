@@ -56,6 +56,8 @@ export function InventoryTable({
   const [auctionLoadingId, setAuctionLoadingId] = useState<string | null>(null)
   const [projectionTimeframe, setProjectionTimeframe] = useState(initialProjectionTimeframe)
   const [isSavingTimeframe, setIsSavingTimeframe] = useState(false)
+  // Image Zoom State
+  const [zoomedImg, setZoomedImg] = useState<string | null>(null)
 
   // Lot / Bundle state
   const [showLotModal, setShowLotModal] = useState(false)
@@ -1280,7 +1282,7 @@ export function InventoryTable({
             <div className="w-full flex border-b border-slate-200 bg-slate-100">
               <div className="flex-1 h-36 flex items-center justify-center overflow-hidden border-r border-slate-200 relative group/img">
                 {item.image_url ? (
-                  <img src={item.image_url} alt="Front" className="h-full w-full object-contain" />
+                  <img src={item.image_url} alt="Front" className="h-full w-full object-contain cursor-zoom-in transition-transform hover:scale-105" onClick={() => setZoomedImg(item.image_url)} />
                 ) : (
                   <span className="text-[10px] text-slate-400 font-medium">No Front</span>
                 )}
@@ -1300,7 +1302,7 @@ export function InventoryTable({
               </div>
               <div className="flex-1 h-36 flex items-center justify-center overflow-hidden relative group/img">
                 {item.back_image_url ? (
-                  <img src={item.back_image_url} alt="Back" className="h-full w-full object-contain" />
+                  <img src={item.back_image_url} alt="Back" className="h-full w-full object-contain cursor-zoom-in transition-transform hover:scale-105" onClick={() => setZoomedImg(item.back_image_url)} />
                 ) : (
                   <span className="text-[10px] text-slate-400 font-medium">No Back</span>
                 )}
@@ -1676,6 +1678,28 @@ export function InventoryTable({
           </div>
         ))}
       </div>
+
+      {/* ── Image zoom lightbox ─────────────────────────────────────────────── */}
+      {zoomedImg && (
+        <div
+          className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4 cursor-zoom-out"
+          onClick={() => setZoomedImg(null)}
+        >
+          <img
+            src={zoomedImg}
+            alt="zoomed card"
+            className="max-w-[90vw] max-h-[90vh] object-contain rounded-2xl shadow-2xl ring-1 ring-white/10"
+            onClick={e => e.stopPropagation()}
+          />
+          <button
+            className="absolute top-4 right-5 text-white/70 hover:text-white text-3xl font-bold leading-none"
+            onClick={() => setZoomedImg(null)}
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+      )}
     </div>
   )
 }
