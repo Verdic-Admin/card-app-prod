@@ -505,42 +505,8 @@ export async function editCardAction(id: string, payload: EditCardPayload): Prom
     discountRate = 0;
   }
 
-  const hasOracle = Number.isFinite(oracle) && oracle > 0;
-  const expectedStore = hasOracle ? oracle * (1 - discountRate / 100) : null;
-  const manualBreak =
-    hasOracle && expectedStore != null && Math.abs(newListed - expectedStore) > 0.01;
-
-  if (manualBreak) {
-    await pool.query(
-      `UPDATE inventory SET
-         listed_price = $1,
-         oracle_projection = NULL,
-         market_price = NULL,
-         oracle_trend_percentage = NULL,
-         trend_data = NULL,
-         player_index_url = NULL,
-         oracle_comps = NULL
-       WHERE id = $2::uuid`,
-      [newListed, id],
-    );
-    revalidatePath('/');
-    revalidatePath('/admin');
-    revalidatePath('/sold');
-    return {
-      success: true,
-      patch: {
-        ...patch,
-        listed_price: newListed,
-        oracle_projection: null,
-        market_price: null,
-        oracle_trend_percentage: null,
-        trend_data: null,
-        player_index_url: null,
-        oracle_comps: null,
-      },
-    };
-  }
-
+  // We no longer wipe Oracle data when a manual price is set. 
+  // Instead, we just update the listed_price and let the UI detect the divergence.
   await pool.query(`UPDATE inventory SET listed_price = $1 WHERE id = $2::uuid`, [newListed, id]);
   revalidatePath('/');
   revalidatePath('/admin');

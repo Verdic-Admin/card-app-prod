@@ -145,15 +145,14 @@ export async function syncInventoryWithOracle() {
 
         const computedPrice = projection * (1 - discountRate / 100);
         
-        // Manual Override Detection Logic (matches src/utils/pricing.ts)
+        // Smarter Manual Override Detection:
+        // If an item has a listed_price, and it diverges from the NEW computed price,
+        // we treat it as manual and preserve it. This ensures "Sync All" never
+        // overwrites a price you've intentionally set or changed.
         const currentListed = Number(row.listed_price || 0);
-        const currentProjection = Number(row.oracle_projection || 0);
-        const currentComputed = currentProjection > 0 ? currentProjection * (1 - discountRate / 100) : 0;
-        
         const isManualOverride = 
-          currentProjection > 0 && 
           currentListed > 0 && 
-          Math.abs(currentListed - currentComputed) > 0.01;
+          Math.abs(currentListed - computedPrice) > 0.01;
 
         // If manual override exists, preserve the current listed_price.
         // Otherwise, update to the new computed price.
