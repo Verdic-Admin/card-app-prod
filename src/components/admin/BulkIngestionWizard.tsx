@@ -556,7 +556,15 @@ export function BulkIngestionWizard() {
       }
 
       const priced = batchRes.results.filter(r => r.success).length
-      showToast(`Batch priced ${priced} card(s) with 1 token.`, 'success')
+
+      // Auto-move successfully priced cards to the Priced tab
+      const pricedCardIds = batchRes.results.filter(r => r.success && r.listed_price != null).map(r => r.id)
+      if (pricedCardIds.length) {
+        setPricedIds(prev => { const n = new Set(prev); pricedCardIds.forEach(id => n.add(id)); return n })
+        setActiveTab('priced')
+      }
+
+      showToast(`Batch priced ${priced} card(s) with 1 token — moved to Priced tab.`, 'success')
     } catch (e: any) {
       if (e.message === 'credits_exhausted') { creditsExhausted(); return }
       showToast('Batch pricing failed: ' + e.message, 'error')
