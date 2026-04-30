@@ -224,7 +224,7 @@ export async function listScanStagingAction(uploadKind?: 'single_pair' | 'matrix
     `SELECT id, player_name, team_name, card_set, card_number, insert_name,
             parallel_name, print_run, raw_front_url, raw_back_url,
             image_url, back_image_url, listed_price, market_price,
-            trend_data, player_index_url, oracle_projection, oracle_trend_percentage,
+            trend_data, player_index_url, oracle_projection, oracle_trend_percentage, oracle_comps,
             is_rookie, is_1st, is_short_print, is_ssp, is_auto, is_relic, grading_company, grade, upload_kind
      FROM scan_staging
      ${filter}
@@ -834,9 +834,10 @@ export async function applyStagingDraftBatchPricingAction(
            market_price = $2,
            oracle_projection = $3,
            oracle_trend_percentage = $4,
-           player_index_url = $5
-         WHERE id = $6::uuid`,
-        [listed, projection, projection, trend, playerIndexUrl || null, id],
+           player_index_url = $5,
+           oracle_comps = $6::jsonb
+         WHERE id = $7::uuid`,
+        [listed, projection, projection, trend, playerIndexUrl || null, JSON.stringify(priceResult.ebay_comps || []), id],
       );
       output.push({ id, success: true, listed_price: listed, market_price: projection, ebay_comps: priceResult.ebay_comps || [] });
     } catch (e: unknown) {

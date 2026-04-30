@@ -86,6 +86,7 @@ function rowToStagingCard(row: Record<string, unknown>): StagingCard {
     is_relic:         Boolean(row.is_relic ?? false),
     grading_company:  String(row.grading_company ?? ''),
     grade:            String(row.grade ?? ''),
+    ebay_comps:       Array.isArray(row.oracle_comps) ? (row.oracle_comps as any[]) : [],
   }
 }
 
