@@ -484,7 +484,6 @@ export function ManualIngestionGrid({ refreshKey = 0 }: ManualIngestionGridProps
           </div>
         </>
       )}
-      )}
     </div>
   );
 }
