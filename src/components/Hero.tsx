@@ -3,7 +3,7 @@ import { Instagram, Twitter, Facebook } from 'lucide-react';
 
 export function Hero({ settings }: { settings: StoreSettings }) {
   return (
-    <div className="bg-zinc-950 text-white py-20 sm:py-28 border-b border-zinc-800">
+    <div className="bg-zinc-950 text-white py-12 sm:py-20 lg:py-28 border-b border-zinc-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center flex flex-col items-center">
         <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-6 text-white leading-tight">
           {settings?.site_name || 'Zero-Fee Sports Card Storefront'}

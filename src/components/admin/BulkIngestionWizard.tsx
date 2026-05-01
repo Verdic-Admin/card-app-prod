@@ -963,9 +963,9 @@ export function BulkIngestionWizard() {
               .map(card => (
                 <div key={card.id}
                   className={`border rounded-xl p-3 bg-surface transition ${reviewSelected.has(card.id) ? 'border-brand/50' : 'border-border opacity-60'}`}>
-                  <div className="flex gap-3">
+                  <div className="flex flex-col sm:flex-row gap-4">
                     {/* Images — front + back side by side, click to zoom */}
-                    <div className="flex-shrink-0 flex gap-2">
+                    <div className="flex-shrink-0 flex justify-center sm:justify-start gap-2">
                       <div className="flex flex-col items-center gap-0.5">
                         <span className="text-[9px] font-bold text-muted uppercase tracking-wide">Front</span>
                         {card.image_url ? (
@@ -997,7 +997,7 @@ export function BulkIngestionWizard() {
                     </div>
 
                     {/* Fields */}
-                    <div className="flex-1 space-y-1.5">
+                    <div className="flex-1 space-y-2">
                       {/* Confidence badge */}
                       {!isPendingScan(card) && (
                         <div className="flex items-center gap-2">

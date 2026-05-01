@@ -81,7 +81,8 @@ export function Navbar({ settings }: { settings: StoreSettings }) {
                 </Link>
               </div>
             </div>
-            <div className="flex items-center gap-4 sm:gap-6">
+            {/* Desktop nav links — hidden on mobile (BottomTabBar handles mobile nav) */}
+            <div className="hidden sm:flex items-center gap-4 sm:gap-6">
               <Link href="/" className="text-sm font-bold text-muted hover:text-foreground transition-colors">
                 Shop
               </Link>
@@ -108,6 +109,19 @@ export function Navbar({ settings }: { settings: StoreSettings }) {
                 )}
               </button>
             </div>
+
+            {/* Mobile cart icon — top-right shortcut alongside BottomTabBar */}
+            <button
+              onClick={() => setIsCartOpen(true)}
+              className="sm:hidden relative p-2 text-muted hover:bg-surface-hover hover:text-brand rounded-full transition-all"
+            >
+              <ShoppingCart className="w-5 h-5" />
+              {cartItems.length > 0 && (
+                <span className="absolute top-0 right-0 w-[18px] h-[18px] bg-brand text-background text-[10px] font-black flex items-center justify-center rounded-full shadow-sm select-none transform translate-x-0.5 -translate-y-0.5 border border-surface">
+                  {cartItems.length}
+                </span>
+              )}
+            </button>
           </div>
         </div>
       </nav>

@@ -1136,7 +1136,7 @@ export function InventoryTable({
       </div>
 
       {/* Toolbar */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
          <div className="flex items-center gap-3 flex-1">
             <div className="relative w-full max-w-md">
                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -1170,39 +1170,39 @@ export function InventoryTable({
               ]} 
             />
          </div>
-         <div className="flex items-center gap-2">
+         <div className="flex flex-wrap items-center gap-2">
            {pendingCorrections.length > 0 && (
-             <button onClick={() => setShowCorrectionsModal(true)} className="whitespace-nowrap bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer animate-pulse">
+             <button onClick={() => setShowCorrectionsModal(true)} className="flex-1 sm:flex-none justify-center whitespace-nowrap bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer animate-pulse">
                <AlertCircle className="w-4 h-4" />
-               Review Results ({pendingCorrections.length})
+               Review ({pendingCorrections.length})
              </button>
            )}
-           <div className="relative flex items-center shrink-0">
+           <div className="relative flex items-center shrink-0 flex-1 sm:flex-none">
             <select
                value={projectionTimeframe}
                onChange={e => handleSaveTimeframe(e.target.value)}
                disabled={isSavingTimeframe}
-               className="appearance-none bg-slate-100 hover:bg-slate-200 border border-slate-200 outline-none text-slate-700 text-sm font-bold pl-3 pr-8 py-2.5 rounded-lg cursor-pointer disabled:opacity-50 transition-colors h-full"
+               className="w-full appearance-none bg-slate-100 hover:bg-slate-200 border border-slate-200 outline-none text-slate-700 text-sm font-bold pl-3 pr-8 py-2.5 rounded-lg cursor-pointer disabled:opacity-50 transition-colors h-full"
             >
-               <option value="30-Day">30-Day Forecast</option>
-               <option value="90-Day">90-Day Forecast</option>
-               <option value="6-Month">6-Month Forecast</option>
-               <option value="12-Month">12-Month Forecast</option>
+               <option value="30-Day">30D Forecast</option>
+               <option value="90-Day">90D Forecast</option>
+               <option value="6-Month">6M Forecast</option>
+               <option value="12-Month">12M Forecast</option>
             </select>
             {isSavingTimeframe && <Loader2 className="w-4 h-4 text-slate-400 animate-spin absolute right-2 pointer-events-none" />}
             {!isSavingTimeframe && <div className="absolute right-3 text-slate-400 pointer-events-none text-xs">▼</div>}
           </div>
-           <button onClick={handleMasterSync} disabled={isMasterSyncing} className="whitespace-nowrap bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer disabled:opacity-50">
+           <button onClick={handleMasterSync} disabled={isMasterSyncing} className="flex-1 sm:flex-none justify-center whitespace-nowrap bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer disabled:opacity-50">
              {isMasterSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-             Sync All Inventory
+             Sync
            </button>
-            <button onClick={handleApplyAllOracle} disabled={isApplyingAll} className="whitespace-nowrap bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer disabled:opacity-50">
+            <button onClick={handleApplyAllOracle} disabled={isApplyingAll} className="flex-1 sm:flex-none justify-center whitespace-nowrap bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer disabled:opacity-50">
               {isApplyingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <DollarSign className="w-4 h-4" />}
-              Apply All Pricing
+              Apply All
             </button>
-           <button onClick={handleExportCSV} className="whitespace-nowrap bg-zinc-800 hover:bg-zinc-900 text-white px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer">
+           <button onClick={handleExportCSV} className="flex-1 sm:flex-none justify-center whitespace-nowrap bg-zinc-800 hover:bg-zinc-900 text-white px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer">
              <Download className="w-4 h-4" />
-             Export CSV
+             CSV
            </button>
          </div>
       </div>
@@ -1221,22 +1221,22 @@ export function InventoryTable({
       </div>
 
       {selectedIds.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-white border border-slate-200 p-3 rounded-2xl shadow-2xl animate-in slide-in-from-bottom-8 fade-in">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-wrap items-center justify-center gap-3 bg-white border border-slate-200 p-3 rounded-2xl shadow-2xl animate-in slide-in-from-bottom-8 fade-in w-[95%] max-w-4xl">
           <span className="text-sm font-bold text-slate-800 bg-slate-100 px-3 py-1.5 rounded-lg">{selectedIds.size} selected</span>
-          <div className="h-8 w-px bg-slate-200 mx-1"></div>
+          <div className="hidden sm:block h-8 w-px bg-slate-200 mx-1"></div>
           <div className="flex items-center gap-2">
-               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Default Cost $</label>
+               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Cost $</label>
                <input type="number" step="0.01" value={bulkCostBasis} onChange={e => setBulkCostBasis(e.target.value)} className="w-16 p-1 text-xs font-mono font-bold text-slate-900 bg-slate-50 border border-slate-200 rounded outline-none focus:ring-2 focus:ring-indigo-500 text-center" />
           </div>
-          <label className="flex items-center gap-2 cursor-pointer ml-2">
+          <label className="flex items-center gap-2 cursor-pointer">
                <input type="checkbox" checked={bulkAcceptsOffers} onChange={e => setBulkAcceptsOffers(e.target.checked)} className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500" />
-               <span className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">Offers OBO</span>
+               <span className="text-[10px] font-bold text-slate-700 uppercase tracking-wider whitespace-nowrap">Offers OBO</span>
           </label>
-          <button onClick={handleBulkUpdateMetrics} disabled={isBulkUpdating} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-50 shadow-sm ml-2">
+          <button onClick={handleBulkUpdateMetrics} disabled={isBulkUpdating} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-50 shadow-sm">
             {isBulkUpdating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            Apply Update
+            Update
           </button>
-          <div className="h-8 w-px bg-slate-200 mx-1"></div>
+          <div className="hidden sm:block h-8 w-px bg-slate-200 mx-1"></div>
           <button
             onClick={() => { setShowLotModal(true); setLotTitle(''); setLotPrice('0.00') }}
             disabled={selectedIds.size < 2}
@@ -1244,19 +1244,17 @@ export function InventoryTable({
             title="Bundle selected cards into a Lot"
           >
             <Package className="w-4 h-4" />
-            Bundle Lot
+            Lot
           </button>
-          <div className="h-8 w-px bg-slate-200 mx-1"></div>
           <button onClick={handleBulkPublish} disabled={isBulkPublishing} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-50 shadow-sm">
             {isBulkPublishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
-            Publish Forecasts
+            Publish
           </button>
-          <div className="h-8 w-px bg-slate-200 mx-1"></div>
           <button onClick={handleBulkDelete} disabled={isBulkDeleting} className="bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-50 shadow-sm">
             {isBulkDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
             Delete
           </button>
-          <button onClick={() => setSelectedIds(new Set())} className="ml-2 text-slate-400 hover:text-slate-600 p-1">
+          <button onClick={() => setSelectedIds(new Set())} className="ml-auto text-slate-400 hover:text-slate-600 p-1">
             <X className="w-5 h-5" />
           </button>
         </div>

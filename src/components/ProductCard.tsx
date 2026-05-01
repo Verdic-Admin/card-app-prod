@@ -128,13 +128,13 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
         </div>
 
         {/* Details Footer */}
-        <div className="p-5 flex flex-col flex-grow border-t border-border bg-surface">
+        <div className="p-3 sm:p-5 flex flex-col flex-grow border-t border-border bg-surface">
           <Link href={`/item/${item.id}`} className="hover:text-brand-hover transition-colors">
-            <h3 className="font-extrabold text-lg text-white leading-tight tracking-tight">
+            <h3 className="font-extrabold text-sm sm:text-lg text-white leading-tight tracking-tight">
               {item.player_name}
             </h3>
           </Link>
-          <span className="text-xs font-bold text-muted mt-1 uppercase tracking-widest">
+          <span className="text-[10px] sm:text-xs font-bold text-muted mt-1 uppercase tracking-widest leading-tight">
             {item.card_set} • #{item.card_number}{(item as any).print_run ? ` / ${(item as any).print_run}` : ''}
           </span>
           <div className="flex flex-wrap gap-2 mt-2 mb-2 font-semibold">
@@ -206,7 +206,7 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
                   )}
                 </div>
                 <div className="flex items-end gap-2">
-                  <span className="font-black text-3xl text-white tracking-tighter">
+                  <span className="font-black text-2xl sm:text-3xl text-white tracking-tighter">
                     ${pricing.effectiveStorePrice.toFixed(2)}
                   </span>
                   {(item as any).trend_data && Array.isArray((item as any).trend_data) && (item as any).trend_data.length > 0 && (
@@ -233,7 +233,7 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
                   <span className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 shrink-0">
                     Store
                   </span>
-                  <span className="font-black text-3xl text-white tracking-tighter">
+                  <span className="font-black text-2xl sm:text-3xl text-white tracking-tighter">
                     ${p(item.listed_price ?? item.avg_price).toFixed(2)}
                   </span>
                   {(item as any).trend_data && Array.isArray((item as any).trend_data) && (item as any).trend_data.length > 0 && (
@@ -249,12 +249,12 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
               </div>
             )}
             {isAvailable && (
-              <div className="grid grid-cols-2 gap-2 w-full">
+              <div className="grid grid-cols-2 gap-1.5 sm:gap-2 w-full">
                      <button 
                         onClick={(e) => { e.stopPropagation(); setIsTradeModalOpen(true); }}
-                        className="w-full text-xs font-bold py-3 rounded-lg transition-all shadow-md active:scale-95 bg-background hover:bg-surface-hover text-foreground border border-border hover:border-muted uppercase tracking-widest flex items-center justify-center"
+                        className="w-full text-[10px] sm:text-xs font-bold py-2.5 sm:py-3 rounded-lg transition-all shadow-md active:scale-95 bg-background hover:bg-surface-hover text-foreground border border-border hover:border-muted uppercase tracking-widest flex items-center justify-center"
                      >
-                        Propose Trade
+                        Trade
                      </button>
                   {isLiveAuction ? (
                     <Link

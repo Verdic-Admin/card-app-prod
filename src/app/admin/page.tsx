@@ -117,7 +117,7 @@ export default async function AdminPage() {
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-extrabold tracking-tight text-foreground">Admin Platform</h1>
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">Admin Platform</h1>
             <InstructionTrigger 
               title="Command Center Guide" 
               steps={[
@@ -138,42 +138,42 @@ export default async function AdminPage() {
           </div>
           <p className="text-muted mt-1 font-medium">Manage inventory, perform massive bulk scans, and track sales.</p>
         </div>
-        <div className="flex flex-col gap-3 lg:items-end">
-          <div className="flex items-center gap-3 flex-wrap justify-start lg:justify-end">
+        <div className="flex flex-col gap-4 lg:items-end w-full lg:w-auto">
+          <div className="flex items-center gap-2 flex-wrap justify-stretch lg:justify-end">
             <Link
               href="/admin/auction-studio"
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-500 text-slate-950 font-black rounded-lg hover:bg-amber-400 transition-colors shadow-md border border-amber-400/50 text-sm uppercase tracking-wide"
+              className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-5 py-3 bg-amber-500 text-slate-950 font-black rounded-lg hover:bg-amber-400 transition-colors shadow-md border border-amber-400/50 text-xs uppercase tracking-wide"
             >
               <Gavel className="w-4 h-4" />
               Auction staging
               {auctionPendingCount > 0 && (
                 <span className="ml-0.5 bg-slate-900 text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-full">
-                  {auctionPendingCount} pending
+                  {auctionPendingCount}
                 </span>
               )}
             </Link>
-            <Link href="/admin/add-inventory" className="px-5 py-2.5 bg-brand text-background font-bold rounded-lg hover:bg-brand/90 transition-colors shadow-md text-sm">
+            <Link href="/admin/add-inventory" className="flex-1 lg:flex-none inline-flex items-center justify-center px-5 py-3 bg-brand text-background font-bold rounded-lg hover:bg-brand/90 transition-colors shadow-md text-xs">
               + Add Inventory
             </Link>
           </div>
-          <div className="flex items-center gap-3 flex-wrap justify-start lg:justify-end">
-            <Link href="/admin/design" className="px-4 py-2 bg-violet-50 text-violet-700 font-bold rounded-lg hover:bg-violet-100 transition-colors text-sm">
-              Brand & Design
+          <div className="flex items-center gap-2 flex-wrap justify-stretch lg:justify-end">
+            <Link href="/admin/design" className="flex-1 lg:flex-none text-center px-4 py-2 bg-violet-50 text-violet-700 font-bold rounded-lg hover:bg-violet-100 transition-colors text-xs">
+              Design
             </Link>
-            <Link href="/admin/settings" className="px-4 py-2 bg-indigo-50 text-indigo-700 font-bold rounded-lg hover:bg-indigo-100 transition-colors text-sm">
-              Store Settings
+            <Link href="/admin/settings" className="flex-1 lg:flex-none text-center px-4 py-2 bg-indigo-50 text-indigo-700 font-bold rounded-lg hover:bg-indigo-100 transition-colors text-xs">
+              Settings
             </Link>
-            <a href="https://playerindexdata.com/master-operations-manual.pdf" target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-slate-900 text-white font-black rounded-lg hover:bg-slate-800 transition-colors shadow-sm border border-slate-700 text-sm">
-              Master Ops Manual
+            <a href="https://playerindexdata.com/master-operations-manual.pdf" target="_blank" rel="noopener noreferrer" className="flex-1 lg:flex-none text-center px-4 py-2 bg-slate-900 text-white font-black rounded-lg hover:bg-slate-800 transition-colors shadow-sm border border-slate-700 text-xs whitespace-nowrap">
+              Ops Manual
             </a>
             <a
               href="https://station.railway.com/templates/white-label-card-shop-b7550479"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white font-black rounded-lg hover:bg-teal-500 transition-colors shadow-sm border border-teal-500/50 text-sm"
+              className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 bg-teal-600 text-white font-black rounded-lg hover:bg-teal-500 transition-colors shadow-sm border border-teal-500/50 text-xs"
             >
               <MessageCircleQuestion className="w-4 h-4" />
-              Feedback & Questions
+              Support
             </a>
           </div>
         </div>
@@ -181,7 +181,7 @@ export default async function AdminPage() {
 
       <div className="mb-10">
         <h2 className="text-lg font-bold text-foreground mb-4">Command Center</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           <a href="#collector-requests" className="bg-surface border border-border p-5 rounded-xl shadow-sm hover:shadow-md hover:border-amber-500/50 hover:-translate-y-0.5 transition-all flex items-center justify-between group">
             <div>
               <h3 className="text-sm font-bold text-muted uppercase tracking-wider mb-1 group-hover:text-amber-500 transition-colors">Orders Pending Payment</h3>

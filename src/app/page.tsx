@@ -167,7 +167,7 @@ export default async function Home(props: { searchParams: Promise<{ [key: string
   return (
     <div>
       <Hero settings={settings} />
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-16 flex flex-col lg:flex-row items-start gap-8">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 lg:py-16 flex flex-col lg:flex-row items-start gap-4 sm:gap-8">
         
         <StoreFilters availableTeams={availableTeams} />
 

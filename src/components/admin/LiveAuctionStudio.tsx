@@ -300,30 +300,32 @@ export function LiveAuctionStudio({
           <button type="button" onClick={() => setToastMsg(null)} className="ml-2 opacity-50 hover:opacity-100"><X className="w-3.5 h-3.5" /></button>
         </div>
       )}
-      <div className="bg-white text-slate-900 p-6 rounded-xl shadow-sm border border-slate-200">
+      <div className="bg-white text-slate-900 p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-xl font-bold">Auction Studio Controls</h2>
         </div>
-        <div className="flex flex-col lg:flex-row gap-6">
+        <div className="flex flex-col gap-6">
           {/* Left: settings */}
-          <div className="flex flex-col gap-5 flex-1">
+          <div className="flex flex-col gap-5">
             {/* Projection timeframe */}
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
               <label className="text-sm font-bold text-slate-700 whitespace-nowrap">Projection timeframe</label>
-              <select
-                value={timeframe}
-                onChange={e => handleSaveTimeframe(e.target.value)}
-                disabled={isSavingTimeframe}
-                className="border border-slate-300 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800 bg-white focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-60 shadow-sm"
-              >
-                {['30-Day', '90-Day', '6-Month', 'End of Season'].map(opt => (
-                  <option key={opt} value={opt}>{opt}</option>
-                ))}
-              </select>
-              {isSavingTimeframe && <span className="text-xs text-slate-400 animate-pulse">Saving...</span>}
-              {!isSavingTimeframe && (
-                <span className="text-xs text-emerald-600 font-semibold">Active: {timeframe}</span>
-              )}
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <select
+                  value={timeframe}
+                  onChange={e => handleSaveTimeframe(e.target.value)}
+                  disabled={isSavingTimeframe}
+                  className="flex-1 sm:flex-none border border-slate-300 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800 bg-white focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-60 shadow-sm"
+                >
+                  {['30-Day', '90-Day', '6-Month', 'End of Season'].map(opt => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+                {isSavingTimeframe && <span className="text-xs text-slate-400 animate-pulse">Saving...</span>}
+                {!isSavingTimeframe && (
+                  <span className="text-xs text-emerald-600 font-semibold whitespace-nowrap">Active: {timeframe}</span>
+                )}
+              </div>
             </div>
 
             {/* QR toggle + URL */}
@@ -371,7 +373,7 @@ export function LiveAuctionStudio({
 
           {/* Right: live QR preview */}
           {showQR && (
-            <div className="flex items-center justify-center lg:w-56 shrink-0">
+            <div className="flex items-center justify-center sm:justify-start lg:w-56 shrink-0 pt-4 border-t border-slate-100 sm:border-0">
               <AuctionQRCode
                 isVisible
                 toggleVisibility={() => setShowQR(false)}

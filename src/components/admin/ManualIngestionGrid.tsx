@@ -165,20 +165,19 @@ export function ManualIngestionGrid({ refreshKey = 0 }: ManualIngestionGridProps
   return (
     <div className="space-y-6">
 
-      {/* Toolbar */}
-      <div className="flex items-center justify-between bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 cursor-pointer select-none">
-            <input 
-              type="checkbox" 
-              className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
-              checked={drafts.length > 0 && selectedIds.size === drafts.length}
-              onChange={toggleSelectAll}
-            />
-            <span className="text-sm font-bold text-slate-700">Select All ({selectedIds.size})</span>
-          </label>
-        </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between bg-white border border-slate-200 rounded-xl p-3 shadow-sm gap-4">
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input 
+                type="checkbox" 
+                className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                checked={drafts.length > 0 && selectedIds.size === drafts.length}
+                onChange={toggleSelectAll}
+              />
+              <span className="text-sm font-bold text-slate-700">Select All ({selectedIds.size})</span>
+            </label>
+          </div>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           <button
             onClick={async () => {
               if (!selectedIds.size) return;
@@ -200,167 +199,291 @@ export function ManualIngestionGrid({ refreshKey = 0 }: ManualIngestionGridProps
             {isPromoting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
             Push to Premium
           </button>
-          <button
-            onClick={handlePublish}
-            disabled={selectedIds.size === 0 || isPublishing}
-            className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-sm px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
-          >
-            {isPublishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            Publish Selected
-          </button>
+            <button
+              onClick={handlePublish}
+              disabled={selectedIds.size === 0 || isPublishing}
+              className="flex-1 sm:flex-none justify-center bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-sm px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+            >
+              {isPublishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              Publish
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* Grid */}
+      {/* Grid / List */}
       {drafts.length === 0 ? (
         <div className="text-center py-20 bg-white rounded-xl border border-dashed border-slate-300">
           <ImageIcon className="w-10 h-10 text-slate-300 mx-auto mb-3" />
           <p className="text-slate-500 font-medium">No drafts found in staging.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm whitespace-nowrap">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
-                <tr>
-                  <th className="px-4 py-3 w-10"></th>
-                  <th className="px-4 py-3">Images</th>
-                  <th className="px-4 py-3">Player Name</th>
-                  <th className="px-4 py-3">Set</th>
-                  <th className="px-4 py-3">Card #</th>
-                  <th className="px-4 py-3">Parallel/Insert</th>
-                  <th className="px-4 py-3">Flags</th>
-                  <th className="px-4 py-3 w-16">PR</th>
-                  <th className="px-4 py-3 w-24">Price ($)</th>
-                  <th className="px-4 py-3 w-28 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {drafts.map((draft) => (
-                  <tr 
-                    key={draft.id} 
-                    className={`hover:bg-slate-50 transition-colors ${selectedIds.has(draft.id) ? 'bg-indigo-50/50' : ''}`}
-                  >
-                    <td className="px-4 py-3 text-center align-middle">
-                      <input 
-                        type="checkbox" 
-                        className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
-                        checked={selectedIds.has(draft.id)}
-                        onChange={() => toggleSelect(draft.id)}
-                      />
-                    </td>
-                    <td className="px-4 py-3 align-middle">
-                      <div className="flex items-center gap-2">
-                        {draft.image_url || draft.raw_front_url ? (
-                          <img src={draft.image_url || draft.raw_front_url} className="w-10 h-14 object-cover rounded shadow-sm border border-slate-200 bg-slate-100" />
-                        ) : (
-                          <div className="w-10 h-14 bg-slate-100 rounded border border-dashed border-slate-300 flex items-center justify-center">
-                            <ImageIcon className="w-4 h-4 text-slate-300" />
-                          </div>
-                        )}
-                        {draft.back_image_url || draft.raw_back_url ? (
-                          <img src={draft.back_image_url || draft.raw_back_url} className="w-10 h-14 object-cover rounded shadow-sm border border-slate-200 bg-slate-100" />
-                        ) : null}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 align-middle">
-                      <input 
-                        type="text" 
-                        defaultValue={draft.player_name || ''}
-                        onBlur={(e) => handleUpdate(draft.id, 'player_name', e.target.value)}
-                        className="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none py-1 font-bold text-slate-900 transition-colors"
-                        placeholder="Player Name"
-                      />
-                    </td>
-                    <td className="px-4 py-3 align-middle">
+        <>
+          {/* Mobile Card View */}
+          <div className="grid grid-cols-1 gap-4 lg:hidden">
+            {drafts.map((draft) => (
+              <div 
+                key={draft.id} 
+                className={`bg-white rounded-xl border p-4 shadow-sm space-y-4 transition-colors ${selectedIds.has(draft.id) ? 'border-indigo-500 bg-indigo-50/30' : 'border-slate-200'}`}
+              >
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 relative">
+                    <input 
+                      type="checkbox" 
+                      className="absolute -top-1 -left-1 w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 z-10 shadow-sm"
+                      checked={selectedIds.has(draft.id)}
+                      onChange={() => toggleSelect(draft.id)}
+                    />
+                    <div className="flex items-center gap-1">
+                      {draft.image_url || draft.raw_front_url ? (
+                        <img src={draft.image_url || draft.raw_front_url} className="w-16 h-24 object-cover rounded shadow-sm border border-slate-200 bg-slate-100" />
+                      ) : (
+                        <div className="w-16 h-24 bg-slate-100 rounded border border-dashed border-slate-300 flex items-center justify-center">
+                          <ImageIcon className="w-6 h-6 text-slate-300" />
+                        </div>
+                      )}
+                      {draft.back_image_url || draft.raw_back_url ? (
+                        <img src={draft.back_image_url || draft.raw_back_url} className="w-16 h-24 object-cover rounded shadow-sm border border-slate-200 bg-slate-100" />
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <input 
+                      type="text" 
+                      defaultValue={draft.player_name || ''}
+                      onBlur={(e) => handleUpdate(draft.id, 'player_name', e.target.value)}
+                      className="w-full bg-transparent border-b border-slate-200 focus:border-indigo-500 focus:outline-none py-1 font-bold text-slate-900"
+                      placeholder="Player Name"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
                       <input 
                         type="text" 
                         defaultValue={draft.card_set || ''}
                         onBlur={(e) => handleUpdate(draft.id, 'card_set', e.target.value)}
-                        className="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none py-1 font-medium text-slate-700 transition-colors"
-                        placeholder="Card Set"
+                        className="w-full bg-transparent border-b border-slate-200 focus:border-indigo-500 focus:outline-none py-1 text-xs font-medium text-slate-700"
+                        placeholder="Set"
                       />
-                    </td>
-                    <td className="px-4 py-3 align-middle">
                       <input 
                         type="text" 
                         defaultValue={draft.card_number || ''}
                         onBlur={(e) => handleUpdate(draft.id, 'card_number', e.target.value)}
-                        className="w-16 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none py-1 font-medium text-slate-700 transition-colors"
-                        placeholder="#"
+                        className="w-full bg-transparent border-b border-slate-200 focus:border-indigo-500 focus:outline-none py-1 text-xs font-medium text-slate-700"
+                        placeholder="Card #"
                       />
-                    </td>
-                    <td className="px-4 py-3 align-middle">
-                      <ParallelTypeahead
-                        value={draft.parallel_name || draft.insert_name || ''}
-                        onChange={(val) => handleUpdate(draft.id, 'parallel_name', val)}
-                        className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none py-1 font-medium text-slate-700 transition-colors w-full"
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Parallel/Insert</label>
+                    <ParallelTypeahead
+                      value={draft.parallel_name || draft.insert_name || ''}
+                      onChange={(val) => handleUpdate(draft.id, 'parallel_name', val)}
+                      className="bg-slate-50 border border-slate-200 rounded px-2 py-1.5 text-xs font-medium text-slate-700 w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Price ($)</label>
+                    <div className="relative flex items-center">
+                      <span className="absolute left-2 text-slate-400 font-bold text-xs">$</span>
+                      <input 
+                        type="number" 
+                        step="0.01"
+                        defaultValue={parseFloat(draft.listed_price || 0).toFixed(2)}
+                        onBlur={(e) => handleUpdate(draft.id, 'price', e.target.value)}
+                        className="w-full pl-5 bg-slate-50 border border-slate-200 rounded px-2 py-1.5 text-xs font-black text-emerald-600"
                       />
-                    </td>
-                    <td className="px-4 py-3 align-middle">
-                      <div className="flex items-center gap-2">
-                        {[
-                          { key: 'is_rookie', label: 'RC' },
-                          { key: 'is_1st', label: '1st' },
-                          { key: 'is_short_print', label: 'SP' },
-                        ].map((f) => (
-                          <label key={f.key} className="flex items-center gap-1 cursor-pointer select-none group">
-                            <input
-                              type="checkbox"
-                              checked={Boolean(draft[f.key])}
-                              onChange={(e) => handleUpdate(draft.id, f.key, e.target.checked)}
-                              className="w-3.5 h-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 accent-indigo-600"
-                            />
-                            <span className="text-[10px] font-bold text-slate-400 group-hover:text-slate-600 uppercase tracking-tighter">{f.label}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 align-middle text-center">
-                      <PrintRunTypeahead
-                        value={draft.print_run ? Number(draft.print_run) : null}
-                        onChange={(val) => handleUpdate(draft.id, 'print_run', val)}
-                        className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none py-1 font-medium text-indigo-600 transition-colors"
-                      />
-                    </td>
-                    <td className="px-4 py-3 align-middle">
-                      <div className="relative flex items-center">
-                        <span className="absolute left-0 text-slate-400 font-bold">$</span>
-                        <input 
-                          type="number" 
-                          step="0.01"
-                          defaultValue={parseFloat(draft.listed_price || 0).toFixed(2)}
-                          onBlur={(e) => handleUpdate(draft.id, 'price', e.target.value)}
-                          className="w-full pl-3 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-emerald-500 focus:outline-none py-1 font-black text-emerald-600 transition-colors"
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                  <div className="flex items-center gap-2">
+                    {[
+                      { key: 'is_rookie', label: 'RC' },
+                      { key: 'is_1st', label: '1st' },
+                      { key: 'is_short_print', label: 'SP' },
+                    ].map((f) => (
+                      <label key={f.key} className="flex items-center gap-1 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(draft[f.key])}
+                          onChange={(e) => handleUpdate(draft.id, f.key, e.target.checked)}
+                          className="w-3.5 h-3.5 rounded border-slate-300 text-indigo-600"
                         />
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 align-middle text-right whitespace-nowrap">
-                      <a 
-                        href={draft.player_index_url || `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent([draft.player_name, draft.card_set, draft.insert_name, draft.parallel_name, draft.card_number].filter((v: any) => v && String(v).toLowerCase() !== 'base').join(' '))}&LH_Sold=1&LH_Complete=1`} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="inline-flex items-center gap-1 text-[10px] font-bold text-sky-600 hover:text-sky-700 hover:bg-sky-50 px-2 py-1.5 rounded transition-colors mr-1" 
-                        title="Check eBay Completed Listings"
-                      >
-                        <Search className="w-3.5 h-3.5" />
-                        Comps
-                      </a>
-                      <button 
-                        onClick={() => handleDelete(draft.id)}
-                        disabled={isDeleting === draft.id}
-                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
-                        title="Delete Draft"
-                      >
-                        {isDeleting === draft.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                        <span className="text-[10px] font-bold text-slate-500 uppercase">{f.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <a 
+                      href={draft.player_index_url || `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent([draft.player_name, draft.card_set, draft.insert_name, draft.parallel_name, draft.card_number].filter((v: any) => v && String(v).toLowerCase() !== 'base').join(' '))}&LH_Sold=1&LH_Complete=1`} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="inline-flex items-center gap-1 text-[10px] font-bold text-sky-600 hover:bg-sky-50 px-2 py-1.5 rounded transition-colors" 
+                    >
+                      <Search className="w-3.5 h-3.5" />
+                      Comps
+                    </a>
+                    <button 
+                      onClick={() => handleDelete(draft.id)}
+                      disabled={isDeleting === draft.id}
+                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                    >
+                      {isDeleting === draft.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
-        </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden lg:block bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm whitespace-nowrap">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                  <tr>
+                    <th className="px-4 py-3 w-10"></th>
+                    <th className="px-4 py-3">Images</th>
+                    <th className="px-4 py-3">Player Name</th>
+                    <th className="px-4 py-3">Set</th>
+                    <th className="px-4 py-3">Card #</th>
+                    <th className="px-4 py-3">Parallel/Insert</th>
+                    <th className="px-4 py-3">Flags</th>
+                    <th className="px-4 py-3 w-16">PR</th>
+                    <th className="px-4 py-3 w-24">Price ($)</th>
+                    <th className="px-4 py-3 w-28 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {drafts.map((draft) => (
+                    <tr 
+                      key={draft.id} 
+                      className={`hover:bg-slate-50 transition-colors ${selectedIds.has(draft.id) ? 'bg-indigo-50/50' : ''}`}
+                    >
+                      <td className="px-4 py-3 text-center align-middle">
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                          checked={selectedIds.has(draft.id)}
+                          onChange={() => toggleSelect(draft.id)}
+                        />
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <div className="flex items-center gap-2">
+                          {draft.image_url || draft.raw_front_url ? (
+                            <img src={draft.image_url || draft.raw_front_url} className="w-10 h-14 object-cover rounded shadow-sm border border-slate-200 bg-slate-100" />
+                          ) : (
+                            <div className="w-10 h-14 bg-slate-100 rounded border border-dashed border-slate-300 flex items-center justify-center">
+                              <ImageIcon className="w-4 h-4 text-slate-300" />
+                            </div>
+                          )}
+                          {draft.back_image_url || draft.raw_back_url ? (
+                            <img src={draft.back_image_url || draft.raw_back_url} className="w-10 h-14 object-cover rounded shadow-sm border border-slate-200 bg-slate-100" />
+                          ) : null}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <input 
+                          type="text" 
+                          defaultValue={draft.player_name || ''}
+                          onBlur={(e) => handleUpdate(draft.id, 'player_name', e.target.value)}
+                          className="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none py-1 font-bold text-slate-900 transition-colors"
+                          placeholder="Player Name"
+                        />
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <input 
+                          type="text" 
+                          defaultValue={draft.card_set || ''}
+                          onBlur={(e) => handleUpdate(draft.id, 'card_set', e.target.value)}
+                          className="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none py-1 font-medium text-slate-700 transition-colors"
+                          placeholder="Card Set"
+                        />
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <input 
+                          type="text" 
+                          defaultValue={draft.card_number || ''}
+                          onBlur={(e) => handleUpdate(draft.id, 'card_number', e.target.value)}
+                          className="w-16 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none py-1 font-medium text-slate-700 transition-colors"
+                          placeholder="#"
+                        />
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <ParallelTypeahead
+                          value={draft.parallel_name || draft.insert_name || ''}
+                          onChange={(val) => handleUpdate(draft.id, 'parallel_name', val)}
+                          className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none py-1 font-medium text-slate-700 transition-colors w-full"
+                        />
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <div className="flex items-center gap-2">
+                          {[
+                            { key: 'is_rookie', label: 'RC' },
+                            { key: 'is_1st', label: '1st' },
+                            { key: 'is_short_print', label: 'SP' },
+                          ].map((f) => (
+                            <label key={f.key} className="flex items-center gap-1 cursor-pointer select-none group">
+                              <input
+                                type="checkbox"
+                                checked={Boolean(draft[f.key])}
+                                onChange={(e) => handleUpdate(draft.id, f.key, e.target.checked)}
+                                className="w-3.5 h-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 accent-indigo-600"
+                              />
+                              <span className="text-[10px] font-bold text-slate-400 group-hover:text-slate-600 uppercase tracking-tighter">{f.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 align-middle text-center">
+                        <PrintRunTypeahead
+                          value={draft.print_run ? Number(draft.print_run) : null}
+                          onChange={(val) => handleUpdate(draft.id, 'print_run', val)}
+                          className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none py-1 font-medium text-indigo-600 transition-colors"
+                        />
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <div className="relative flex items-center">
+                          <span className="absolute left-0 text-slate-400 font-bold">$</span>
+                          <input 
+                            type="number" 
+                            step="0.01"
+                            defaultValue={parseFloat(draft.listed_price || 0).toFixed(2)}
+                            onBlur={(e) => handleUpdate(draft.id, 'price', e.target.value)}
+                            className="w-full pl-3 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-emerald-500 focus:outline-none py-1 font-black text-emerald-600 transition-colors"
+                          />
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 align-middle text-right whitespace-nowrap">
+                        <a 
+                          href={draft.player_index_url || `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent([draft.player_name, draft.card_set, draft.insert_name, draft.parallel_name, draft.card_number].filter((v: any) => v && String(v).toLowerCase() !== 'base').join(' '))}&LH_Sold=1&LH_Complete=1`} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="inline-flex items-center gap-1 text-[10px] font-bold text-sky-600 hover:text-sky-700 hover:bg-sky-50 px-2 py-1.5 rounded transition-colors mr-1" 
+                          title="Check eBay Completed Listings"
+                        >
+                          <Search className="w-3.5 h-3.5" />
+                          Comps
+                        </a>
+                        <button 
+                          onClick={() => handleDelete(draft.id)}
+                          disabled={isDeleting === draft.id}
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
+                          title="Delete Draft"
+                        >
+                          {isDeleting === draft.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
       )}
     </div>
   );

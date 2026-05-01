@@ -154,12 +154,39 @@ export function StoreFilters({ availableTeams }: StoreFiltersProps) {
 
   return (
     <>
-      <div className="lg:hidden w-full mb-4">
-        <button 
+      {/* ── Mobile: always-visible search bar + filter button ── */}
+      <div className="lg:hidden w-full mb-4 space-y-2">
+        {/* Inline search — always visible */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
+          <input
+            type="search"
+            placeholder="Search players, sets..."
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            className="w-full pl-9 pr-4 py-3 text-sm bg-zinc-900 border border-zinc-800 rounded-xl focus:ring-2 focus:ring-cyan-500 outline-none transition-colors placeholder:text-zinc-600 text-white font-medium"
+          />
+          {query && (
+            <button
+              onClick={() => setQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+        {/* Filter drawer trigger */}
+        <button
           onClick={() => setIsOpen(true)}
-          className="w-full flex items-center gap-2 justify-center bg-zinc-900 border border-zinc-800 shadow-sm py-3 px-4 rounded-xl font-bold text-white hover:bg-zinc-800 transition-colors"
+          className="w-full flex items-center gap-2 justify-center bg-zinc-900 border border-zinc-800 shadow-sm py-2.5 px-4 rounded-xl font-bold text-sm text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
         >
-          <Filter className="w-5 h-5" /> Filter & Search Results
+          <Filter className="w-4 h-4" />
+          Filters
+          {Array.from(searchParams.keys()).filter(k => k !== 'q').length > 0 && (
+            <span className="ml-1 bg-cyan-500 text-black text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center">
+              {Array.from(searchParams.keys()).filter(k => k !== 'q').length}
+            </span>
+          )}
         </button>
       </div>
 

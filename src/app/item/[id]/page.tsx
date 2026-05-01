@@ -198,7 +198,7 @@ export default async function ItemPage({ params }: PageProps) {
   const isLiveAuction = Boolean((item as any).is_auction) && (item as any).auction_status === 'live'
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-20">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 lg:py-20 pb-24 sm:pb-12 lg:pb-20">
       {/* Bundle-Save Banner */}
       {parentLot && (
         <Link
@@ -269,7 +269,7 @@ export default async function ItemPage({ params }: PageProps) {
         {/* Details + CTA */}
         <div className="flex flex-col gap-4">
           <div>
-            <h1 className="text-4xl font-black text-white tracking-tight leading-tight mb-1">
+            <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight leading-tight mb-1">
               {item.player_name}
             </h1>
             {item.team_name && (
@@ -353,7 +353,7 @@ export default async function ItemPage({ params }: PageProps) {
                   )}
                 </div>
                 <div className="flex items-center gap-3">
-                  <p className="text-5xl font-black text-white tracking-tighter">
+                  <p className="text-4xl sm:text-5xl font-black text-white tracking-tighter">
                     ${pricing.effectiveStorePrice.toFixed(2)}
                   </p>
                   {(item as any).trend_data && Array.isArray((item as any).trend_data) && (item as any).trend_data.length > 0 && (
@@ -376,7 +376,7 @@ export default async function ItemPage({ params }: PageProps) {
               </div>
             ) : (
               <div className="flex items-center gap-3">
-                <p className="text-5xl font-black text-white tracking-tighter">
+                <p className="text-4xl sm:text-5xl font-black text-white tracking-tighter">
                   ${p(item.listed_price ?? item.avg_price).toFixed(2)}
                 </p>
                 {(item as any).trend_data && Array.isArray((item as any).trend_data) && (item as any).trend_data.length > 0 && (

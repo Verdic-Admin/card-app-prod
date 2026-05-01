@@ -175,20 +175,76 @@ export function TradeLeadsCRM() {
               Manage incoming trade proposals and verify pending cash checkouts seamlessly.
            </p>
         </div>
-        <div className="flex flex-wrap gap-3">
-           <button onClick={loadData} className="px-3 py-2 bg-slate-100 text-slate-700 font-bold rounded-lg hover:bg-slate-200 transition-colors flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-3">
+           <button onClick={loadData} className="flex-1 sm:flex-none justify-center px-3 py-2 bg-slate-100 text-slate-700 font-bold rounded-lg hover:bg-slate-200 transition-colors flex items-center gap-2">
               <RefreshCcw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} /> Sync
            </button>
-           <button onClick={handleExportCSV} className="px-4 py-2 bg-emerald-50 text-emerald-700 font-bold rounded-lg hover:bg-emerald-100 transition-colors flex items-center gap-2">
-              <Download className="w-4 h-4" /> 1-Click Export CSV
+           <button onClick={handleExportCSV} className="flex-1 sm:flex-none justify-center px-4 py-2 bg-emerald-50 text-emerald-700 font-bold rounded-lg hover:bg-emerald-100 transition-colors flex items-center gap-2 whitespace-nowrap">
+              <Download className="w-4 h-4" /> CSV
            </button>
-           <button onClick={handleMassDelete} disabled={selectedIds.size === 0} className="px-4 py-2 bg-red-50 text-red-600 font-bold rounded-lg hover:bg-red-100 disabled:opacity-50 disabled:grayscale transition-colors flex items-center gap-2">
-              <Trash2 className="w-4 h-4" /> Mass Cleanup ({selectedIds.size})
+           <button onClick={handleMassDelete} disabled={selectedIds.size === 0} className="flex-1 sm:flex-none justify-center px-4 py-2 bg-red-50 text-red-600 font-bold rounded-lg hover:bg-red-100 disabled:opacity-50 disabled:grayscale transition-colors flex items-center gap-2 whitespace-nowrap">
+              <Trash2 className="w-4 h-4" /> Cleanup ({selectedIds.size})
            </button>
         </div>
       </div>
 
-      <div className="overflow-x-auto border border-slate-200 rounded-lg">
+      <div className="grid grid-cols-1 gap-4 lg:hidden">
+        {offers.length === 0 ? (
+          <div className="px-4 py-8 text-center text-slate-500 font-medium bg-white rounded-xl border border-dashed border-slate-200">No Trade Offers Found.</div>
+        ) : (
+          offers.map(offer => (
+            <div key={offer.id} className={`bg-white rounded-xl border p-4 shadow-sm space-y-4 transition-colors ${selectedIds.has(offer.id) ? 'border-indigo-500 bg-indigo-50/30' : 'border-slate-200'}`}>
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <button onClick={() => toggleSelect(offer.id)} className={`${selectedIds.has(offer.id) ? "text-indigo-600" : "text-slate-300"} hover:text-indigo-600 transition-colors`}>
+                    {selectedIds.has(offer.id) ? <CheckSquare className="w-6 h-6"/> : <Square className="w-6 h-6"/>}
+                  </button>
+                  <div className="text-slate-900 font-bold">{new Date(offer.created_at).toLocaleDateString()}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {offer.status === 'pending_payment' ? (
+                    <span className="bg-amber-100 text-amber-700 font-black text-[10px] px-2 py-0.5 rounded-full uppercase tracking-widest border border-amber-200 shadow-sm flex items-center gap-1"><DollarSign className="w-3 h-3"/> Checkout</span>
+                  ) : offer.status === 'completed' ? (
+                    <span className="bg-emerald-100 text-emerald-700 font-black text-[10px] px-2 py-0.5 rounded-full uppercase tracking-widest border border-emerald-200 shadow-sm flex items-center gap-1"><Check className="w-3 h-3"/> Paid</span>
+                  ) : (
+                    <span className="bg-cyan-100 text-cyan-700 font-black text-[10px] px-2 py-0.5 rounded-full uppercase tracking-widest border border-cyan-200 shadow-sm flex items-center gap-1"><Handshake className="w-3 h-3"/> Trade</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <div className="font-bold text-slate-900 text-base">{offer.buyer_name}</div>
+                <div className="text-slate-500 text-sm">{offer.buyer_email}</div>
+              </div>
+
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 text-sm text-slate-600">
+                <div className="font-bold text-[10px] text-slate-400 uppercase mb-1">Offer Details</div>
+                {offer.offer_text}
+              </div>
+
+              <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100">
+                <div className="flex items-center gap-2">
+                  <span className="bg-slate-100 text-slate-700 font-bold px-2 py-1 rounded text-[10px] uppercase">
+                    {offer.target_items.length} item{offer.target_items.length > 1 ? 's' : ''}
+                  </span>
+                  {offer.attached_image_url && (
+                    <a href={offer.attached_image_url} target="_blank" rel="noreferrer" className="text-indigo-600 font-bold flex items-center gap-1 hover:underline text-[10px] uppercase">
+                      <ImageIcon className="w-3.5 h-3.5"/> View
+                    </a>
+                  )}
+                </div>
+                {offer.status === 'pending_payment' && (
+                  <button onClick={() => handleApprovePayment(offer.id)} className="bg-emerald-500 hover:bg-emerald-600 text-white font-black px-3 py-1.5 rounded shadow-sm flex items-center gap-1 text-[10px] uppercase">
+                    <CheckSquare className="w-3.5 h-3.5" /> Approve
+                  </button>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="hidden lg:block overflow-x-auto border border-slate-200 rounded-lg">
         <table className="min-w-full divide-y divide-slate-200">
           <thead className="bg-slate-50">
             <tr>

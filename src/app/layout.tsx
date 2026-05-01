@@ -7,6 +7,7 @@ import { Footer } from "@/components/Footer";
 import { CartProvider } from "@/context/CartContext";
 import { CartDrawer } from "@/components/CartDrawer";
 import { FloatingCart } from "@/components/FloatingCart";
+import { BottomTabBar } from "@/components/BottomTabBar";
 import { getStoreSettings } from "@/app/actions/settings";
 import { getAppOrigin } from "@/utils/app-origin";
 
@@ -65,12 +66,13 @@ export default async function RootLayout({
         />
         <CartProvider>
           <Navbar settings={settings} />
-          <main className="flex-grow flex flex-col">
+          <main className="flex-grow flex flex-col pb-20 sm:pb-0">
             {children}
           </main>
           <Footer settings={settings} />
           <CartDrawer settings={settings} />
           <FloatingCart />
+          <BottomTabBar />
         </CartProvider>
       </body>
     </html>
