@@ -258,7 +258,7 @@ export function LiveAuctionGrid({ initialItems }: { initialItems: Item[] }) {
                 <h3 className="font-bold text-lg text-white leading-tight">{item.player_name}</h3>
                 <p className="text-zinc-400 text-sm">{item.card_set}</p>
 
-                {/* Player Index forecast */}
+                {/* Estimated Value forecast */}
                 {(item.oracle_projection != null && Number(item.oracle_projection) > 0) ||
                 item.oracle_trend_percentage != null ? (
                   <PlayerIndexForecastLink
@@ -266,7 +266,7 @@ export function LiveAuctionGrid({ initialItems }: { initialItems: Item[] }) {
                     className="mt-2 mb-2 block rounded-lg border border-indigo-700/50 bg-indigo-950/50 px-2.5 py-2 hover:bg-indigo-900/50 transition-colors"
                   >
                     <div className="text-[10px] font-black uppercase tracking-widest text-indigo-200 mb-1 flex items-center justify-between gap-1">
-                      <span>Player Index</span>
+                      <span>Estimated Value</span>
                       <ExternalLink className="w-3 h-3 shrink-0 opacity-80" aria-hidden />
                     </div>
                     {item.oracle_projection != null && Number(item.oracle_projection) > 0 && (
