@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { price } from '@/utils/math'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, Share2 } from 'lucide-react'
 import { buildPlayerIndexForecasterUrl } from '@/lib/player-index-deeplink'
 import { PlayerIndexForecastLink } from '@/components/PlayerIndexForecastLink'
 
@@ -163,7 +163,7 @@ function AsyncBidInput({ itemId, currentBid, bidIncrement, endTime, onBidPlaced 
           aria-label="Increase bid"
         >+</button>
       </div>
-      <p className="text-[10px] text-zinc-600 text-center">
+      <p className="text-[10px] text-zinc-400 font-medium text-center mb-2">
         Min bid: ${minBid.toFixed(2)} · Increment: ${bidIncrement.toFixed(2)}
       </p>
 
@@ -275,6 +275,34 @@ export function AsyncAuctionGrid({ initialItems }: { initialItems: AsyncItem[] }
                 endTime={item.auction_end_time}
                 onBidPlaced={() => {}}
               />
+
+              {/* Share Item Button */}
+              <button
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const shareUrl = `${window.location.origin}/item/${item.id}`;
+                  const shareTitle = `${item.player_name} ${item.card_set ? `- ${item.card_set}` : ''}`.trim();
+                  try {
+                    if (navigator.share) {
+                      await navigator.share({
+                        title: shareTitle,
+                        text: `Check out this card: ${shareTitle}`,
+                        url: shareUrl,
+                      });
+                      return;
+                    }
+                    await navigator.clipboard.writeText(shareUrl);
+                    alert('Item link copied.');
+                  } catch {
+                    // User canceled or clipboard unavailable.
+                  }
+                }}
+                className="w-full mt-3 text-xs font-bold py-2.5 rounded-lg transition-all text-zinc-300 border border-zinc-700 hover:text-white hover:bg-zinc-800 flex items-center justify-center gap-2 uppercase tracking-widest"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                Share Item
+              </button>
             </div>
           </div>
         )
