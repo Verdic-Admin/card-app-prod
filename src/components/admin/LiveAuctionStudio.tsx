@@ -855,7 +855,7 @@ export function LiveAuctionStudio({
                         ) : (
                           <div className="text-slate-400 text-sm font-mono">No ID generated</div>
                         )}
-                        <a href={`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent([item.player_name, item.card_set, item.insert_name, item.parallel_name, item.parallel_insert_type, item.card_number].filter((v: any) => v && String(v).toLowerCase() !== 'base').join(' '))}&LH_Sold=1&LH_Complete=1`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded transition-colors" title="Check eBay Completed Listings">
+                        <a href={item.player_index_url || `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent([item.player_name, item.card_set, item.insert_name, item.parallel_name, item.parallel_insert_type, item.card_number].filter((v: any) => v && String(v).toLowerCase() !== 'base').join(' '))}&LH_Sold=1&LH_Complete=1`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded transition-colors" title="Check eBay Completed Listings">
                           <Search className="w-3 h-3" /> Check Comps
                         </a>
                       </div>

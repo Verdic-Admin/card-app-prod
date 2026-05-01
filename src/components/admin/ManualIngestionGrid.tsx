@@ -337,7 +337,7 @@ export function ManualIngestionGrid({ refreshKey = 0 }: ManualIngestionGridProps
                     </td>
                     <td className="px-4 py-3 align-middle text-right whitespace-nowrap">
                       <a 
-                        href={`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent([draft.player_name, draft.card_set, draft.insert_name, draft.parallel_name, draft.card_number].filter((v: any) => v && String(v).toLowerCase() !== 'base').join(' '))}&LH_Sold=1&LH_Complete=1`} 
+                        href={draft.player_index_url || `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent([draft.player_name, draft.card_set, draft.insert_name, draft.parallel_name, draft.card_number].filter((v: any) => v && String(v).toLowerCase() !== 'base').join(' '))}&LH_Sold=1&LH_Complete=1`} 
                         target="_blank" 
                         rel="noopener noreferrer" 
                         className="inline-flex items-center gap-1 text-[10px] font-bold text-sky-600 hover:text-sky-700 hover:bg-sky-50 px-2 py-1.5 rounded transition-colors mr-1" 

@@ -839,7 +839,7 @@ export async function applyStagingDraftBatchPricingAction(
          WHERE id = $7::uuid`,
         [listed, projection, projection, trend, playerIndexUrl || null, JSON.stringify(priceResult.ebay_comps || []), id],
       );
-      output.push({ id, success: true, listed_price: listed, market_price: projection, ebay_comps: priceResult.ebay_comps || [] });
+      output.push({ id, success: true, listed_price: listed, market_price: projection, player_index_url: playerIndexUrl || null, ebay_comps: priceResult.ebay_comps || [] });
     } catch (e: unknown) {
       output.push({ id, success: false, error: e instanceof Error ? e.message : String(e) });
     }
