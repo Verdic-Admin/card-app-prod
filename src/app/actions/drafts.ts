@@ -740,6 +740,7 @@ export interface BatchPricingResult {
   listed_price?: number;
   market_price?: number;
   ebay_comps?: { price: number; url: string }[];
+  player_index_url?: string | null;
   error?: string;
 }
 
