@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { price } from '@/utils/math'
-import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ExternalLink, Share2 } from 'lucide-react'
 import { buildPlayerIndexForecasterUrl } from '@/lib/player-index-deeplink'
 import { PlayerIndexForecastLink } from '@/components/PlayerIndexForecastLink'
 
@@ -342,6 +342,34 @@ export function LiveAuctionGrid({ initialItems }: { initialItems: Item[] }) {
                   className="w-full mt-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-2 rounded-lg text-sm transition-colors shadow-lg"
                 >
                   Offer Trade
+                </button>
+
+                {/* Share Item Button */}
+                <button
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const shareUrl = `${window.location.origin}/item/${item.id}`;
+                    const shareTitle = `${item.player_name} ${item.card_set ? `- ${item.card_set}` : ''}`.trim();
+                    try {
+                      if (navigator.share) {
+                        await navigator.share({
+                          title: shareTitle,
+                          text: `Check out this card: ${shareTitle}`,
+                          url: shareUrl,
+                        });
+                        return;
+                      }
+                      await navigator.clipboard.writeText(shareUrl);
+                      alert('Item link copied.');
+                    } catch {
+                      // User canceled or clipboard unavailable.
+                    }
+                  }}
+                  className="w-full mt-2 text-xs font-bold py-2.5 rounded-lg transition-all text-zinc-300 border border-zinc-700 hover:text-white hover:bg-zinc-800 flex items-center justify-center gap-2 uppercase tracking-widest"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  Share Item
                 </button>
               </div>
             </div>
