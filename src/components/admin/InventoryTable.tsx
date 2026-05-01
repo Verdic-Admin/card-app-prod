@@ -9,6 +9,7 @@ import { AuctionBidLogButton } from '@/components/admin/AuctionBidLogButton'
 import { syncSingleItemWithOracle, syncInventoryWithOracle, applyOracleDiscount, applyOracleDiscountAll, applyCorrection, approvePriceOnly, denyCorrection } from '@/app/actions/oracleSync'
 import ParallelTypeahead from '@/components/admin/ParallelTypeahead';
 import PrintRunTypeahead from '@/components/admin/PrintRunTypeahead';
+import InsertTypeahead from '@/components/admin/InsertTypeahead';
 import { Loader2, Trash2, Edit2, Check, X, Search, Download, RotateCw, RefreshCw, DollarSign, Save, AlertCircle, Gavel, Package, Share2, CopyPlus, MoreHorizontal, Eye } from 'lucide-react'
 import { price } from '@/utils/math'
 import { deriveDisplayPricing } from '@/utils/pricing'
@@ -1341,7 +1342,11 @@ export function InventoryTable({
                       onChange={val => setEditForm({...editForm, print_run: val})}
                       className="w-1/4 p-1.5 text-xs font-bold text-slate-900 bg-white border border-indigo-100 rounded focus:border-indigo-500 outline-none"
                     />
-                    <input type="text" value={editForm.insert_name || ''} onChange={e => setEditForm({...editForm, insert_name: e.target.value})} className="w-1/4 p-1.5 text-xs font-bold text-slate-900 bg-white border border-indigo-100 rounded focus:border-indigo-500 outline-none" placeholder="Insert" />
+                    <InsertTypeahead
+                      value={editForm.insert_name || ''}
+                      onChange={val => setEditForm({...editForm, insert_name: val})}
+                      className="w-1/4 p-1.5 text-xs font-bold text-slate-900 bg-white border border-indigo-100 rounded focus:border-indigo-500 outline-none"
+                    />
                     <ParallelTypeahead
                       value={editForm.parallel_name || ''}
                       onChange={val => setEditForm({...editForm, parallel_name: val})}

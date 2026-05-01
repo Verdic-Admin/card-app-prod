@@ -1,6 +1,7 @@
 'use client'
 import { useState, useCallback, useEffect } from 'react'
 import ParallelTypeahead from '@/components/admin/ParallelTypeahead'
+import InsertTypeahead from '@/components/admin/InsertTypeahead'
 import {
   Upload, Loader2, Play, CheckCircle2, Wand2,
   RefreshCw, Trash2, Send, Scissors, DollarSign, Search, AlertCircle
@@ -1060,7 +1061,6 @@ export function BulkIngestionWizard() {
                           { field: 'team_name', placeholder: 'Team' },
                           { field: 'card_set', placeholder: 'Card Set' },
                           { field: 'card_number', placeholder: 'Card #' },
-                          { field: 'insert_name', placeholder: 'Insert' },
                           { field: 'print_run', placeholder: 'Print Run' },
                         ].map(({ field, placeholder }) => (
                           <input key={field}
@@ -1071,6 +1071,13 @@ export function BulkIngestionWizard() {
                             className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
                           />
                         ))}
+                        {/* Insert — fuzzy typeahead with known inserts */}
+                        <InsertTypeahead
+                          value={(card as any).insert_name || ''}
+                          onChange={val => updateReviewField(card.id, 'insert_name' as keyof StagingCard, val)}
+                          onBlur={val => saveReviewField(card.id, 'insert_name', val)}
+                          className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
+                        />
                         {/* Parallel — fuzzy typeahead with known parallels */}
                         <ParallelTypeahead
                           value={(card as any).parallel_name || ''}
