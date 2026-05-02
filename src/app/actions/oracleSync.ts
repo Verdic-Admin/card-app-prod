@@ -143,7 +143,13 @@ export async function syncInventoryWithOracle() {
         const projection = Number(r?.projected_target ?? r?.target_price ?? 0);
         if (!Number.isFinite(projection) || projection <= 0) continue;
 
-        const computedPrice = projection * (1 - discountRate / 100);
+        // Comp average = real market price. Falls back to projection if no comps.
+        const comps: { price: number }[] = Array.isArray(r?.ebay_comps) ? r.ebay_comps : [];
+        const compAvg = comps.length > 0
+          ? comps.reduce((sum: number, c: { price: number }) => sum + c.price, 0) / comps.length
+          : null;
+        const marketBase = compAvg ?? projection;
+        const computedPrice = marketBase * (1 - discountRate / 100);
         
         // Smarter Manual Override Detection:
         // If an item has a listed_price, and it diverges from the NEW computed price,
@@ -166,12 +172,12 @@ export async function syncInventoryWithOracle() {
         updates.push({
           id: String(row.id),
           listed_price: finalListed,
-          market_price: projection,
+          market_price: marketBase,
           trend_data: trendPayload,
           player_index_url: String(r?.player_index_url || ''),
           oracle_projection: projection,
           oracle_trend_percentage: r?.trend_percentage != null ? Number(r.trend_percentage) : null,
-          oracle_comps: Array.isArray(r?.ebay_comps) && r.ebay_comps.length > 0 ? r.ebay_comps : null,
+          oracle_comps: comps.length > 0 ? comps : null,
         });
         pricedCount++;
       }
@@ -283,11 +289,14 @@ export async function syncSingleItemWithOracle(id: string) {
       return { success: false, message: `Oracle returned invalid projected target for item ${(item as any).id}.` };
     }
 
-    const currentPrice = data.current_price != null && Number(data.current_price) > 0 
-      ? Number(data.current_price) 
-      : Math.max(0.99, projection);
+    // Comp average = real market price. Falls back to projection if no comps.
+    const comps: { price: number }[] = Array.isArray(data.ebay_comps) ? data.ebay_comps : [];
+    const compAvg = comps.length > 0
+      ? comps.reduce((sum: number, c: { price: number }) => sum + c.price, 0) / comps.length
+      : null;
+    const marketBase = compAvg ?? (data.current_price != null && Number(data.current_price) > 0 ? Number(data.current_price) : Math.max(0.99, projection));
 
-    const new_price = currentPrice * (1 - (discountRate / 100));
+    const new_price = marketBase * (1 - (discountRate / 100));
     const trend = data.trend_percentage != null ? Number(data.trend_percentage) : null;
     const trendPayload = {
       days_ago: data.last_search_days_ago,
@@ -295,7 +304,7 @@ export async function syncSingleItemWithOracle(id: string) {
     };
     const playerIndexUrl = String(data.player_index_url || '');
 
-    const comps = Array.isArray(data.ebay_comps) && data.ebay_comps.length > 0 ? data.ebay_comps : null;
+    const compsJson = comps.length > 0 ? comps : null;
 
     await pool.query(
       `UPDATE inventory
@@ -307,15 +316,15 @@ export async function syncSingleItemWithOracle(id: string) {
            player_index_url = $6,
            oracle_comps = $7::jsonb
        WHERE id = $8`,
-      [new_price, currentPrice, projection, trend, JSON.stringify(trendPayload), playerIndexUrl, comps ? JSON.stringify(comps) : null, item.id]
+      [new_price, marketBase, projection, trend, JSON.stringify(trendPayload), playerIndexUrl, compsJson ? JSON.stringify(compsJson) : null, item.id]
     );
 
     return {
       success: true,
-      message: `Repriced to $${new_price.toFixed(2)} (Market $${currentPrice.toFixed(2)}, Oracle Target $${projection.toFixed(2)}${discountRate > 0 ? `, ${discountRate}% store discount applied` : ''}).`,
+      message: `Repriced to $${new_price.toFixed(2)} (Comp Avg $${marketBase.toFixed(2)}, PI Forecast $${projection.toFixed(2)}${discountRate > 0 ? `, ${discountRate}% store discount applied` : ''}).`,
       new_price,
       listed_price: new_price,
-      market_price: currentPrice,
+      market_price: marketBase,
       oracle_projection: projection,
       oracle_trend_percentage: trend,
       trend_data: trendPayload,
