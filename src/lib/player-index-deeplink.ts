@@ -41,6 +41,18 @@ export function getPlayerIndexAppOrigin(): string {
 }
 
 /**
+ * Converts a player name to a clean URL slug (matches the Player Index directory logic).
+ */
+export function slugifyPlayerName(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+/**
  * Full forecaster deep link with card context. Always includes `player` when known.
  * Include `set` whenever you have it so SSR + client auto-run the card calculation.
  */
@@ -52,8 +64,8 @@ export function buildPlayerIndexForecasterUrl(
   const player = String(item.player_name ?? '').trim();
   if (!player) return `${origin}/`;
 
-  const u = new URL('/', origin);
-  u.searchParams.set('player', player);
+  const slug = slugifyPlayerName(player);
+  const u = new URL(`/player/${slug}`, origin);
 
   const set = String(item.card_set ?? '').trim();
   if (set) u.searchParams.set('set', set);
