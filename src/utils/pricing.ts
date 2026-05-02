@@ -33,23 +33,21 @@ export function deriveDisplayPricing(input: DeriveDisplayPricingInput): DerivedD
   const discountPercent = Math.max(0, price(input.oracle_discount_percentage, 0));
   const hasProjection = projection > 0;
 
-  const computedDiscountPrice = hasProjection
-    ? Math.max(0, projection * (1 - discountPercent / 100))
-    : 0;
-
-  // Heuristic manual-override detection until a dedicated DB flag exists.
-  const hasManualOverride =
-    hasProjection &&
-    listed > 0 &&
-    Math.abs(listed - computedDiscountPrice) > 0.01;
-
   const fallbackStorePrice = listed > 0 ? listed : avg;
-  const effectiveStorePrice = hasProjection
-    ? hasManualOverride
-      ? listed
-      : computedDiscountPrice
-    : fallbackStorePrice;
+  
+  // Discount is now applied directly to the listed/avg price, NOT the player index
+  const computedDiscountPrice = Math.max(0, fallbackStorePrice * (1 - discountPercent / 100));
 
+  // The effective price is just the discounted base price.
+  const effectiveStorePrice = computedDiscountPrice;
+
+  // We no longer heuristically detect manual overrides this way since the discount 
+  // is applied directly to the user's listed price anyway.
+  const hasManualOverride = listed > 0 && Math.abs(listed - avg) > 0.01;
+
+  // Savings amount is now how much they save vs the original price, OR vs the projection
+  // if you still want to show "percent below player index". We'll compare against projection
+  // to maintain the "Player Index Savings" UI.
   const savingsAmount = hasProjection
     ? Math.max(0, projection - effectiveStorePrice)
     : 0;

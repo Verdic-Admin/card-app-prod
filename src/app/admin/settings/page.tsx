@@ -69,8 +69,8 @@ export default function SettingsPage() {
               title="Store Operations Policy" 
               steps={[
                 { 
-                  title: "Global Oracle Discount", 
-                  content: "Set a discount percentage here to automatically price your cards below the Player Index market value. This shows buyers exactly how much they save by buying direct, effectively replacing the 'eBay tax'." 
+                  title: "Global Store Discount", 
+                  content: "Set a discount percentage here to apply a global price reduction to all of your inventory. This discount is applied to your listed prices automatically, allowing you to run store-wide sales instantly." 
                 },
                 { 
                   title: "Payment Methods", 
@@ -179,7 +179,7 @@ export default function SettingsPage() {
 
 
             <div>
-              <label className="block text-xs font-bold text-foreground md:text-muted uppercase tracking-wider mb-2">Player Index Undercut Percentage (%)</label>
+              <label className="block text-xs font-bold text-foreground md:text-muted uppercase tracking-wider mb-2">Global Store Discount Percentage (%)</label>
               <div className="relative">
                 <input 
                   type="number" 
@@ -192,7 +192,7 @@ export default function SettingsPage() {
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted/60 font-bold">%</span>
               </div>
-              <p className="text-[10px] text-muted mt-1.5 font-medium">How far below the Player Index fair value do you want to auto-price? (e.g., 5 for 5% off).</p>
+              <p className="text-[10px] text-muted mt-1.5 font-medium">Apply a store-wide discount to all of your listed prices. (e.g., 5 for 5% off the base price).</p>
             </div>
 
             <div className="flex items-center justify-between p-4 bg-surface border border-emerald-200/60 rounded-lg shadow-sm">
