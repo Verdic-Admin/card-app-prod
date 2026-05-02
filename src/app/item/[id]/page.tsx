@@ -411,7 +411,7 @@ export default async function ItemPage({ params }: PageProps) {
                   </p>
                 </div>
                 {/* Bull / Bear Range */}
-                {((item as any).p_bull != null || (item as any).p_bear != null) && (
+                {item.oracle_projection != null && (
                   <div className="grid grid-cols-2 gap-2 mb-3">
                     <div className="bg-emerald-950/40 border border-emerald-700/30 rounded-lg px-3 py-2 text-center">
                       <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400/80 mb-0.5">Best Case</p>
