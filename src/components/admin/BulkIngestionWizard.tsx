@@ -39,6 +39,7 @@ interface StagingCard {
   parallel_name: string
   print_run: string
   listed_price: string
+  oracle_projection: string
   image_url: string | null
   back_image_url: string | null
   raw_front_url?: string | null
@@ -75,6 +76,7 @@ function rowToStagingCard(row: Record<string, unknown>): StagingCard {
     parallel_name:    String(row.parallel_name ?? ''),
     print_run:        row.print_run != null ? String(row.print_run) : '',
     listed_price:     row.listed_price != null ? String(row.listed_price) : '',
+    oracle_projection: row.oracle_projection != null ? String(row.oracle_projection) : '',
     image_url:        (row.image_url as string) ?? null,
     back_image_url:   (row.back_image_url as string) ?? null,
     raw_front_url:    (row.raw_front_url as string) ?? null,
@@ -588,7 +590,7 @@ export function BulkIngestionWizard() {
       for (const r of batchRes.results) {
         if (r.success && r.listed_price != null) {
           setReviewCards(prev => prev.map(c =>
-            c.id === r.id ? { ...c, repricing: false, listed_price: String(r.listed_price), ebay_comps: r.ebay_comps || [] } : c
+            c.id === r.id ? { ...c, repricing: false, listed_price: String(r.listed_price), oracle_projection: r.market_price != null ? String(r.market_price) : c.oracle_projection, ebay_comps: r.ebay_comps || [] } : c
           ))
         } else {
           setReviewCards(prev => prev.map(c =>
@@ -1171,6 +1173,11 @@ export function BulkIngestionWizard() {
                           placeholder="0.00"
                           className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground w-24 focus:ring-1 focus:ring-brand outline-none"
                         />
+                        {card.oracle_projection && parseFloat(card.oracle_projection) > 0 && (
+                          <span className="text-[10px] font-bold text-indigo-500 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded" title="Player Index projected value">
+                            PI: ${parseFloat(card.oracle_projection).toFixed(2)}
+                          </span>
+                        )}
                         <button
                           onClick={() => card.image_url && handleReprice(card.id, card.image_url)}
                           disabled={card.repricing || !card.image_url}

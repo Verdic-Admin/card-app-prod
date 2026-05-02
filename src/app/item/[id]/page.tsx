@@ -242,7 +242,7 @@ export default async function ItemPage({ params }: PageProps) {
                     href={playerIndexCalcUrl}
                     className="absolute top-3 left-3 z-20 bg-indigo-900/95 text-indigo-200 text-[11px] px-3 py-1.5 rounded-full border border-indigo-600 font-black shadow-lg hover:bg-indigo-800 transition-colors pointer-events-auto"
                   >
-                    🔥 {pricing.percentBelowPlayerIndex.toFixed(0)}% Below Estimated Value
+                    🔥 {pricing.percentBelowPlayerIndex.toFixed(0)}% Below Player Index Forecast
                   </PlayerIndexForecastLink>
                 )}
             </div>
@@ -338,12 +338,12 @@ export default async function ItemPage({ params }: PageProps) {
                     href={playerIndexCalcUrl}
                     className="text-[11px] uppercase tracking-widest text-indigo-300 font-bold hover:text-indigo-200 underline-offset-2 hover:underline"
                   >
-                    Estimated Value
+                    Player Index Forecast
                     <span className="line-through opacity-70 ml-1">${pricing.playerIndexPrice.toFixed(2)}</span>
                   </PlayerIndexForecastLink>
                   {pricing.discountPercent > 0 && (
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-950/70 text-indigo-200 border border-indigo-700/70">
-                    {pricing.discountPercent.toFixed(0)}% below Estimated Value
+                    {pricing.discountPercent.toFixed(0)}% below Player Index Forecast
                     </span>
                   )}
                   {(item as any).oracle_trend_percentage != null && (
@@ -397,7 +397,7 @@ export default async function ItemPage({ params }: PageProps) {
                   Analytics &amp; Forecasting
                 </p>
                 <div className="flex items-center justify-between">
-                  <p className="text-sm text-zinc-300 font-semibold">Estimated Value Projection ({settings.projection_timeframe || '90-Day'})</p>
+                  <p className="text-sm text-zinc-300 font-semibold">Player Index Forecast Projection ({settings.projection_timeframe || '90-Day'})</p>
                   <p className={`text-xl font-mono font-black ${Number(item.oracle_projection) < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
                     ${Number(item.oracle_projection).toFixed(2)}
                   </p>

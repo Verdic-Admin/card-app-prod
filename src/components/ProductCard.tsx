@@ -122,7 +122,7 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
               className="absolute top-2 left-2 z-20 bg-indigo-900 text-indigo-300 text-xs px-2.5 py-1 rounded-full border border-indigo-700 font-bold shadow-[0_0_12px_rgba(79,70,229,0.4)] pointer-events-auto flex items-center gap-1 hover:bg-indigo-800 transition-colors"
               onClick={(e) => e.stopPropagation()}
             >
-              🔥 {pricing.percentBelowPlayerIndex.toFixed(0)}% Below Estimated Value
+              🔥 {pricing.percentBelowPlayerIndex.toFixed(0)}% Below Player Index Forecast
             </PlayerIndexForecastLink>
           )}
         </div>
@@ -192,7 +192,7 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
                     href={playerIndexCalcUrl}
                     className="text-[10px] uppercase tracking-widest font-bold text-indigo-300 hover:text-indigo-200 underline-offset-2 hover:underline"
                   >
-                    Estimated Value <span className="line-through opacity-70 ml-1">${pricing.playerIndexPrice.toFixed(2)}</span>
+                    Player Index Forecast <span className="line-through opacity-70 ml-1">${pricing.playerIndexPrice.toFixed(2)}</span>
                   </PlayerIndexForecastLink>
                   {pricing.discountPercent > 0 && (
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-950/70 text-indigo-200 border border-indigo-700/70">
@@ -244,7 +244,7 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
                   )}
                 </div>
                 <span className="text-[10px] font-semibold text-zinc-500">
-                  Direct listing (no Estimated Value projection on file)
+                  Direct listing (no Player Index Forecast projection on file)
                 </span>
               </div>
             )}
