@@ -111,6 +111,8 @@ ALTER TABLE inventory ADD COLUMN IF NOT EXISTS trend_data JSONB;
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS player_index_url TEXT;
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS oracle_projection NUMERIC(10, 2);
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS oracle_trend_percentage NUMERIC(10, 4);
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS p_bull NUMERIC(10, 2);
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS p_bear NUMERIC(10, 2);
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS needs_correction BOOLEAN DEFAULT false;
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS needs_price_approval BOOLEAN DEFAULT false;
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS filename TEXT;
@@ -188,6 +190,8 @@ async function init() {
       player_index_url TEXT,
       oracle_projection NUMERIC(10, 2),
       oracle_trend_percentage NUMERIC(10, 4),
+      p_bull NUMERIC(10, 2),
+      p_bear NUMERIC(10, 2),
       needs_correction BOOLEAN DEFAULT false,
       needs_price_approval BOOLEAN DEFAULT false,
       sold_at TIMESTAMPTZ,
