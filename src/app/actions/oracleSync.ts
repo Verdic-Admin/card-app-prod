@@ -54,6 +54,11 @@ export async function syncInventoryWithOracle() {
 
   console.log(`-> Repricing ${inventory.length} items via Oracle calculate endpoint...`);
 
+  // One-time migration: ensure p_bull / p_bear columns exist
+  try {
+    await pool.query(`ALTER TABLE inventory ADD COLUMN IF NOT EXISTS p_bull numeric, ADD COLUMN IF NOT EXISTS p_bear numeric`);
+  } catch { /* columns already exist or DB unavailable — safe to continue */ }
+
   const apiKey = await getShopOracleApiKey();
   if (!apiKey) {
     return {
@@ -76,6 +81,8 @@ export async function syncInventoryWithOracle() {
     oracle_projection: number;
     oracle_trend_percentage: number | null;
     oracle_comps: any[] | null;
+    p_bull: number;
+    p_bear: number;
   }> = [];
   let pricedCount = 0;
 
@@ -167,6 +174,8 @@ export async function syncInventoryWithOracle() {
           oracle_projection: projection,
           oracle_trend_percentage: r?.trend_percentage != null ? Number(r.trend_percentage) : null,
           oracle_comps: comps.length > 0 ? comps : null,
+          p_bull: r?.p_bull != null ? Number(r.p_bull) : Math.round(projection * 1.15 * 100) / 100,
+          p_bear: r?.p_bear != null ? Number(r.p_bear) : Math.round(projection * 0.85 * 100) / 100,
         });
         pricedCount++;
       }
@@ -194,8 +203,8 @@ export async function syncInventoryWithOracle() {
 
     for (const u of updates) {
       await pool.query(
-        `UPDATE inventory SET oracle_projection = $1, oracle_trend_percentage = $2, oracle_comps = $3::jsonb WHERE id = $4`,
-        [u.oracle_projection, u.oracle_trend_percentage, u.oracle_comps ? JSON.stringify(u.oracle_comps) : null, u.id]
+        `UPDATE inventory SET oracle_projection = $1, oracle_trend_percentage = $2, oracle_comps = $3::jsonb, p_bull = $4, p_bear = $5 WHERE id = $6`,
+        [u.oracle_projection, u.oracle_trend_percentage, u.oracle_comps ? JSON.stringify(u.oracle_comps) : null, u.p_bull, u.p_bear, u.id]
       );
     }
   } catch (err: any) {
@@ -303,9 +312,11 @@ export async function syncSingleItemWithOracle(id: string) {
            oracle_trend_percentage = $4,
            trend_data = $5::jsonb,
            player_index_url = $6,
-           oracle_comps = $7::jsonb
-       WHERE id = $8`,
-      [new_price, marketBase, projection, trend, JSON.stringify(trendPayload), playerIndexUrl, compsJson ? JSON.stringify(compsJson) : null, item.id]
+           oracle_comps = $7::jsonb,
+           p_bull = $8,
+           p_bear = $9
+       WHERE id = $10`,
+      [new_price, marketBase, projection, trend, JSON.stringify(trendPayload), playerIndexUrl, compsJson ? JSON.stringify(compsJson) : null, Math.round(projection * 1.15 * 100) / 100, Math.round(projection * 0.85 * 100) / 100, item.id]
     );
 
     return {
@@ -318,6 +329,8 @@ export async function syncSingleItemWithOracle(id: string) {
       oracle_trend_percentage: trend,
       trend_data: trendPayload,
       player_index_url: playerIndexUrl,
+      p_bull: Math.round(projection * 1.15 * 100) / 100,
+      p_bear: Math.round(projection * 0.85 * 100) / 100,
     };
   } catch (err: any) {
     return { success: false, message: `Error processing item: ${err.message}` };

@@ -453,6 +453,8 @@ export function InventoryTable({
                     result.oracle_trend_percentage ?? (i as any).oracle_trend_percentage,
                   trend_data: result.trend_data ?? (i as any).trend_data,
                   player_index_url: result.player_index_url ?? (i as any).player_index_url,
+                  p_bull: result.p_bull ?? (i as any).p_bull,
+                  p_bear: result.p_bear ?? (i as any).p_bear,
                 }
               : i,
           ),
@@ -1511,6 +1513,13 @@ export function InventoryTable({
                       <div className="flex items-baseline gap-2 mb-1">
                         <span className="text-lg font-black text-purple-900 leading-none">${pricing.playerIndexPrice.toFixed(2)}</span>
                       </div>
+                      {/* Bull/Bear Forecast Range */}
+                      {((item as any).p_bull != null || (item as any).p_bear != null) && (
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-[1px] rounded">▲ ${price((item as any).p_bull).toFixed(2)}</span>
+                          <span className="text-[9px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-[1px] rounded">▼ ${price((item as any).p_bear).toFixed(2)}</span>
+                        </div>
+                      )}
                       {pricing.discountPercent > 0 && (
                         <div className="text-[10px] text-purple-700 font-bold mt-0.5">
                           Configured discount: {pricing.discountPercent.toFixed(0)}%

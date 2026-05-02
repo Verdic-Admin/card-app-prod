@@ -368,11 +368,7 @@ export default async function ItemPage({ params }: PageProps) {
                     You save ${pricing.savingsAmount.toFixed(2)}
                   </p>
                 )}
-                {pricing.hasManualOverride && (
-                  <p className="text-amber-300 font-semibold text-xs mt-1">
-                    Manual price override active
-                  </p>
-                )}
+
               </div>
             ) : (
               <div className="flex items-center gap-3">
@@ -393,17 +389,34 @@ export default async function ItemPage({ params }: PageProps) {
           {item.show_forecast && (
             <div className="border-t border-border pt-4 mt-2">
               <div className="rounded-xl border border-indigo-500/40 bg-indigo-950/30 px-4 py-4 shadow-lg">
-                <p className="text-xs font-black uppercase tracking-widest text-indigo-300 mb-2">
+                <p className="text-xs font-black uppercase tracking-widest text-indigo-300 mb-3">
                   Analytics &amp; Forecasting
                 </p>
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-zinc-300 font-semibold">Player Index Forecast Projection ({settings.projection_timeframe || '90-Day'})</p>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm text-zinc-300 font-semibold">Player Index Forecast ({settings.projection_timeframe || '90-Day'})</p>
                   <p className={`text-xl font-mono font-black ${Number(item.oracle_projection) < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
                     ${Number(item.oracle_projection).toFixed(2)}
                   </p>
                 </div>
-                <p className="text-xs text-zinc-500 mt-2 leading-relaxed">
-                  This represents the algorithm's raw mathematical forecast of the asset's trajectory over the selected timeframe, accounting for player performance and market momentum.
+                {/* Bull / Bear Range */}
+                {((item as any).p_bull != null || (item as any).p_bear != null) && (
+                  <div className="grid grid-cols-2 gap-2 mb-3">
+                    <div className="bg-emerald-950/40 border border-emerald-700/30 rounded-lg px-3 py-2 text-center">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400/80 mb-0.5">Best Case</p>
+                      <p className="text-lg font-mono font-black text-emerald-400">
+                        ${Number((item as any).p_bull || Number(item.oracle_projection) * 1.15).toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="bg-rose-950/40 border border-rose-700/30 rounded-lg px-3 py-2 text-center">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-rose-400/80 mb-0.5">Worst Case</p>
+                      <p className="text-lg font-mono font-black text-rose-400">
+                        ${Number((item as any).p_bear || Number(item.oracle_projection) * 0.85).toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
+                  Algorithmic forecast based on player performance (WAR), market momentum, and scarcity. Best/worst case reflects ±15% volatility band.
                 </p>
               </div>
             </div>

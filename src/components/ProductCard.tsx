@@ -221,11 +221,7 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
                     You save ${pricing.savingsAmount.toFixed(2)}
                   </span>
                 )}
-                {pricing.hasManualOverride && (
-                  <span className="text-[10px] font-semibold text-amber-300 mt-0.5">
-                    Manual price override active
-                  </span>
-                )}
+
               </div>
             ) : (
               <div className="space-y-1">
