@@ -824,7 +824,16 @@ export async function applyStagingDraftBatchPricingAction(
       continue;
     }
 
-    const listed = roundMoney(projection * (1 - discountRate / 100));
+    // Listed price = average of eBay comps (real market value).
+    // Oracle projection = algorithm's forward-looking expected value (shown alongside).
+    // Falls back to projection only when no comps are available.
+    const comps = priceResult.ebay_comps || [];
+    const compAvg = comps.length > 0
+      ? comps.reduce((sum: number, c: { price: number }) => sum + c.price, 0) / comps.length
+      : null;
+
+    const listedBase = compAvg ?? projection;
+    const listed = roundMoney(listedBase * (1 - discountRate / 100));
     const trend = priceResult.trend_percentage != null ? Number(priceResult.trend_percentage) : null;
     const playerIndexUrl = priceResult.url || '';
 
@@ -838,9 +847,9 @@ export async function applyStagingDraftBatchPricingAction(
            player_index_url = $5,
            oracle_comps = $6::jsonb
          WHERE id = $7::uuid`,
-        [listed, projection, projection, trend, playerIndexUrl || null, JSON.stringify(priceResult.ebay_comps || []), id],
+        [listed, compAvg ?? projection, projection, trend, playerIndexUrl || null, JSON.stringify(comps), id],
       );
-      output.push({ id, success: true, listed_price: listed, market_price: projection, player_index_url: playerIndexUrl || null, ebay_comps: priceResult.ebay_comps || [] });
+      output.push({ id, success: true, listed_price: listed, market_price: projection, player_index_url: playerIndexUrl || null, ebay_comps: comps });
     } catch (e: unknown) {
       output.push({ id, success: false, error: e instanceof Error ? e.message : String(e) });
     }
