@@ -151,18 +151,7 @@ export async function syncInventoryWithOracle() {
         const marketBase = compAvg ?? projection;
         const computedPrice = marketBase * (1 - discountRate / 100);
         
-        // Smarter Manual Override Detection:
-        // If an item has a listed_price, and it diverges from the NEW computed price,
-        // we treat it as manual and preserve it. This ensures "Sync All" never
-        // overwrites a price you've intentionally set or changed.
-        const currentListed = Number(row.listed_price || 0);
-        const isManualOverride = 
-          currentListed > 0 && 
-          Math.abs(currentListed - computedPrice) > 0.01;
-
-        // If manual override exists, preserve the current listed_price.
-        // Otherwise, update to the new computed price.
-        const finalListed = isManualOverride ? currentListed : computedPrice;
+        const finalListed = computedPrice;
 
         const trendPayload = {
           days_ago: r?.last_search_days_ago,
