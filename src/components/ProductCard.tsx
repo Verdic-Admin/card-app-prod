@@ -11,6 +11,7 @@ import { deriveDisplayPricing } from '@/utils/pricing';
 import { Share2 } from 'lucide-react';
 import { buildPlayerIndexForecasterUrl } from '@/lib/player-index-deeplink';
 import { PlayerIndexForecastLink } from '@/components/PlayerIndexForecastLink';
+import { InstructionTrigger } from '@/components/admin/DraggableGuide';
 
 type InventoryItem = Database['public']['Tables']['inventory']['Row'];
 
@@ -188,12 +189,23 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
             ) : pricing.hasProjection ? (
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <PlayerIndexForecastLink
-                    href={playerIndexCalcUrl}
-                    className="text-[10px] uppercase tracking-widest font-bold text-indigo-300 hover:text-indigo-200 underline-offset-2 hover:underline"
-                  >
-                    Player Index Forecast <span className="line-through opacity-70 ml-1">${pricing.playerIndexPrice.toFixed(2)}</span>
-                  </PlayerIndexForecastLink>
+                  <div className="flex items-center gap-1.5">
+                    <PlayerIndexForecastLink
+                      href={playerIndexCalcUrl}
+                      className="text-xs uppercase tracking-widest font-black text-indigo-300 hover:text-indigo-200 underline-offset-2 hover:underline"
+                    >
+                      Player Index Forecast <span className="line-through opacity-70 ml-1">${pricing.playerIndexPrice.toFixed(2)}</span>
+                    </PlayerIndexForecastLink>
+                    <InstructionTrigger 
+                      iconOnly 
+                      title="Player Index Forecasts" 
+                      steps={[
+                        { title: "What is this?", content: "The Player Index is an algorithmic pricing engine that analyzes player performance (WAR), true market scarcity, and real-time momentum to calculate a fair-value projection for this exact card." },
+                        { title: "Why is it here?", content: "We believe in radical transparency. By showing you the algorithmic fair-value alongside our store price, you can see exactly how much you are saving compared to the open market." },
+                        { title: "Best/Worst Case", content: "This represents a standard volatility band (+/- 15%) showing where the card's price could swing based on short-term market hype or slumps." }
+                      ]} 
+                    />
+                  </div>
                   {pricing.discountPercent > 0 && (
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-950/70 text-indigo-200 border border-indigo-700/70">
                       {pricing.discountPercent.toFixed(0)}% off
