@@ -6,8 +6,8 @@ import { getShopOracleApiKey } from '@/lib/shop-oracle-credentials';
 import { batchUpdatePrices } from '@/app/actions/inventory'
 import { calculatePricingAction } from '@/app/actions/oracleAPI'
 
-const BATCH_PRICING_SIZE = 50;
-const BATCH_CONCURRENCY  = 2;   // keep gateway fan-out bounded
+const BATCH_PRICING_SIZE = 15;
+const BATCH_CONCURRENCY  = 3;   // keep gateway fan-out bounded
 
 const ALLOWED_COLUMNS = [
   'player_name', 'card_set', 'card_number', 'insert_name', 
