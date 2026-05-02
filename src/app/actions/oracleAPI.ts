@@ -192,13 +192,14 @@ export interface BatchPricingResultItem {
 }
 
 /**
- * Price up to 9 cards in a single API call (burns 1 token).
- * Uses the existing /v1/b2b/calculate-batch endpoint.
+ * Price up to N cards by chunking into batches of 50 (the backend max).
+ * Each chunk is sent as a separate API call; results are concatenated.
  */
 export async function calculatePricingBatchAction(
   items: BatchPricingItem[],
 ): Promise<{ success: boolean; results: BatchPricingResultItem[]; error?: string }> {
   const base = await getOracleGatewayBaseUrl();
+  const CHUNK_SIZE = 50;
 
   // Map to the shape the b2b batch endpoint expects
   const apiItems = items.map((f) => ({
@@ -215,21 +216,35 @@ export async function calculatePricingBatchAction(
     skip_fuzzy: false,
   }));
 
-  const raw = await submitOracleRequest(`${base}/v1/b2b/calculate-batch`, {
-    method: 'POST',
-    body: JSON.stringify({ items: apiItems }),
-  });
+  // Chunk into batches of CHUNK_SIZE to stay under the backend's 50-item limit
+  const allResults: BatchPricingResultItem[] = [];
 
-  if (raw && typeof raw === 'object' && 'error' in raw && raw.error === 'credits_exhausted') {
-    return { success: false, results: [], error: 'credits_exhausted' };
+  for (let start = 0; start < apiItems.length; start += CHUNK_SIZE) {
+    const chunk = apiItems.slice(start, start + CHUNK_SIZE);
+
+    const raw = await submitOracleRequest(`${base}/v1/b2b/calculate-batch`, {
+      method: 'POST',
+      body: JSON.stringify({ items: chunk }),
+    });
+
+    if (raw && typeof raw === 'object' && 'error' in raw && raw.error === 'credits_exhausted') {
+      return { success: false, results: allResults, error: 'credits_exhausted' };
+    }
+
+    if (!raw || typeof raw !== 'object' || !('success' in raw) || !raw.success) {
+      const r = raw as { status?: number; statusText?: string; detail?: string };
+      const msg = [r.status && `HTTP ${r.status}`, r.statusText, r.detail].filter(Boolean).join(' — ');
+      return { success: false, results: allResults, error: msg || 'Batch pricing failed.' };
+    }
+
+    // Detect backend error envelope: { status: "error", message: "..." }
+    const data = raw.data as { status?: string; message?: string; results?: BatchPricingResultItem[] };
+    if (data.status === 'error') {
+      return { success: false, results: allResults, error: data.message || 'Backend batch error.' };
+    }
+
+    allResults.push(...(data.results ?? []));
   }
 
-  if (!raw || typeof raw !== 'object' || !('success' in raw) || !raw.success) {
-    const r = raw as { status?: number; statusText?: string; detail?: string };
-    const msg = [r.status && `HTTP ${r.status}`, r.statusText, r.detail].filter(Boolean).join(' — ');
-    return { success: false, results: [], error: msg || 'Batch pricing failed.' };
-  }
-
-  const data = raw.data as { results?: BatchPricingResultItem[] };
-  return { success: true, results: data.results ?? [] };
+  return { success: true, results: allResults };
 }
