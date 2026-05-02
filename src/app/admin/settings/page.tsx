@@ -120,7 +120,7 @@ export default function SettingsPage() {
                    <p className="font-bold text-foreground">Permanent profile links (saved in your database)</p>
                    <ul className="list-disc pl-4 space-y-1">
                      <li><strong className="text-foreground">Venmo</strong> — your public profile, e.g. <code className="text-foreground">https://venmo.com/u/YourShop</code>. After checkout, buyers copy a short &quot;payment note&quot; we generate (order ref + items + total) into the Venmo memo.</li>
-                     <li><strong className="text-foreground">PayPal</strong> — PayPal.me link without the trailing amount, e.g. <code className="text-foreground">https://paypal.me/YourShop</code>. Checkout may append the order total for one-tap pay.</li>
+                     <li><strong className="text-foreground">PayPal</strong> — Enter your PayPal.me link OR just your PayPal email address. (Using your email automatically forces a secure Goods & Services checkout).</li>
                      <li><strong className="text-foreground">Cash App</strong> — <code className="text-foreground">https://cash.app/$YourCashtag</code>; checkout can append the amount.</li>
                      <li><strong className="text-foreground">Zelle</strong> — your phone or email only (no URL). Buyers use their bank app; they still copy the same payment note so you can match the transfer.</li>
                    </ul>
@@ -132,8 +132,8 @@ export default function SettingsPage() {
                         <input type="url" value={settings.payment_venmo || ''} onChange={e => setSettings({...settings, payment_venmo: e.target.value})} className="w-full px-3 py-2 bg-surface border border-border md:border-muted/30 rounded-lg text-sm text-foreground focus:ring-2 focus:ring-brand outline-none shadow-sm placeholder:text-muted/40" placeholder="https://venmo.com/u/..." />
                      </div>
                      <div>
-                        <label className="block text-xs font-bold text-foreground md:text-muted uppercase tracking-wider mb-2">PayPal Target Link</label>
-                        <input type="url" value={settings.payment_paypal || ''} onChange={e => setSettings({...settings, payment_paypal: e.target.value})} className="w-full px-3 py-2 bg-surface border border-border md:border-muted/30 rounded-lg text-sm text-foreground focus:ring-2 focus:ring-brand outline-none shadow-sm placeholder:text-muted/40" placeholder="https://paypal.me/..." />
+                        <label className="block text-xs font-bold text-foreground md:text-muted uppercase tracking-wider mb-2">PayPal Link or Email</label>
+                        <input type="text" value={settings.payment_paypal || ''} onChange={e => setSettings({...settings, payment_paypal: e.target.value})} className="w-full px-3 py-2 bg-surface border border-border md:border-muted/30 rounded-lg text-sm text-foreground focus:ring-2 focus:ring-brand outline-none shadow-sm placeholder:text-muted/40" placeholder="https://paypal.me/... OR email@example.com" />
                      </div>
                      <div>
                         <label className="block text-xs font-bold text-foreground md:text-muted uppercase tracking-wider mb-2">CashApp Target Link</label>

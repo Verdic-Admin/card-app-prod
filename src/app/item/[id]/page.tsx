@@ -11,6 +11,7 @@ import { getStoreSettings } from '@/app/actions/settings'
 import { deriveDisplayPricing } from '@/utils/pricing'
 import { buildPlayerIndexForecasterUrl } from '@/lib/player-index-deeplink'
 import { PlayerIndexForecastLink } from '@/components/PlayerIndexForecastLink'
+import { InstructionTrigger } from '@/components/admin/DraggableGuide'
 import { getAppOrigin } from '@/utils/app-origin'
 
 type PageProps = { params: Promise<{ id: string }> }
@@ -389,9 +390,20 @@ export default async function ItemPage({ params }: PageProps) {
           {item.show_forecast && (
             <div className="border-t border-border pt-4 mt-2">
               <div className="rounded-xl border border-indigo-500/40 bg-indigo-950/30 px-4 py-4 shadow-lg">
-                <p className="text-xs font-black uppercase tracking-widest text-indigo-300 mb-3">
-                  Analytics &amp; Forecasting
-                </p>
+                <div className="flex items-center justify-between mb-3">
+                   <p className="text-xs font-black uppercase tracking-widest text-indigo-300">
+                     Analytics &amp; Forecasting
+                   </p>
+                   <InstructionTrigger 
+                     iconOnly 
+                     title="Player Index Forecasts" 
+                     steps={[
+                       { title: "What is this?", content: "The Player Index is an algorithmic pricing engine that analyzes player performance (WAR), true market scarcity, and real-time momentum to calculate a fair-value projection for this exact card." },
+                       { title: "Why is it here?", content: "We believe in radical transparency. By showing you the algorithmic fair-value alongside our store price, you can see exactly how much you are saving compared to the open market." },
+                       { title: "Best/Worst Case", content: "This represents a standard volatility band (+/- 15%) showing where the card's price could swing based on short-term market hype or slumps." }
+                     ]} 
+                   />
+                </div>
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-sm text-zinc-300 font-semibold">Player Index Forecast ({settings.projection_timeframe || '90-Day'})</p>
                   <p className={`text-xl font-mono font-black ${Number(item.oracle_projection) < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
@@ -415,9 +427,15 @@ export default async function ItemPage({ params }: PageProps) {
                     </div>
                   </div>
                 )}
-                <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
+                <p className="text-xs text-zinc-500 mt-1 leading-relaxed mb-4">
                   Algorithmic forecast based on player performance (WAR), market momentum, and scarcity. Best/worst case reflects ±15% volatility band.
                 </p>
+                <PlayerIndexForecastLink
+                  href={playerIndexCalcUrl}
+                  className="w-full block text-center bg-indigo-900/50 hover:bg-indigo-800 text-indigo-200 font-bold text-xs py-2.5 rounded-lg border border-indigo-700/50 transition-colors"
+                >
+                  Calculate this card on Player Index &rarr;
+                </PlayerIndexForecastLink>
               </div>
             </div>
           )}

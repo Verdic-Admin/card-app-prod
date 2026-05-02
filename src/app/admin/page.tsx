@@ -23,6 +23,8 @@ function normalizeInventoryMoneyFields<T extends Record<string, unknown>>(row: T
     current_bid: row.current_bid == null ? null : price(row.current_bid),
     oracle_projection: row.oracle_projection == null ? null : price(row.oracle_projection),
     oracle_trend_percentage: row.oracle_trend_percentage == null ? null : price(row.oracle_trend_percentage),
+    p_bull: row.p_bull == null ? null : price(row.p_bull),
+    p_bear: row.p_bear == null ? null : price(row.p_bear),
   };
 }
 

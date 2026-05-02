@@ -8,17 +8,20 @@ export interface InstructionStep {
   content: string
 }
 
-export function InstructionTrigger({ title, steps }: { title: string, steps: InstructionStep[] }) {
+export function InstructionTrigger({ title, steps, label = "Instructions", iconOnly = false }: { title: string, steps: InstructionStep[], label?: string, iconOnly?: boolean }) {
    const [isOpen, setIsOpen] = useState(false)
    
    return (
       <>
          <button 
            onClick={() => setIsOpen(true)}
-           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg shadow-sm hover:bg-indigo-100 transition-colors ml-3"
-           title="View System Instructions"
+           className={iconOnly 
+             ? "inline-flex items-center justify-center p-1.5 text-indigo-400 bg-indigo-950/50 hover:bg-indigo-900 border border-indigo-500/30 rounded-full shadow-sm transition-colors ml-2" 
+             : "inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg shadow-sm hover:bg-indigo-100 transition-colors ml-3"
+           }
+           title="View Info"
          >
-           <HelpCircle className="w-4 h-4" /> Instructions
+           <HelpCircle className="w-4 h-4" /> {!iconOnly && label}
          </button>
          
          {isOpen && (

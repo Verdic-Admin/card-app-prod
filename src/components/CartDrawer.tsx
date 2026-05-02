@@ -370,22 +370,22 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
                          </div>
                          <div className="space-y-2">
                              {settings.payment_venmo && (
-                                <a href={settings.payment_venmo} target="_blank" rel="noopener noreferrer" className="block w-full bg-[#008CFF] hover:bg-[#0074D4] text-foreground font-black py-3 rounded-lg transition-colors text-sm shadow-md">
+                                <a href={paymentUrlWithAmount(settings.payment_venmo, checkoutResult.total, checkoutResult.paymentMemo)} target="_blank" rel="noopener noreferrer" className="block w-full bg-[#008CFF] hover:bg-[#0074D4] text-foreground font-black py-3 rounded-lg transition-colors text-sm shadow-md text-center">
                                    Open Venmo — pay ${checkoutResult.total.toFixed(2)}
                                 </a>
                              )}
                              {settings.payment_paypal && (
-                                <a href={paymentUrlWithAmount(settings.payment_paypal, checkoutResult.total)} target="_blank" rel="noopener noreferrer" className="block w-full bg-[#003087] hover:bg-[#001C53] text-foreground font-black py-3 rounded-lg transition-colors text-sm shadow-md">
+                                <a href={paymentUrlWithAmount(settings.payment_paypal, checkoutResult.total, checkoutResult.paymentMemo)} target="_blank" rel="noopener noreferrer" className="block w-full bg-[#003087] hover:bg-[#001C53] text-foreground font-black py-3 rounded-lg transition-colors text-sm shadow-md text-center">
                                    Open PayPal — ${checkoutResult.total.toFixed(2)}
                                 </a>
                              )}
                              {settings.payment_cashapp && (
-                                <a href={paymentUrlWithAmount(settings.payment_cashapp, checkoutResult.total)} target="_blank" rel="noopener noreferrer" className="block w-full bg-[#00D632] hover:bg-[#00A827] text-foreground font-black py-3 rounded-lg transition-colors text-sm shadow-md">
+                                <a href={paymentUrlWithAmount(settings.payment_cashapp, checkoutResult.total, checkoutResult.paymentMemo)} target="_blank" rel="noopener noreferrer" className="block w-full bg-[#00D632] hover:bg-[#00A827] text-foreground font-black py-3 rounded-lg transition-colors text-sm shadow-md text-center">
                                    Open Cash App — ${checkoutResult.total.toFixed(2)}
                                 </a>
                              )}
                              {settings.payment_zelle && (
-                                <a href={(settings.payment_zelle.includes('@') ? `mailto:${settings.payment_zelle}` : `tel:${settings.payment_zelle}`)} target="_blank" rel="noopener noreferrer" className="block w-full bg-[#7411E2] hover:bg-[#5C0DB3] text-foreground font-black py-3 rounded-lg transition-colors text-sm shadow-md">
+                                <a href={(settings.payment_zelle.includes('@') ? `mailto:${settings.payment_zelle}` : `tel:${settings.payment_zelle}`)} target="_blank" rel="noopener noreferrer" className="block w-full bg-[#7411E2] hover:bg-[#5C0DB3] text-foreground font-black py-3 rounded-lg transition-colors text-sm shadow-md text-center">
                                    Zelle: {settings.payment_zelle} — send ${checkoutResult.total.toFixed(2)}
                                 </a>
                              )}
