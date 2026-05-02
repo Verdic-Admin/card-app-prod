@@ -514,12 +514,15 @@ export async function applyOracleDiscount(id: string) {
   const { rows: settingsRows } = await pool.query(`SELECT oracle_discount_percentage FROM store_settings WHERE id = 1`); const settings = settingsRows[0]
   const discountRate = settings?.oracle_discount_percentage || 0;
   
-  const { rows } = await pool.query(`SELECT oracle_projection FROM inventory WHERE id = $1`, [id]); const item = rows[0];
-  // @ts-ignore
-  if (item?.oracle_projection) {
-       const new_price = item.oracle_projection * (1 - (discountRate / 100))
-       await pool.query(`UPDATE inventory SET listed_price = $1 WHERE id = $2`, [new_price, id])
-       return { success: true, new_price }
+  const { rows } = await pool.query(`SELECT oracle_projection, market_price FROM inventory WHERE id = $1`, [id]); const item = rows[0];
+  if (item) {
+       // Comp avg (market_price) is the real market base; fall back to PI projection if no comps
+       const base = item.market_price > 0 ? item.market_price : item.oracle_projection;
+       if (base > 0) {
+           const new_price = base * (1 - (discountRate / 100))
+           await pool.query(`UPDATE inventory SET listed_price = $1 WHERE id = $2`, [new_price, id])
+           return { success: true, new_price }
+       }
   }
   return { success: false, message: 'No oracle projection' }
 }
@@ -529,12 +532,14 @@ export async function applyOracleDiscountAll() {
   const { rows: settingsRows } = await pool.query(`SELECT oracle_discount_percentage FROM store_settings WHERE id = 1`); const settings = settingsRows[0]
   const discountRate = settings?.oracle_discount_percentage || 0;
   
-  const { rows: items } = await pool.query(`SELECT id, oracle_projection FROM inventory WHERE oracle_projection IS NOT NULL`)
+  const { rows: items } = await pool.query(`SELECT id, oracle_projection, market_price FROM inventory WHERE oracle_projection IS NOT NULL`)
   let count = 0
   if (items) {
       for (const item of items) {
-          if (item.oracle_projection) {
-              const new_price = item.oracle_projection * (1 - (discountRate / 100))
+          // Comp avg (market_price) is the real market base; fall back to PI projection if no comps
+          const base = item.market_price > 0 ? item.market_price : item.oracle_projection;
+          if (base > 0) {
+              const new_price = base * (1 - (discountRate / 100))
               await pool.query(`UPDATE inventory SET listed_price = $1 WHERE id = $2`, [new_price, item.id])
               count++
           }
