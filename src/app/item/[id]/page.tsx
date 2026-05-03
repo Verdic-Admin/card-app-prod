@@ -115,41 +115,63 @@ export default async function ItemPage({ params }: PageProps) {
     return (
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-20">
         {/* Lot Header */}
-        <div className="mb-10">
-          <span className="inline-flex items-center gap-2 bg-cyan-950 text-brand text-xs font-black px-3 py-1.5 rounded-full border border-cyan-800 mb-4 uppercase tracking-widest">
-            📦 Lot Bundle
-          </span>
-          <h1 className="text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight mb-3">
-            {item.player_name}
-          </h1>
-          {item.card_set && (
-            <p className="text-muted font-semibold text-lg mb-6">{item.card_set}</p>
-          )}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-start mb-10">
+          <div>
+            <span className="inline-flex items-center gap-2 bg-cyan-950 text-brand text-xs font-black px-3 py-1.5 rounded-full border border-cyan-800 mb-4 uppercase tracking-widest">
+              📦 Lot Bundle
+            </span>
+            <h1 className="text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight mb-3">
+              {item.player_name}
+            </h1>
+            {item.card_set && (
+              <p className="text-muted font-semibold text-lg mb-6">{item.card_set}</p>
+            )}
 
-          <div className="flex flex-wrap items-center gap-4">
-            <span className="text-5xl font-black text-white tracking-tighter">
-              ${p(item.listed_price ?? item.avg_price).toFixed(2)}
-            </span>
-            <span className="text-muted font-bold text-sm">
-              {children?.length ?? 0} cards included
-            </span>
+            <div className="flex flex-wrap items-center gap-4">
+              <span className="text-5xl font-black text-white tracking-tighter">
+                ${p(item.listed_price ?? item.avg_price).toFixed(2)}
+              </span>
+              <span className="text-muted font-bold text-sm">
+                {children?.length ?? 0} cards included
+              </span>
+            </div>
+            
+            {savings > 0 && (
+              <div className="mt-4 flex items-center gap-2 bg-gradient-to-r from-emerald-950/60 to-emerald-900/30 border border-emerald-500/30 rounded-xl px-5 py-3 w-fit shadow-lg shadow-emerald-900/10">
+                 <span className="text-emerald-400 text-lg flex-shrink-0">💰</span>
+                 <div>
+                   <p className="text-emerald-400 font-black text-xs uppercase tracking-widest mb-0.5">Bundle Savings</p>
+                   <p className="text-white font-bold text-sm tracking-wide">
+                     Save <span className="text-emerald-300 font-black">${savings.toFixed(2)}</span> ({savingsPct.toFixed(0)}%) vs individual pricing
+                   </p>
+                 </div>
+              </div>
+            )}
+
+            {/* Add whole lot to cart */}
+            <div className="mt-6">
+              <ItemDetailClient item={item as any} />
+            </div>
           </div>
           
-          {savings > 0 && (
-            <div className="mt-4 flex items-center gap-2 bg-gradient-to-r from-emerald-950/60 to-emerald-900/30 border border-emerald-500/30 rounded-xl px-5 py-3 w-fit shadow-lg shadow-emerald-900/10">
-               <span className="text-emerald-400 text-lg flex-shrink-0">💰</span>
-               <div>
-                 <p className="text-emerald-400 font-black text-xs uppercase tracking-widest mb-0.5">Bundle Savings</p>
-                 <p className="text-white font-bold text-sm tracking-wide">
-                   Save <span className="text-emerald-300 font-black">${savings.toFixed(2)}</span> ({savingsPct.toFixed(0)}%) vs individual pricing
-                 </p>
-               </div>
-            </div>
-          )}
-
-          {/* Add whole lot to cart */}
-          <div className="mt-6">
-            <ItemDetailClient item={item as any} />
+          <div className="space-y-4">
+            {item.image_url && (
+              <div className="rounded-2xl overflow-hidden border border-border bg-background shadow-2xl flex items-center justify-center relative group">
+                <img src={item.image_url} alt={`${item.player_name} lot composite`} className="w-full h-auto object-contain" />
+              </div>
+            )}
+            {item.coined_image_url && (
+              <div className="rounded-2xl overflow-hidden border-2 border-emerald-500/50 bg-emerald-950/20 shadow-xl flex items-center justify-center p-2 relative">
+                <div className="absolute top-4 right-4 bg-emerald-500 text-foreground text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-lg z-10 flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-background animate-pulse" /> Validated
+                </div>
+                <img
+                  src={item.coined_image_url}
+                  alt={`${item.player_name} physical coin proof`}
+                  className="w-full h-auto object-contain drop-shadow-xl rounded-xl"
+                />
+              </div>
+            )}
           </div>
         </div>
 
