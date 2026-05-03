@@ -187,6 +187,12 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
         setCheckoutLoading(false);
         return;
       }
+
+      if (!paymentMethod) {
+        setCartError("Please select a payment method.");
+        setCheckoutLoading(false);
+        return;
+      }
       
       const res = await submitManualCheckout(
         cashItems.map(i => i.id),
