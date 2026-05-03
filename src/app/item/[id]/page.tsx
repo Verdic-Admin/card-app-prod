@@ -197,6 +197,7 @@ export default async function ItemPage({ params }: PageProps) {
   })
   const playerIndexCalcUrl = buildPlayerIndexForecasterUrl(item as any)
   const isLiveAuction = Boolean((item as any).is_auction) && (item as any).auction_status === 'live'
+  const showForecastData = pricing.hasProjection && (item as any).show_forecast !== false
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 lg:py-20 pb-24 sm:pb-12 lg:pb-20">
@@ -237,7 +238,7 @@ export default async function ItemPage({ params }: PageProps) {
               <ImageMagnifier src={item.image_url} alt={`${item.player_name} front`} />
               <div className="absolute inset-0 ring-1 ring-inset ring-white/10 rounded-2xl pointer-events-none z-10" />
               {!isLiveAuction &&
-                pricing.hasProjection &&
+                showForecastData &&
                 pricing.percentBelowPlayerIndex > 0 && (
                   <PlayerIndexForecastLink
                     href={playerIndexCalcUrl}
@@ -332,7 +333,7 @@ export default async function ItemPage({ params }: PageProps) {
                   to place a bid.
                 </p>
               </div>
-            ) : pricing.hasProjection ? (
+            ) : showForecastData ? (
               <div className="space-y-2">
                 <div className="flex items-center gap-2 flex-wrap">
                   <PlayerIndexForecastLink
@@ -372,16 +373,26 @@ export default async function ItemPage({ params }: PageProps) {
 
               </div>
             ) : (
-              <div className="flex items-center gap-3">
-                <p className="text-4xl sm:text-5xl font-black text-white tracking-tighter">
-                  ${p(item.listed_price ?? item.avg_price).toFixed(2)}
-                </p>
-                {(item as any).trend_data && Array.isArray((item as any).trend_data) && (item as any).trend_data.length > 0 && (
-                  <MarketSparkline
-                     data={(item as any).trend_data}
-                     playerIndexUrl={playerIndexCalcUrl}
-                  />
-                )}
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-3">
+                  <p className="text-4xl sm:text-5xl font-black text-white tracking-tighter">
+                    ${pricing.effectiveStorePrice.toFixed(2)}
+                  </p>
+                  {pricing.discountPercent > 0 && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-950/70 text-indigo-200 border border-indigo-700/70">
+                      {pricing.discountPercent.toFixed(0)}% off
+                    </span>
+                  )}
+                  {(item as any).trend_data && Array.isArray((item as any).trend_data) && (item as any).trend_data.length > 0 && (
+                    <MarketSparkline
+                       data={(item as any).trend_data}
+                       playerIndexUrl={playerIndexCalcUrl}
+                    />
+                  )}
+                </div>
+                <span className="text-[10px] font-semibold text-zinc-500">
+                  {(item as any).show_forecast === false ? 'Direct listing (Player Index Forecast hidden)' : 'Direct listing (no Player Index Forecast projection on file)'}
+                </span>
               </div>
             )}
           </div>

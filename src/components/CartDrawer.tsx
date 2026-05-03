@@ -26,6 +26,7 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
   const [cartError, setCartError] = useState<string | null>(null)
   const [checkoutStage, setCheckoutStage] = useState<'cart' | 'form' | 'success'>('cart')
   const [checkoutForm, setCheckoutForm] = useState({ name: '', email: '', address: '' })
+  const [paymentMethod, setPaymentMethod] = useState<string>('')
   const [checkoutResult, setCheckoutResult] = useState<CheckoutSuccessPayload | null>(null)
   const [memoCopied, setMemoCopied] = useState(false)
 
@@ -84,8 +85,15 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
       setCheckoutStage('cart')
       setCheckoutResult(null)
       setMemoCopied(false)
+    } else {
+      if (!paymentMethod) {
+        if (settings.payment_venmo) setPaymentMethod('venmo');
+        else if (settings.payment_paypal) setPaymentMethod('paypal');
+        else if (settings.payment_cashapp) setPaymentMethod('cashapp');
+        else if (settings.payment_zelle) setPaymentMethod('zelle');
+      }
     }
-  }, [isCartOpen])
+  }, [isCartOpen, settings])
 
   if (!isCartOpen) return null
 
@@ -309,6 +317,37 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
                         <input required type="text" placeholder="Full Name" value={checkoutForm.name} onChange={e => setCheckoutForm({...checkoutForm, name: e.target.value})} className="w-full bg-surface border border-border rounded outline-none p-2.5 text-foreground placeholder-zinc-500" />
                         <input required type="email" placeholder="Email Address" value={checkoutForm.email} onChange={e => setCheckoutForm({...checkoutForm, email: e.target.value})} className="w-full bg-surface border border-border rounded outline-none p-2.5 text-foreground placeholder-zinc-500" />
                         <textarea required placeholder="Shipping Address" value={checkoutForm.address} onChange={e => setCheckoutForm({...checkoutForm, address: e.target.value})} className="w-full bg-surface border border-border rounded outline-none p-2.5 text-foreground placeholder-zinc-500 resize-none h-20" />
+                        
+                        <div className="space-y-2 mt-2 mb-2">
+                          <p className="text-[10px] font-black uppercase text-muted tracking-widest px-1">Select Payment Method</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            {!!settings.payment_venmo && (
+                              <label className={`flex items-center justify-center p-3 rounded-xl border ${paymentMethod === 'venmo' ? 'bg-brand/20 border-brand text-brand font-black' : 'bg-surface border-border text-muted font-bold hover:bg-surface-hover'} cursor-pointer transition-colors text-sm`}>
+                                 <input type="radio" name="paymentMethod" value="venmo" checked={paymentMethod === 'venmo'} onChange={() => setPaymentMethod('venmo')} className="hidden" />
+                                 Venmo
+                              </label>
+                            )}
+                            {!!settings.payment_paypal && (
+                              <label className={`flex items-center justify-center p-3 rounded-xl border ${paymentMethod === 'paypal' ? 'bg-brand/20 border-brand text-brand font-black' : 'bg-surface border-border text-muted font-bold hover:bg-surface-hover'} cursor-pointer transition-colors text-sm`}>
+                                 <input type="radio" name="paymentMethod" value="paypal" checked={paymentMethod === 'paypal'} onChange={() => setPaymentMethod('paypal')} className="hidden" />
+                                 PayPal
+                              </label>
+                            )}
+                            {!!settings.payment_cashapp && (
+                              <label className={`flex items-center justify-center p-3 rounded-xl border ${paymentMethod === 'cashapp' ? 'bg-brand/20 border-brand text-brand font-black' : 'bg-surface border-border text-muted font-bold hover:bg-surface-hover'} cursor-pointer transition-colors text-sm`}>
+                                 <input type="radio" name="paymentMethod" value="cashapp" checked={paymentMethod === 'cashapp'} onChange={() => setPaymentMethod('cashapp')} className="hidden" />
+                                 Cash App
+                              </label>
+                            )}
+                            {!!settings.payment_zelle && (
+                              <label className={`flex items-center justify-center p-3 rounded-xl border ${paymentMethod === 'zelle' ? 'bg-brand/20 border-brand text-brand font-black' : 'bg-surface border-border text-muted font-bold hover:bg-surface-hover'} cursor-pointer transition-colors text-sm`}>
+                                 <input type="radio" name="paymentMethod" value="zelle" checked={paymentMethod === 'zelle'} onChange={() => setPaymentMethod('zelle')} className="hidden" />
+                                 Zelle
+                              </label>
+                            )}
+                          </div>
+                        </div>
+
                         <div className="flex gap-2 pt-2">
                            <button type="button" onClick={() => setCheckoutStage('cart')} className="flex-1 bg-surface-hover hover:bg-zinc-700 text-foreground font-bold py-3 rounded text-sm transition-colors">Back</button>
                            <button type="submit" disabled={checkoutLoading} className="flex-[2] bg-brand hover:bg-brand-hover text-white font-black py-3 rounded flex items-center justify-center gap-2 transition-colors disabled:opacity-50 text-sm">
@@ -369,22 +408,22 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
                             </p>
                          </div>
                          <div className="space-y-2">
-                             {settings.payment_venmo && (
+                             {paymentMethod === 'venmo' && settings.payment_venmo && (
                                 <a href={paymentUrlWithAmount(settings.payment_venmo, checkoutResult.total, checkoutResult.paymentMemo)} target="_blank" rel="noopener noreferrer" className="block w-full bg-[#008CFF] hover:bg-[#0074D4] text-foreground font-black py-3 rounded-lg transition-colors text-sm shadow-md text-center">
                                    Open Venmo — pay ${checkoutResult.total.toFixed(2)}
                                 </a>
                              )}
-                             {settings.payment_paypal && (
+                             {paymentMethod === 'paypal' && settings.payment_paypal && (
                                 <a href={paymentUrlWithAmount(settings.payment_paypal, checkoutResult.total, checkoutResult.paymentMemo)} target="_blank" rel="noopener noreferrer" className="block w-full bg-[#003087] hover:bg-[#001C53] text-foreground font-black py-3 rounded-lg transition-colors text-sm shadow-md text-center">
                                    Open PayPal — ${checkoutResult.total.toFixed(2)}
                                 </a>
                              )}
-                             {settings.payment_cashapp && (
+                             {paymentMethod === 'cashapp' && settings.payment_cashapp && (
                                 <a href={paymentUrlWithAmount(settings.payment_cashapp, checkoutResult.total, checkoutResult.paymentMemo)} target="_blank" rel="noopener noreferrer" className="block w-full bg-[#00D632] hover:bg-[#00A827] text-foreground font-black py-3 rounded-lg transition-colors text-sm shadow-md text-center">
                                    Open Cash App — ${checkoutResult.total.toFixed(2)}
                                 </a>
                              )}
-                             {settings.payment_zelle && (
+                             {paymentMethod === 'zelle' && settings.payment_zelle && (
                                 <a href={(settings.payment_zelle.includes('@') ? `mailto:${settings.payment_zelle}` : `tel:${settings.payment_zelle}`)} target="_blank" rel="noopener noreferrer" className="block w-full bg-[#7411E2] hover:bg-[#5C0DB3] text-foreground font-black py-3 rounded-lg transition-colors text-sm shadow-md text-center">
                                    Zelle: {settings.payment_zelle} — send ${checkoutResult.total.toFixed(2)}
                                 </a>

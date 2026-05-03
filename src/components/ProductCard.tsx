@@ -34,6 +34,7 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
     oracle_discount_percentage: discountRate,
   });
   const playerIndexCalcUrl = buildPlayerIndexForecasterUrl(item as any);
+  const showForecastData = pricing.hasProjection && (item as any).show_forecast !== false;
 
   const handleShare = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -117,7 +118,7 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
             </div>
           )}
           </Link>
-          {isAvailable && !isLiveAuction && pricing.hasProjection && pricing.percentBelowPlayerIndex > 0 && (
+          {isAvailable && !isLiveAuction && showForecastData && pricing.percentBelowPlayerIndex > 0 && (
             <PlayerIndexForecastLink
               href={playerIndexCalcUrl}
               className="absolute top-2 left-2 z-20 bg-indigo-900 text-indigo-300 text-xs px-2.5 py-1 rounded-full border border-indigo-700 font-bold shadow-[0_0_12px_rgba(79,70,229,0.4)] pointer-events-auto flex items-center gap-1 hover:bg-indigo-800 transition-colors"
@@ -186,7 +187,7 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
                   Store price is hidden while this card is on the live block — use Live Auctions to bid.
                 </p>
               </div>
-            ) : pricing.hasProjection ? (
+            ) : showForecastData ? (
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2 flex-wrap">
                   <div className="flex items-center gap-1.5">
@@ -242,8 +243,13 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
                     Store
                   </span>
                   <span className="font-black text-2xl sm:text-3xl text-white tracking-tighter">
-                    ${p(item.listed_price ?? item.avg_price).toFixed(2)}
+                    ${pricing.effectiveStorePrice.toFixed(2)}
                   </span>
+                  {pricing.discountPercent > 0 && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-950/70 text-indigo-200 border border-indigo-700/70">
+                      {pricing.discountPercent.toFixed(0)}% off
+                    </span>
+                  )}
                   {(item as any).trend_data && Array.isArray((item as any).trend_data) && (item as any).trend_data.length > 0 && (
                     <MarketSparkline
                        data={(item as any).trend_data}
@@ -252,7 +258,7 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
                   )}
                 </div>
                 <span className="text-[10px] font-semibold text-zinc-500">
-                  Direct listing (no Player Index Forecast projection on file)
+                  {(item as any).show_forecast === false ? 'Direct listing (Player Index Forecast hidden)' : 'Direct listing (no Player Index Forecast projection on file)'}
                 </span>
               </div>
             )}
