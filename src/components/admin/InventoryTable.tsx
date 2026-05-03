@@ -1702,8 +1702,8 @@ export function InventoryTable({
 
                     {/* Status + actions */}
                     <div className="flex flex-col sm:items-end gap-1.5 w-full sm:w-auto">
-                      <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 sm:gap-4 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 w-full sm:w-auto">
-                        <div className="w-full sm:w-auto flex justify-end">
+                      <div className="flex flex-col items-end gap-2 bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 w-full sm:w-auto shadow-sm">
+                        <div className="w-full flex justify-end">
                           <ToggleSwitch
                             checked={item.status === 'available'}
                             onChange={() => handleToggle(item)}
@@ -1714,17 +1714,17 @@ export function InventoryTable({
                             offLabel="Hidden"
                           />
                         </div>
-                        <div className="hidden sm:block w-px h-6 bg-slate-200"></div>
-                        <div className="w-full sm:w-auto flex justify-end border-t sm:border-t-0 border-slate-200 pt-1 sm:pt-0">
-                        <ToggleSwitch
-                          checked={!!(item as any).show_forecast}
-                          onChange={() => handleToggleForecast(item)}
-                          label="Forecast"
-                          loading={forecastLoadingId === item.id}
-                          disabled={forecastLoadingId === item.id}
-                          onLabel="Visible"
-                          offLabel="Hidden"
-                        />
+                        <div className="w-full h-px bg-slate-200/70"></div>
+                        <div className="w-full flex justify-end">
+                          <ToggleSwitch
+                            checked={!!(item as any).show_forecast}
+                            onChange={() => handleToggleForecast(item)}
+                            label="Forecast"
+                            loading={forecastLoadingId === item.id}
+                            disabled={forecastLoadingId === item.id}
+                            onLabel="Visible"
+                            offLabel="Hidden"
+                          />
                         </div>
                       </div>
 
