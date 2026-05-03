@@ -3,8 +3,14 @@
  * Venmo does not reliably support note/amount in URLs — use the copied payment memo instead.
  */
 export function paymentUrlWithAmount(profileUrl: string, total: number, note?: string): string {
-  const raw = profileUrl.trim();
+  let raw = profileUrl.trim();
   if (!raw) return raw;
+
+  // Auto-prefix https:// if it looks like a domain without a protocol
+  if (!raw.toLowerCase().startsWith('http') && !raw.includes('@') && (raw.includes('paypal.me') || raw.includes('venmo.com') || raw.includes('cash.app') || raw.includes('.com') || raw.includes('.me') || raw.includes('.app'))) {
+    raw = 'https://' + raw;
+  }
+
   try {
     const parsed = new URL(raw);
     const host = parsed.hostname.replace(/^www\./i, "").toLowerCase();
@@ -31,12 +37,11 @@ export function paymentUrlWithAmount(profileUrl: string, total: number, note?: s
   } catch {
     // If the URL parsing fails, check if they provided a raw email address for PayPal
     if (raw.includes('@') && !raw.toLowerCase().startsWith('http')) {
-      const amt = total.toFixed(2);
-      const encodedNote = note ? encodeURIComponent(note) : '';
-      // This is the classic PayPal Standard 'Buy Now' link which forces a Goods & Services payment
-      return `https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&business=${encodeURIComponent(raw)}&amount=${amt}&item_name=${encodedNote}&currency_code=USD`;
+      // _xclick (Buy Now) buttons often fail for personal PayPal accounts.
+      // Redirecting to the send money homepage is the most reliable fallback.
+      return `https://www.paypal.com/myaccount/transfer/homepage`;
     }
-    return profileUrl;
+    return raw;
   }
-  return profileUrl;
+  return raw;
 }
