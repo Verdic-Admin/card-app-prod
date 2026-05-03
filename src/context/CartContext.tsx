@@ -6,15 +6,31 @@ import { price } from '@/utils/math'
 
 type InventoryItem = Database['public']['Tables']['inventory']['Row'];
 
+export interface BuiltTradeItem {
+  id: string;
+  playerName: string;
+  cardSet: string;
+  cardNumber: string;
+  insertName: string;
+  parallelName: string;
+  printRun: string;
+  grade: string;
+  comps: any[];
+  marketPrice: number;
+  playerIndexUrl: string;
+  imageFile?: File;
+  imagePreviewUrl?: string;
+}
+
 export interface CartItem extends InventoryItem {
   cartItemId: string;
   isTradeProposal?: boolean;
   tradeDetails?: {
     name: string;
-    email: string;
+    contactMethod: string;
+    contactValue: string;
     notes: string;
-    offerImages: File[];
-    offerImageUrls: string[];
+    builtItems: BuiltTradeItem[];
   };
 }
 
@@ -45,7 +61,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         // Strip out volatile properties natively when hydrating
         const hydrated = JSON.parse(stored).map((i: any) => {
            if (i.isTradeProposal && i.tradeDetails) {
-              return { ...i, tradeDetails: { ...i.tradeDetails, offerImages: [], offerImageUrls: [] } };
+              return { ...i, tradeDetails: { ...i.tradeDetails, builtItems: i.tradeDetails.builtItems?.map((b: any) => ({ ...b, imageFile: undefined, imagePreviewUrl: undefined })) || [] } };
            }
            return i;
         });
@@ -62,7 +78,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       // Don't save trade bindings natively into localStorage because File[] objects will crash JSON.stringify serialization
       const savable = cartItems.map(i => {
          if (i.isTradeProposal && i.tradeDetails) {
-            return { ...i, tradeDetails: { ...i.tradeDetails, offerImages: [], offerImageUrls: [] } };
+            return { ...i, tradeDetails: { ...i.tradeDetails, builtItems: i.tradeDetails.builtItems?.map((b: any) => ({ ...b, imageFile: undefined, imagePreviewUrl: undefined })) || [] } };
          }
          return i;
       });
@@ -89,8 +105,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const removeFromCart = (cartItemId: string) => {
     setCartItems(prev => {
        const target = prev.find(i => i.cartItemId === cartItemId);
-       if (target?.tradeDetails?.offerImageUrls) {
-          target.tradeDetails.offerImageUrls.forEach(url => URL.revokeObjectURL(url));
+       if (target?.tradeDetails?.builtItems) {
+          target.tradeDetails.builtItems.forEach(b => {
+            if (b.imagePreviewUrl) URL.revokeObjectURL(b.imagePreviewUrl);
+          });
        }
        return prev.filter(i => i.cartItemId !== cartItemId);
     });
@@ -106,8 +124,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const clearCart = () => {
     setCartItems(prev => {
        prev.forEach(i => {
-          if (i.tradeDetails?.offerImageUrls) {
-             i.tradeDetails.offerImageUrls.forEach(url => URL.revokeObjectURL(url));
+          if (i.tradeDetails?.builtItems) {
+             i.tradeDetails.builtItems.forEach(b => {
+               if (b.imagePreviewUrl) URL.revokeObjectURL(b.imagePreviewUrl);
+             });
           }
        });
        return [];

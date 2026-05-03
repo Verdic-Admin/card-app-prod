@@ -44,28 +44,68 @@ export function TradeLeadsCRM() {
   }, [])
 
   const handleExportCSV = () => {
-    if (offers.length === 0) { showToast('error', 'No records to export.'); return }
-    const headers = ['Offer Date', 'Buyer Name', 'Email', 'Status', 'Offer Text', 'Target Items (JSON)', 'Attachment URL']
     const csvContent = [
-        headers.join(','),
-        ...offers.map(t => 
-            `"${new Date(t.created_at).toLocaleDateString()}",` +
-            `"${t.buyer_name}",` +
-            `"${t.buyer_email}",` +
-            `"${t.status}",` +
-            `"${(t.offer_text || '').replace(/"/g, '""')}",` +
-            `"${JSON.stringify(t.target_items).replace(/"/g, '""')}",` +
-            `"${t.attached_image_url || ''}"`
-        )
-    ].join('\n')
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `trade_leads_${new Date().toISOString().split('T')[0]}.csv`
-    link.click()
+      ["Date", "Status", "Buyer Name", "Contact", "Offer Text", "Target Item Count"],
+      ...offers.map(o => [
+         new Date(o.created_at).toLocaleDateString(),
+         o.status,
+         o.buyer_name,
+         o.buyer_email,
+         `"${o.offer_text.replace(/"/g, '""')}"`,
+         o.target_items.length
+      ])
+    ].map(e => e.join(",")).join("\n");
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `trade_offers_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
   }
+
+  const renderOfferDetails = (offer: any) => {
+    if (offer.status === 'pending_payment') {
+      return (
+        <div className="p-3 bg-amber-50/50 rounded-lg border border-amber-100">
+           {offer.offer_text.split('\n').map((line: string, i: number) => <div key={i}>{line}</div>)}
+        </div>
+      );
+    }
+
+    try {
+      const parsed = JSON.parse(offer.offer_text);
+      if (parsed && parsed.offerItems) {
+        return (
+          <div className="space-y-3">
+             <div className="text-xs bg-slate-50 p-2 border border-slate-200 rounded">
+                <span className="font-bold text-slate-700">Contact Method:</span> {parsed.contactMethod} ({parsed.contactValue})<br/>
+                {parsed.notes && <><span className="font-bold text-slate-700 mt-1 block">Notes:</span> {parsed.notes}</>}
+             </div>
+             {parsed.offerItems.length > 0 && (
+                <div className="space-y-2 mt-2">
+                   <div className="text-[10px] font-bold text-slate-400 uppercase">Trade Items Offered:</div>
+                   {parsed.offerItems.map((item: any, idx: number) => (
+                     <div key={idx} className="flex gap-3 p-2 bg-white border border-slate-200 rounded-lg shadow-sm">
+                        <div className="flex-1">
+                           <div className="font-bold text-slate-900 leading-tight">{item.playerName}</div>
+                           <div className="text-[11px] text-slate-500 mt-0.5">{item.cardSet} {item.cardNumber} {item.parallelName} {item.grade}</div>
+                           <div className="text-xs font-black text-emerald-600 mt-1">Est. Value: ${item.marketPrice?.toFixed(2)}</div>
+                        </div>
+                     </div>
+                   ))}
+                </div>
+             )}
+          </div>
+        );
+      }
+    } catch (e) {
+      // Fallback
+    }
+
+    return <div>{offer.offer_text}</div>;
+  };
 
   const handleMassDelete = async () => {
      if (selectedIds.size === 0) return;
@@ -219,7 +259,7 @@ export function TradeLeadsCRM() {
 
               <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 text-sm text-slate-600">
                 <div className="font-bold text-[10px] text-slate-400 uppercase mb-1">Offer Details</div>
-                {offer.offer_text}
+                {renderOfferDetails(offer)}
               </div>
 
               <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100">
@@ -287,13 +327,7 @@ export function TradeLeadsCRM() {
                    <div className="text-slate-500">{offer.buyer_email}</div>
                 </td>
                 <td className="px-4 py-4 text-slate-600 min-w-[250px] whitespace-pre-wrap font-medium">
-                   {offer.status === 'pending_payment' ? (
-                      <div className="p-3 bg-amber-50/50 rounded-lg border border-amber-100">
-                         {offer.offer_text.split('\n').map((line, i) => <div key={i}>{line}</div>)}
-                      </div>
-                   ) : (
-                      offer.offer_text
-                   )}
+                   {renderOfferDetails(offer)}
                 </td>
                 <td className="px-4 py-4 text-slate-600">
                    <div className="flex flex-col gap-2">

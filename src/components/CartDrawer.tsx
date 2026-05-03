@@ -109,14 +109,23 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
             
             const data = new FormData();
             data.append('name', trade.tradeDetails.name);
-            data.append('email', trade.tradeDetails.email);
+            data.append('email', trade.tradeDetails.contactValue);
+            data.append('contactMethod', trade.tradeDetails.contactMethod);
             data.append('offer', trade.tradeDetails.notes);
             
             const { cartItemId, isTradeProposal, tradeDetails, ...cleanInventoryItem } = trade;
             data.append('targetItems', JSON.stringify([cleanInventoryItem]));
             
-            trade.tradeDetails.offerImages.forEach(file => {
-               data.append('images', file);
+            const builtItemsWithoutFiles = trade.tradeDetails.builtItems.map(b => {
+               const { imageFile, imagePreviewUrl, ...rest } = b;
+               return rest;
+            });
+            data.append('offerItems', JSON.stringify(builtItemsWithoutFiles));
+
+            trade.tradeDetails.builtItems.forEach(b => {
+               if (b.imageFile) {
+                  data.append('images', b.imageFile);
+               }
             });
             
             const res = await submitTradeOffer(data);
@@ -154,12 +163,14 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
            <div className="mt-auto flex items-center gap-2 flex-wrap pt-1">
               <span className="text-[9px] font-black text-foreground bg-brand-hover border-transparent px-2 py-0.5 rounded uppercase tracking-widest leading-none border border-brand shadow-sm">Trade Proposal</span>
               
-              {item.tradeDetails && item.tradeDetails.offerImageUrls.length > 0 && (
+              {item.tradeDetails && item.tradeDetails.builtItems.length > 0 && (
                  <div className="flex items-center gap-1 opacity-90">
-                    {item.tradeDetails.offerImageUrls.map((url: string, idx: number) => (
-                       <div key={idx} className="w-5 h-5 rounded hover:scale-150 transition-transform origin-left border border-border overflow-hidden shadow-sm">
-                          <img src={url} className="w-full h-full object-cover" />
-                       </div>
+                    {item.tradeDetails.builtItems.map((b: any, idx: number) => (
+                       b.imagePreviewUrl && (
+                         <div key={idx} className="w-5 h-5 rounded hover:scale-150 transition-transform origin-left border border-border overflow-hidden shadow-sm">
+                            <img src={b.imagePreviewUrl} className="w-full h-full object-cover" />
+                         </div>
+                       )
                     ))}
                  </div>
               )}

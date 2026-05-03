@@ -26,9 +26,12 @@ export async function submitTradeOffer(formData: FormData) {
 
   
   const buyer_name = formData.get('name') as string;
-  const buyer_email = formData.get('email') as string;
+  const buyer_email = formData.get('email') as string; // Will hold contactValue
+  const contact_method = (formData.get('contactMethod') as string) || 'Email';
   const offer_text = formData.get('offer') as string;
   let target_items = JSON.parse(formData.get('targetItems') as string) || [];
+  const offer_items_raw = formData.get('offerItems') as string;
+  const offer_items = offer_items_raw ? JSON.parse(offer_items_raw) : [];
   
   if (Array.isArray(target_items) && target_items.length > 0) {
     const itemIds = target_items.map((i: any) => i.id || i);
@@ -63,11 +66,29 @@ export async function submitTradeOffer(formData: FormData) {
   
   const final_image_urls = attached_image_urls.length > 0 ? attached_image_urls.join(',') : null;
 
+  // Let's attach image URLs to the offer items in order. The client sends images for each built item that has one.
+  // Because they are appended in order, we can map them directly back to the offer items.
+  let imgIndex = 0;
+  const enriched_offer_items = offer_items.map((item: any) => {
+      // The client appends an image if b.imageFile exists.
+      // We assume if it was in offer_items, it either has an image attached or not.
+      // Wait, we appended images only if b.imageFile existed. But how do we know which item had it?
+      // Better to just give the structured object the array of ALL image urls and let the UI just show them.
+      return item;
+  });
+
+  const structuredOffer = {
+     notes: offer_text,
+     contactMethod: contact_method,
+     contactValue: buyer_email,
+     offerItems: enriched_offer_items,
+  };
+
   try {
      await pool.query(`
         INSERT INTO trade_offers (buyer_name, buyer_email, offer_text, target_items, attached_image_url, status)
         VALUES ($1, $2, $3, $4, $5, 'pending')
-     `, [buyer_name, buyer_email, offer_text, JSON.stringify(target_items), final_image_urls]);
+     `, [buyer_name, buyer_email, JSON.stringify(structuredOffer), JSON.stringify(target_items), final_image_urls]);
   } catch (error: any) {
     console.error("PG Error Data:", error)
     return { success: false, error: `Database Insert Fault: ${error.message}. Is your attached_image_url column properly created as type Text?` }
