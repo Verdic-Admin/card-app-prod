@@ -150,12 +150,9 @@ export async function syncInventoryWithOracle() {
         const projection = Number(r?.projected_target ?? r?.target_price ?? 0);
         if (!Number.isFinite(projection) || projection <= 0) continue;
 
-        // Comp average = real market price. Falls back to projection if no comps.
+        // Real market price from backend (already calculated and trimmed by backend)
         const comps: { price: number }[] = Array.isArray(r?.ebay_comps) ? r.ebay_comps : [];
-        const compAvg = comps.length > 0
-          ? comps.reduce((sum: number, c: { price: number }) => sum + c.price, 0) / comps.length
-          : null;
-        const marketBase = compAvg ?? projection;
+        const marketBase = r.current_price != null && Number(r.current_price) > 0 ? Number(r.current_price) : projection;
         const computedPrice = marketBase * (1 - discountRate / 100);
         
         const finalListed = computedPrice;
@@ -199,14 +196,12 @@ export async function syncInventoryWithOracle() {
       market_price: u.market_price,
       trend_data: u.trend_data,
       player_index_url: u.player_index_url,
+      oracle_projection: u.oracle_projection,
+      oracle_trend_percentage: u.oracle_trend_percentage,
+      oracle_comps: u.oracle_comps,
+      p_bull: u.p_bull,
+      p_bear: u.p_bear
     })));
-
-    for (const u of updates) {
-      await pool.query(
-        `UPDATE inventory SET oracle_projection = $1, oracle_trend_percentage = $2, oracle_comps = $3::jsonb, p_bull = $4, p_bear = $5 WHERE id = $6`,
-        [u.oracle_projection, u.oracle_trend_percentage, u.oracle_comps ? JSON.stringify(u.oracle_comps) : null, u.p_bull, u.p_bear, u.id]
-      );
-    }
   } catch (err: any) {
     if (String(err?.message || '').includes('credits_exhausted')) {
       return { success: false, message: "API Credits exhausted. Please refill.", count: 0, total: inventory.length };
@@ -287,12 +282,9 @@ export async function syncSingleItemWithOracle(id: string) {
       return { success: false, message: `Oracle returned invalid projected target for item ${(item as any).id}.` };
     }
 
-    // Comp average = real market price. Falls back to projection if no comps.
+    // Real market price from backend (already calculated and trimmed by backend)
     const comps: { price: number }[] = Array.isArray(data.ebay_comps) ? data.ebay_comps : [];
-    const compAvg = comps.length > 0
-      ? comps.reduce((sum: number, c: { price: number }) => sum + c.price, 0) / comps.length
-      : null;
-    const marketBase = compAvg ?? (data.current_price != null && Number(data.current_price) > 0 ? Number(data.current_price) : Math.max(0.99, projection));
+    const marketBase = data.current_price != null && Number(data.current_price) > 0 ? Number(data.current_price) : Math.max(0.99, projection);
 
     const new_price = marketBase * (1 - (discountRate / 100));
     const trend = data.trend_percentage != null ? Number(data.trend_percentage) : null;
@@ -303,6 +295,9 @@ export async function syncSingleItemWithOracle(id: string) {
     const playerIndexUrl = String(data.player_index_url || '');
 
     const compsJson = comps.length > 0 ? comps : null;
+
+    const pBull = data.probability_cone?.bull_case ?? Math.round(projection * 1.15 * 100) / 100;
+    const pBear = data.probability_cone?.bear_case ?? Math.round(projection * 0.85 * 100) / 100;
 
     await pool.query(
       `UPDATE inventory
@@ -316,7 +311,7 @@ export async function syncSingleItemWithOracle(id: string) {
            p_bull = $8,
            p_bear = $9
        WHERE id = $10`,
-      [new_price, marketBase, projection, trend, JSON.stringify(trendPayload), playerIndexUrl, compsJson ? JSON.stringify(compsJson) : null, Math.round(projection * 1.15 * 100) / 100, Math.round(projection * 0.85 * 100) / 100, item.id]
+      [new_price, marketBase, projection, trend, JSON.stringify(trendPayload), playerIndexUrl, compsJson ? JSON.stringify(compsJson) : null, pBull, pBear, item.id]
     );
 
     return {
@@ -329,8 +324,8 @@ export async function syncSingleItemWithOracle(id: string) {
       oracle_trend_percentage: trend,
       trend_data: trendPayload,
       player_index_url: playerIndexUrl,
-      p_bull: Math.round(projection * 1.15 * 100) / 100,
-      p_bear: Math.round(projection * 0.85 * 100) / 100,
+      p_bull: pBull,
+      p_bear: pBear,
     };
   } catch (err: any) {
     return { success: false, message: `Error processing item: ${err.message}` };

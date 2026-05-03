@@ -1562,6 +1562,25 @@ export function InventoryTable({
                           <span className="uppercase opacity-70">Volatility:</span> No Data
                         </div>
                       )}
+                      
+                      {Array.isArray((item as any).oracle_comps) && (item as any).oracle_comps.length > 0 && (
+                        <div className="mt-1.5 pt-1.5 border-t border-purple-200/50">
+                          <div className="text-[9px] uppercase font-bold text-purple-600/70 mb-1">Ebay Comps Used</div>
+                          <div className="flex flex-wrap gap-1">
+                            {((item as any).oracle_comps as any[]).map((comp, idx) => (
+                              <a
+                                key={idx}
+                                href={comp.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[9px] bg-purple-100 hover:bg-purple-200 text-purple-800 px-1.5 py-[1px] rounded transition-colors"
+                              >
+                                ${price(comp.price).toFixed(2)}
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       {pricing.hasManualOverride && (
                         <div className="flex items-center gap-2 mt-1.5">
                            <div className="text-[10px] text-amber-600 font-black uppercase tracking-tight flex items-center gap-1">

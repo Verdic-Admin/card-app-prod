@@ -189,6 +189,9 @@ export interface BatchPricingResultItem {
   did_you_mean?: Record<string, string>;
   status?: string;
   message?: string;
+  current_price?: number | null;
+  p_bull?: number;
+  p_bear?: number;
 }
 
 /**

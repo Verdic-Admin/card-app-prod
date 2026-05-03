@@ -257,7 +257,18 @@ export async function batchInsertInventory(items: InventoryItem[]) {
   return { success: true }
 }
 
-export async function batchUpdatePrices(updates: { id: string, listed_price: number, market_price: number, trend_data?: number[], player_index_url?: string }[]) {
+export async function batchUpdatePrices(updates: { 
+  id: string, 
+  listed_price: number, 
+  market_price: number, 
+  trend_data?: number[], 
+  player_index_url?: string,
+  oracle_projection?: number | null,
+  oracle_trend_percentage?: number | null,
+  oracle_comps?: any[] | null,
+  p_bull?: number | null,
+  p_bear?: number | null
+}[]) {
   if (updates.length === 0) return { success: true };
 
   const ids = updates.map(u => u.id);
@@ -265,6 +276,11 @@ export async function batchUpdatePrices(updates: { id: string, listed_price: num
   const marketPrices = updates.map(u => u.market_price);
   const trendData = updates.map(u => JSON.stringify(u.trend_data || []));
   const playerIndexUrls = updates.map(u => u.player_index_url || '');
+  const oracleProjections = updates.map(u => u.oracle_projection ?? null);
+  const oracleTrendPercentages = updates.map(u => u.oracle_trend_percentage ?? null);
+  const oracleComps = updates.map(u => u.oracle_comps ? JSON.stringify(u.oracle_comps) : null);
+  const pBulls = updates.map(u => u.p_bull ?? null);
+  const pBears = updates.map(u => u.p_bear ?? null);
 
   try {
     await pool.query(`
@@ -273,16 +289,26 @@ export async function batchUpdatePrices(updates: { id: string, listed_price: num
         listed_price = u.listed_price,
         market_price = u.market_price,
         trend_data = u.trend_data,
-        player_index_url = u.player_index_url
+        player_index_url = u.player_index_url,
+        oracle_projection = u.oracle_projection,
+        oracle_trend_percentage = u.oracle_trend_percentage,
+        oracle_comps = u.oracle_comps,
+        p_bull = u.p_bull,
+        p_bear = u.p_bear
       FROM UNNEST(
         $1::UUID[], 
         $2::NUMERIC[], 
         $3::NUMERIC[],
         $4::JSONB[],
-        $5::TEXT[]
-      ) AS u(id, listed_price, market_price, trend_data, player_index_url)
+        $5::TEXT[],
+        $6::NUMERIC[],
+        $7::NUMERIC[],
+        $8::JSONB[],
+        $9::NUMERIC[],
+        $10::NUMERIC[]
+      ) AS u(id, listed_price, market_price, trend_data, player_index_url, oracle_projection, oracle_trend_percentage, oracle_comps, p_bull, p_bear)
       WHERE i.id = u.id;
-    `, [ids, listedPrices, marketPrices, trendData, playerIndexUrls]);
+    `, [ids, listedPrices, marketPrices, trendData, playerIndexUrls, oracleProjections, oracleTrendPercentages, oracleComps, pBulls, pBears]);
     revalidatePath('/');
     revalidatePath('/admin');
     return { success: true };
