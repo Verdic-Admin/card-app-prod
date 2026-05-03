@@ -1273,7 +1273,7 @@ export function InventoryTable({
         const isAllForecastVisible = selectedArr.every(id => (items.find(i => i.id === id) as any)?.show_forecast);
         
         return (
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-wrap items-center justify-center gap-3 bg-white border border-slate-200 p-3 rounded-2xl shadow-2xl animate-in slide-in-from-bottom-8 fade-in w-[95%] max-w-[1000px]">
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex flex-wrap items-center justify-center gap-3 bg-white border border-slate-200 p-3 rounded-2xl shadow-2xl animate-in slide-in-from-bottom-8 fade-in w-[95%] max-w-[1000px]">
             <span className="text-sm font-bold text-slate-800 bg-slate-100 px-3 py-1.5 rounded-lg">{selectedIds.size} selected</span>
           <div className="hidden sm:block h-8 w-px bg-slate-200 mx-1"></div>
           <div className="flex items-center gap-2">
