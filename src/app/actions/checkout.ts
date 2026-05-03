@@ -125,8 +125,8 @@ export async function submitManualCheckout(
 
   const { rows: settingsRows } = await pool.query(`SELECT shipping_fee, free_shipping_threshold FROM store_settings WHERE id = 1`);
   const settings = settingsRows[0] || {};
-  const SHIPPING_THRESHOLD = settings?.free_shipping_threshold ?? 25.00;
-  const SHIPPING_FEE = settings?.shipping_fee ?? 4.00;
+  const SHIPPING_THRESHOLD = Number(settings?.free_shipping_threshold ?? 25.00);
+  const SHIPPING_FEE = Number(settings?.shipping_fee ?? 4.00);
   const shipping = subtotal < SHIPPING_THRESHOLD ? SHIPPING_FEE : 0.00;
   const total = subtotal + shipping;
 

@@ -12,23 +12,7 @@ const IDEMPOTENT_ALTER = `
 -- print_run is INTEGER: stores edition size denominator (e.g. 99 for a /99 card)
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS print_run INTEGER;
 -- Migrate legacy TEXT values to INTEGER: extract denominator from "/99" or "45/99" formats
-DO $$ BEGIN
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_name='inventory' AND column_name='print_run' AND data_type='text'
-  ) THEN
-    -- First extract denominator from any slash-format values
-    UPDATE inventory SET print_run =
-      CASE
-        WHEN print_run ~ '^[0-9]+$' THEN print_run
-        WHEN print_run ~ '/([0-9]+)' THEN regexp_replace(print_run, '^.*\\/([0-9]+).*$', '\\1')
-        ELSE NULL
-      END
-    WHERE print_run IS NOT NULL;
-    -- Then change the column type
-    ALTER TABLE inventory ALTER COLUMN print_run TYPE INTEGER USING print_run::INTEGER;
-  END IF;
-END $$;
+
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS sold_at TIMESTAMPTZ;
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS checkout_expires_at TIMESTAMPTZ;
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS is_auction BOOLEAN DEFAULT false;
@@ -129,6 +113,30 @@ ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS oracle_comps JSONB;
 `;
 
 async function runIdempotentAlters(client) {
+  try {
+    await client.query(`
+      DO $$ BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name='inventory' AND column_name='print_run' AND data_type='text'
+        ) THEN
+          -- First extract denominator from any slash-format values
+          UPDATE inventory SET print_run =
+            CASE
+              WHEN print_run ~ '^[0-9]+$' THEN print_run
+              WHEN print_run ~ '/([0-9]+)' THEN regexp_replace(print_run, '^.*\\/([0-9]+).*$', '\\1')
+              ELSE NULL
+            END
+          WHERE print_run IS NOT NULL;
+          -- Then change the column type
+          ALTER TABLE inventory ALTER COLUMN print_run TYPE INTEGER USING print_run::INTEGER;
+        END IF;
+      END $$;
+    `);
+  } catch (e) {
+    console.warn('[init_db] print_run migration skipped:', e.message || e);
+  }
+
   const statements = IDEMPOTENT_ALTER.split(';')
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
