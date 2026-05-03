@@ -5,6 +5,8 @@ import { price } from '@/utils/math'
 import { ExternalLink, Share2 } from 'lucide-react'
 import { buildPlayerIndexForecasterUrl } from '@/lib/player-index-deeplink'
 import { PlayerIndexForecastLink } from '@/components/PlayerIndexForecastLink'
+import { MarketSparkline } from '@/components/MarketSparkline'
+import { InstructionTrigger } from '@/components/admin/DraggableGuide'
 
 interface AsyncItem {
   id: string
@@ -19,6 +21,8 @@ interface AsyncItem {
   auction_end_time: string
   oracle_projection?: number | null
   oracle_trend_percentage?: number | null
+  p_bull?: number | null
+  p_bear?: number | null
   is_rookie?: boolean
   is_auto?: boolean
   is_relic?: boolean
@@ -245,17 +249,72 @@ export function AsyncAuctionGrid({ initialItems }: { initialItems: AsyncItem[] }
               )}
 
               {/* PI forecast */}
-              {item.oracle_projection != null && Number(item.oracle_projection) > 0 && (
-                <PlayerIndexForecastLink href={piUrl} className="mb-2 block text-xs text-indigo-300 hover:text-indigo-200 font-bold transition-colors">
-                  <ExternalLink className="w-3 h-3 inline mr-1" />
-                  PI Fair: ${price(item.oracle_projection).toFixed(2)}
-                  {item.oracle_trend_percentage != null && (
-                    <span className={price(item.oracle_trend_percentage) >= 0 ? 'text-emerald-400 ml-1' : 'text-red-400 ml-1'}>
-                      ({price(item.oracle_trend_percentage) >= 0 ? '+' : ''}{price(item.oracle_trend_percentage).toFixed(1)}%)
-                    </span>
-                  )}
-                </PlayerIndexForecastLink>
-              )}
+              {item.show_forecast !== false && ((item.oracle_projection != null && Number(item.oracle_projection) > 0) || item.oracle_trend_percentage != null) ? (
+                  <div className="mt-2 mb-2 block rounded-lg border border-indigo-700/50 bg-indigo-950/50 px-2.5 py-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-1.5">
+                        <PlayerIndexForecastLink
+                          href={piUrl}
+                          className="text-[10px] uppercase tracking-widest font-black text-indigo-200 hover:text-indigo-100 underline-offset-2 hover:underline"
+                        >
+                          Player Index Forecast
+                        </PlayerIndexForecastLink>
+                        <InstructionTrigger 
+                          iconOnly 
+                          title="Player Index Forecasts" 
+                          steps={[
+                            { title: "What is this?", content: "The Player Index is an algorithmic pricing engine that analyzes player performance (WAR), true market scarcity, and real-time momentum to calculate a fair-value projection for this exact card." },
+                            { title: "Why is it here?", content: "We believe in radical transparency. By showing you the algorithmic fair-value alongside our store price, you can see exactly how much you are saving compared to the open market." },
+                            { title: "Best/Worst Case", content: "This represents a standard volatility band (+/- 15%) showing where the card's price could swing based on short-term market hype or slumps." }
+                          ]} 
+                        />
+                      </div>
+                      <PlayerIndexForecastLink href={piUrl} className="opacity-80 hover:opacity-100 transition-opacity">
+                        <ExternalLink className="w-3 h-3 text-indigo-300" aria-hidden />
+                      </PlayerIndexForecastLink>
+                    </div>
+
+                    <div className="flex items-end gap-2 mt-1">
+                      {item.oracle_projection != null && Number(item.oracle_projection) > 0 && (
+                        <div className="text-sm text-indigo-50 font-bold">
+                          Fair: ${price(item.oracle_projection).toFixed(2)}
+                        </div>
+                      )}
+                      {Boolean(item.trend_data) && Array.isArray(item.trend_data) && item.trend_data.length > 0 && (
+                        <div className="mb-0.5">
+                          <MarketSparkline
+                             data={item.trend_data as any}
+                             playerIndexUrl={piUrl}
+                          />
+                        </div>
+                      )}
+                      {item.oracle_trend_percentage != null && (
+                        <div className={`text-[10px] font-semibold mb-0.5 ml-auto ${price(item.oracle_trend_percentage) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                          Trend {price(item.oracle_trend_percentage) >= 0 ? '+' : '-'}{Math.abs(price(item.oracle_trend_percentage)).toFixed(1)}%
+                        </div>
+                      )}
+                    </div>
+                    {((item.p_bull != null && Number(item.p_bull) > 0) || (item.p_bear != null && Number(item.p_bear) > 0)) && (
+                      <div className="flex items-center gap-2 mt-2 pt-2 border-t border-indigo-800/50">
+                        <span className="text-[9px] text-indigo-300 font-bold uppercase tracking-wider">Range</span>
+                        {item.p_bull != null && Number(item.p_bull) > 0 && (
+                          <span className="text-[9px] font-bold text-emerald-400 bg-emerald-950/50 border border-emerald-800/50 px-1.5 py-[1px] rounded">
+                            ▲ ${price(item.p_bull).toFixed(2)}
+                          </span>
+                        )}
+                        {item.p_bear != null && Number(item.p_bear) > 0 && (
+                          <span className="text-[9px] font-bold text-rose-400 bg-rose-950/50 border border-rose-800/50 px-1.5 py-[1px] rounded">
+                            ▼ ${price(item.p_bear).toFixed(2)}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+              ) : item.show_forecast === false ? (
+                <span className="text-[10px] font-semibold text-zinc-500 mb-2 block">
+                  Direct listing (Player Index Forecast hidden)
+                </span>
+              ) : null}
 
               {/* Current bid */}
               <div className="text-center font-mono font-black text-2xl text-cyan-400 bg-zinc-950 py-2.5 rounded-lg mb-3 shadow-inner border border-zinc-800 relative">

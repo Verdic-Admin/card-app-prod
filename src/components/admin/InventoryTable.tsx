@@ -725,6 +725,16 @@ export function InventoryTable({
               <button onClick={() => setShowLotModal(false)} className="text-indigo-400 hover:text-indigo-700 p-1 rounded-lg"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-6 space-y-4">
+              <div className="bg-indigo-50/50 p-3 rounded-xl border border-indigo-100 flex justify-between items-center shadow-inner">
+                <div>
+                  <span className="text-slate-500 font-bold uppercase tracking-widest text-[10px] block mb-0.5">Sum of Listed Prices</span>
+                  <span className="font-mono font-black text-slate-800 text-base">${items.filter(i => selectedIds.has(i.id)).reduce((acc, i) => acc + (i.listed_price || 0), 0).toFixed(2)}</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-purple-600 font-bold uppercase tracking-widest text-[10px] block mb-0.5">Sum of Projections</span>
+                  <span className="font-mono font-black text-purple-700 text-base">${items.filter(i => selectedIds.has(i.id)).reduce((acc, i) => acc + ((i as any).oracle_projection || 0), 0).toFixed(2)}</span>
+                </div>
+              </div>
               <div>
                 <label className="text-xs font-black text-slate-500 uppercase tracking-widest block mb-1">Lot Title</label>
                 <input
@@ -1329,12 +1339,15 @@ export function InventoryTable({
             className={`relative rounded-xl border bg-white shadow-sm flex flex-col transition-all group ${selectedIds.has(item.id) ? 'ring-2 ring-indigo-400 border-indigo-300' : 'border-slate-200 hover:border-slate-300'} ${editingId === item.id ? '' : 'overflow-hidden'}`}
           >
             {/* Select checkbox */}
-            <div className="absolute top-2 left-2 z-10">
+            <div 
+              className="absolute top-2 left-2 z-20 bg-white/90 backdrop-blur-sm rounded-lg shadow-sm border border-slate-200/50 p-2.5 flex items-center justify-center cursor-pointer hover:bg-white transition-colors"
+              onClick={(e) => { e.stopPropagation(); toggleSelect(item.id); }}
+            >
               <input
                 type="checkbox"
                 checked={selectedIds.has(item.id)}
-                onChange={() => toggleSelect(item.id)}
-                className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer shadow-sm"
+                onChange={() => {}}
+                className="w-5 h-5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer pointer-events-none"
               />
             </div>
 
