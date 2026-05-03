@@ -307,9 +307,8 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
       <TradeModal 
          isOpen={isTradeModalOpen} 
          onClose={() => setIsTradeModalOpen(false)} 
-         cartItems={[]} 
+         cartItems={[item as any]} 
          onSuccess={() => setIsTradeModalOpen(false)} 
-         targetCard={item} 
       />
 
       <style dangerouslySetInnerHTML={{__html: `

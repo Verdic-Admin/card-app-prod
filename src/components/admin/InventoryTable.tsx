@@ -106,20 +106,6 @@ export function InventoryTable({
      setShowEditLotModal(true);
   };
 
-  const handleBreakLot = async (lotId: string) => {
-    if (!confirm('Are you sure you want to break this lot? The parent lot will be deleted and all children will be returned to standalone status.')) return;
-    setBreakingLotId(lotId);
-    try {
-      await breakLotAction(lotId);
-      showToast('Lot broken successfully.', 'success');
-      window.location.reload();
-    } catch (e: any) {
-      showToast('Error breaking lot: ' + e.message, 'error');
-    } finally {
-      setBreakingLotId(null);
-    }
-  };
-
   const handleSaveEditLot = async () => {
      if (!editingLotId) return;
      setIsSavingLot(true);
