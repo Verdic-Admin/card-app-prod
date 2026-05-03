@@ -449,6 +449,14 @@ export async function toggleCardStatus(id: string, currentStatus: string) {
   revalidatePath('/sold')
 }
 
+export async function toggleStoreVisibility(id: string, makeVisible: boolean) {
+  await checkAuth();
+  const newStatus = makeVisible ? 'available' : 'hidden';
+  await pool.query(`UPDATE inventory SET status = $1 WHERE id = $2`, [newStatus, id]);
+  revalidatePath('/')
+  revalidatePath('/admin')
+}
+
 export async function toggleForecastStatus(id: string, currentStatus: boolean) {
   await checkAuth();
   await pool.query(`UPDATE inventory SET show_forecast = $1 WHERE id = $2`, [!currentStatus, id]);
@@ -465,6 +473,16 @@ export async function bulkPublishForecasts(ids: string[], show: boolean) {
   revalidatePath('/');
   revalidatePath('/admin');
   revalidatePath('/sold');
+}
+
+export async function bulkToggleStoreVisibility(ids: string[], makeVisible: boolean) {
+  await checkAuth();
+  if (!ids.length) return { success: true };
+  const newStatus = makeVisible ? 'available' : 'hidden';
+  await pool.query(`UPDATE inventory SET status = $1 WHERE id = ANY($2::uuid[])`, [newStatus, ids]);
+  revalidatePath('/')
+  revalidatePath('/admin')
+  return { success: true }
 }
 
 export async function editCardAction(id: string, payload: EditCardPayload): Promise<EditCardActionResult> {

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Database } from '@/types/database.types'
 import { useToastContext } from '@/components/admin/ToastProvider'
-import { toggleCardStatus, editCardAction, deleteCardAction, bulkDeleteCardsAction, bulkUpdateMetricsAction, rotateCardImageAction, removeFromAuctionBlock, updateProjectionTimeframe, createLotAction, breakLotAction, updateLotChildren, duplicateInventoryItem, toggleForecastStatus, bulkPublishForecasts } from '@/app/actions/inventory'
+import { toggleCardStatus, toggleStoreVisibility, editCardAction, deleteCardAction, bulkDeleteCardsAction, bulkUpdateMetricsAction, rotateCardImageAction, removeFromAuctionBlock, updateProjectionTimeframe, createLotAction, breakLotAction, updateLotChildren, duplicateInventoryItem, toggleForecastStatus, bulkPublishForecasts, bulkToggleStoreVisibility } from '@/app/actions/inventory'
 import { AuctionBidLogButton } from '@/components/admin/AuctionBidLogButton'
 import { syncSingleItemWithOracle, syncInventoryWithOracle, applyOracleDiscount, applyOracleDiscountAll, applyCorrection, approvePriceOnly, denyCorrection } from '@/app/actions/oracleSync'
 import ParallelTypeahead from '@/components/admin/ParallelTypeahead';
@@ -14,6 +14,19 @@ import { Loader2, Trash2, Edit2, Check, X, Search, Download, RotateCw, RefreshCw
 import { price } from '@/utils/math'
 import { deriveDisplayPricing } from '@/utils/pricing'
 import { InstructionTrigger } from '@/components/admin/DraggableGuide'
+
+function ToggleSwitch({ checked, onChange, label, disabled, loading }: { checked: boolean; onChange: () => void; label?: string; disabled?: boolean; loading?: boolean }) {
+  return (
+    <label className={`flex items-center gap-2 cursor-pointer ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`} onClick={(e) => { if (disabled) e.preventDefault(); }}>
+      <div className="relative flex items-center">
+        <input type="checkbox" className="sr-only peer" checked={checked} onChange={disabled ? undefined : onChange} disabled={disabled} />
+        <div className={`w-8 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all ${checked ? 'peer-checked:bg-indigo-600' : ''}`}></div>
+        {loading && <Loader2 className="absolute left-10 w-3 h-3 animate-spin text-slate-400" />}
+      </div>
+      {label && <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">{label}</span>}
+    </label>
+  );
+}
 
 type InventoryItem = Database['public']['Tables']['inventory']['Row']
 
@@ -31,6 +44,7 @@ export function InventoryTable({
 }) {
   const [items, setItems] = useState(initialItems)
   const [loadingId, setLoadingId] = useState<string | null>(null)
+  const [forecastLoadingId, setForecastLoadingId] = useState<string | null>(null)
   const [errorId, setErrorId] = useState<string | null>(null)
   const { showToast, showConfirm } = useToastContext()
   
@@ -44,6 +58,7 @@ export function InventoryTable({
   const [isBulkDeleting, setIsBulkDeleting] = useState(false)
   const [isBulkUpdating, setIsBulkUpdating] = useState(false)
   const [isBulkPublishing, setIsBulkPublishing] = useState(false)
+  const [isBulkStoreToggling, setIsBulkStoreToggling] = useState(false)
   const [bulkCostBasis, setBulkCostBasis] = useState<string>('0')
   const [bulkAcceptsOffers, setBulkAcceptsOffers] = useState(false)
   const [inlineSaving, setInlineSaving] = useState<Record<string, 'price' | 'cost' | null>>({});
@@ -260,52 +275,52 @@ export function InventoryTable({
     })
   }
 
-  const handleBulkPublish = async () => {
-    if (selectedIds.size === 0) return
-    showConfirm({
-      title: 'Publish Forecasts',
-      message: `Push Player Index forecasts to the public storefront for ${selectedIds.size} selected items?`,
-      confirmText: 'Publish',
-      onConfirm: async () => {
-        setIsBulkPublishing(true)
-        try {
-          const ids = Array.from(selectedIds)
-          await bulkPublishForecasts(ids, true)
-          setItems(prev => prev.map(item => 
-            selectedIds.has(item.id) ? { ...item, show_forecast: true } as any : item
-          ))
-          setSelectedIds(new Set())
-          showToast(`Successfully published forecasts for ${ids.length} items.`, 'success')
-        } catch (e: any) {
-          showToast("Failed to publish: " + e.message, 'error')
-        } finally {
-          setIsBulkPublishing(false)
-        }
-      }
-    })
-  }
-
-  const handleToggleForecastStatus = async (id: string, currentStatus: boolean) => {
-    try {
-      await toggleForecastStatus(id, currentStatus)
-      setItems(prev => prev.map(item => 
-        item.id === id ? { ...item, show_forecast: !currentStatus } as any : item
-      ))
-      showToast(`Forecast ${currentStatus ? 'hidden' : 'shown'} in store.`, 'success')
-    } catch (e: any) {
-      showToast("Failed to toggle forecast: " + e.message, 'error')
-    }
-  }
-
   const handleToggleForecast = async (item: InventoryItem) => {
+    setForecastLoadingId(item.id)
     try {
       const current = !!(item as any).show_forecast
       await toggleForecastStatus(item.id, current)
       setItems(items.map(i => i.id === item.id ? { ...i, show_forecast: !current } as any : i))
     } catch (err: any) {
       showToast("Failed to toggle forecast visibility: " + err.message, 'error')
+    } finally {
+      setForecastLoadingId(null)
     }
   }
+
+  const handleBulkToggleStore = async (makeVisible: boolean) => {
+    if (selectedIds.size === 0) return;
+    setIsBulkStoreToggling(true);
+    try {
+      const ids = Array.from(selectedIds);
+      await bulkToggleStoreVisibility(ids, makeVisible);
+      setItems(prev => prev.map(item => 
+        selectedIds.has(item.id) ? { ...item, status: makeVisible ? 'available' : 'hidden' } as any : item
+      ));
+      showToast(`Store visibility updated for ${ids.length} items.`, 'success');
+    } catch (e: any) {
+      showToast("Bulk store toggle failed: " + e.message, 'error');
+    } finally {
+      setIsBulkStoreToggling(false);
+    }
+  };
+
+  const handleBulkToggleForecast = async (makeVisible: boolean) => {
+    if (selectedIds.size === 0) return;
+    setIsBulkPublishing(true);
+    try {
+      const ids = Array.from(selectedIds);
+      await bulkPublishForecasts(ids, makeVisible);
+      setItems(prev => prev.map(item => 
+        selectedIds.has(item.id) ? { ...item, show_forecast: makeVisible } as any : item
+      ));
+      showToast(`Forecast visibility updated for ${ids.length} items.`, 'success');
+    } catch (e: any) {
+      showToast("Bulk forecast toggle failed: " + e.message, 'error');
+    } finally {
+      setIsBulkPublishing(false);
+    }
+  };
 
   // ── Lot handlers ──────────────────────────────────────────────────────────
   const handleCreateLot = async () => {
@@ -360,8 +375,9 @@ export function InventoryTable({
     setLoadingId(item.id)
     setErrorId(null)
     try {
-      await toggleCardStatus(item.id, item.status || 'available')
-      setItems(items.map(i => i.id === item.id ? { ...i, status: i.status === 'available' ? 'sold' : 'available' } : i))
+      const isAvailable = item.status === 'available';
+      await toggleStoreVisibility(item.id, !isAvailable);
+      setItems(items.map(i => i.id === item.id ? { ...i, status: isAvailable ? 'hidden' : 'available' } : i));
     } catch (err: any) {
       setErrorId(item.id)
     } finally {
@@ -1234,9 +1250,14 @@ export function InventoryTable({
         </label>
       </div>
 
-      {selectedIds.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-wrap items-center justify-center gap-3 bg-white border border-slate-200 p-3 rounded-2xl shadow-2xl animate-in slide-in-from-bottom-8 fade-in w-[95%] max-w-4xl">
-          <span className="text-sm font-bold text-slate-800 bg-slate-100 px-3 py-1.5 rounded-lg">{selectedIds.size} selected</span>
+      {selectedIds.size > 0 && (() => {
+        const selectedArr = Array.from(selectedIds);
+        const isAllStoreVisible = selectedArr.every(id => items.find(i => i.id === id)?.status === 'available');
+        const isAllForecastVisible = selectedArr.every(id => (items.find(i => i.id === id) as any)?.show_forecast);
+        
+        return (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-wrap items-center justify-center gap-3 bg-white border border-slate-200 p-3 rounded-2xl shadow-2xl animate-in slide-in-from-bottom-8 fade-in w-[95%] max-w-[1000px]">
+            <span className="text-sm font-bold text-slate-800 bg-slate-100 px-3 py-1.5 rounded-lg">{selectedIds.size} selected</span>
           <div className="hidden sm:block h-8 w-px bg-slate-200 mx-1"></div>
           <div className="flex items-center gap-2">
                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Cost $</label>
@@ -1260,10 +1281,24 @@ export function InventoryTable({
             <Package className="w-4 h-4" />
             Lot
           </button>
-          <button onClick={handleBulkPublish} disabled={isBulkPublishing} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-50 shadow-sm">
-            {isBulkPublishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
-            Publish
-          </button>
+          <div className="hidden sm:block h-8 w-px bg-slate-200 mx-1"></div>
+          <div className="flex items-center gap-4 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+            <ToggleSwitch 
+              checked={isAllStoreVisible} 
+              onChange={() => handleBulkToggleStore(!isAllStoreVisible)} 
+              label="Store" 
+              loading={isBulkStoreToggling}
+              disabled={isBulkStoreToggling}
+            />
+            <div className="w-px h-6 bg-slate-200"></div>
+            <ToggleSwitch 
+              checked={isAllForecastVisible} 
+              onChange={() => handleBulkToggleForecast(!isAllForecastVisible)} 
+              label="Forecast" 
+              loading={isBulkPublishing}
+              disabled={isBulkPublishing}
+            />
+          </div>
           <button onClick={handleBulkDelete} disabled={isBulkDeleting} className="bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-50 shadow-sm">
             {isBulkDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
             Delete
@@ -1272,10 +1307,11 @@ export function InventoryTable({
             <X className="w-5 h-5" />
           </button>
         </div>
-      )}
+        );
+      })()}
 
       {/* Card Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
         {filteredItems.map(item => (
           <div
             key={item.id}
@@ -1293,7 +1329,7 @@ export function InventoryTable({
 
             {/* Card images — front + back side by side */}
             <div className="w-full flex border-b border-slate-200 bg-slate-100">
-              <div className="flex-1 h-36 flex items-center justify-center overflow-hidden border-r border-slate-200 relative group/img">
+              <div className="flex-1 h-44 flex items-center justify-center overflow-hidden border-r border-slate-200 relative group/img">
                 {item.image_url ? (
                   <img src={item.image_url} alt="Front" className="h-full w-full object-contain cursor-zoom-in transition-transform hover:scale-105" onClick={() => setZoomedImg(item.image_url)} />
                 ) : (
@@ -1313,7 +1349,7 @@ export function InventoryTable({
                 )}
                 <span className="absolute bottom-0 inset-x-0 text-center text-[9px] font-bold uppercase tracking-wider text-white bg-black/50 py-0.5">Front</span>
               </div>
-              <div className="flex-1 h-36 flex items-center justify-center overflow-hidden relative group/img">
+              <div className="flex-1 h-44 flex items-center justify-center overflow-hidden relative group/img">
                 {item.back_image_url ? (
                   <img src={item.back_image_url} alt="Back" className="h-full w-full object-contain cursor-zoom-in transition-transform hover:scale-105" onClick={() => setZoomedImg(item.back_image_url)} />
                 ) : (
@@ -1336,7 +1372,7 @@ export function InventoryTable({
             </div>
 
             {/* Card body */}
-            <div className="p-3 flex flex-col gap-2 flex-grow">
+            <div className="p-4 flex flex-col gap-3 flex-grow">
               {editingId === item.id ? (
                 /* ── Edit Mode ── */
                 <div className="space-y-2">
@@ -1522,12 +1558,6 @@ export function InventoryTable({
                               {price((item as any).oracle_trend_percentage) >= 0 ? '↑' : '↓'} {Math.abs(price((item as any).oracle_trend_percentage)).toFixed(1)}%
                             </span>
                           )}
-                          <button
-                            onClick={() => handleToggleForecastStatus(item.id, (item as any).show_forecast !== false)}
-                            className={`text-[9px] font-bold px-2 py-[2px] rounded border transition-colors ${(item as any).show_forecast !== false ? 'bg-purple-100 text-purple-700 border-purple-200 hover:bg-purple-200' : 'bg-slate-200 text-slate-600 border-slate-300 hover:bg-slate-300'}`}
-                          >
-                            {(item as any).show_forecast !== false ? 'Hide in Store' : 'Show in Store'}
-                          </button>
                         </div>
                       </div>
                       <div className="flex items-baseline gap-2 mb-1">
@@ -1613,12 +1643,6 @@ export function InventoryTable({
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">🔮 Player Index</span>
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] font-bold text-slate-400">No Market Data Found</span>
-                        <button
-                          onClick={() => handleToggleForecastStatus(item.id, (item as any).show_forecast !== false)}
-                          className={`text-[9px] font-bold px-2 py-[2px] rounded border transition-colors ${(item as any).show_forecast !== false ? 'bg-purple-100 text-purple-700 border-purple-200 hover:bg-purple-200' : 'bg-slate-200 text-slate-600 border-slate-300 hover:bg-slate-300'}`}
-                        >
-                          {(item as any).show_forecast !== false ? 'Hide in Store' : 'Show in Store'}
-                        </button>
                       </div>
                     </div>
                   )}
@@ -1657,32 +1681,23 @@ export function InventoryTable({
 
                     {/* Status + actions */}
                     <div className="flex flex-col items-end gap-1.5">
-                      <button
-                        onClick={() => handleToggle(item)}
-                        disabled={loadingId === item.id}
-                        className={`px-2.5 py-1 text-xs font-semibold rounded-full border flex items-center gap-1 transition-colors ${
-                          item.status === 'available'
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                            : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
-                        }`}
-                      >
-                        {loadingId === item.id && <Loader2 className="h-3 w-3 animate-spin" />}
-                        {item.status === 'available' ? 'Available' : 'Sold'}
-                      </button>
-                      
-                      {/* Public Forecast Toggle */}
-                      <button
-                        onClick={() => handleToggleForecast(item)}
-                        className={`px-2.5 py-1 text-xs font-semibold rounded-full border flex items-center gap-1 transition-colors ${
-                          (item as any).show_forecast
-                            ? 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
-                            : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
-                        }`}
-                        title={(item as any).show_forecast ? "Forecast is public on storefront" : "Forecast is hidden"}
-                      >
-                        <Eye className="w-3 h-3" />
-                        {(item as any).show_forecast ? 'Public Forecast' : 'Hidden'}
-                      </button>
+                      <div className="flex items-center gap-4 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">
+                        <ToggleSwitch
+                          checked={item.status === 'available'}
+                          onChange={() => handleToggle(item)}
+                          label="Store"
+                          loading={loadingId === item.id}
+                          disabled={loadingId === item.id}
+                        />
+                        <div className="w-px h-5 bg-slate-200"></div>
+                        <ToggleSwitch
+                          checked={!!(item as any).show_forecast}
+                          onChange={() => handleToggleForecast(item)}
+                          label="Forecast"
+                          loading={forecastLoadingId === item.id}
+                          disabled={forecastLoadingId === item.id}
+                        />
+                      </div>
 
                       {errorId === item.id && <div className="text-[10px] text-red-500 font-medium">Failed</div>}
                       <div className="flex gap-1.5 opacity-100 transition-opacity flex-wrap justify-end relative">
