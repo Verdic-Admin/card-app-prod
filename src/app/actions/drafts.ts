@@ -251,6 +251,8 @@ export type ApplyStagingDraftPricingResult =
       is_1st?: boolean;
       is_short_print?: boolean;
       is_ssp?: boolean;
+      p_bull?: number;
+      p_bear?: number;
     }
   | { success: false; error: string };
 
@@ -316,10 +318,16 @@ export async function applyStagingDraftFieldPricingAction(
     return { success: false, error: 'Oracle returned an invalid projected price.' };
   }
 
-  const listed = roundMoney(projection * (1 - discountRate / 100));
+  const marketBase = data.current_price != null && Number(data.current_price) > 0 ? Number(data.current_price) : projection;
+  const listed = roundMoney(marketBase * (1 - discountRate / 100));
   const trend = data.trend_percentage != null ? Number(data.trend_percentage) : null;
   const trendPoints = Array.isArray(data.trend_points) ? data.trend_points : [];
   const playerIndexUrl = String(data.player_index_url || '');
+  
+  const pBull = data.p_bull != null ? Number(data.p_bull) : Math.round(projection * 1.15 * 100) / 100;
+  const pBear = data.p_bear != null ? Number(data.p_bear) : Math.round(projection * 0.85 * 100) / 100;
+
+  await pool.query(`ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS p_bull numeric, ADD COLUMN IF NOT EXISTS p_bear numeric`);
 
   await pool.query(
     `UPDATE scan_staging SET
@@ -328,15 +336,17 @@ export async function applyStagingDraftFieldPricingAction(
        oracle_projection = $3,
        oracle_trend_percentage = $4,
        trend_data = $5::jsonb,
-       player_index_url = $6
-     WHERE id = $7::uuid`,
-    [listed, projection, projection, trend, JSON.stringify(trendPoints), playerIndexUrl || null, id],
+       player_index_url = $6,
+       p_bull = $7,
+       p_bear = $8
+     WHERE id = $9::uuid`,
+    [listed, marketBase, projection, trend, JSON.stringify(trendPoints), playerIndexUrl || null, pBull, pBear, id],
   );
 
   return {
     success: true,
     listed_price: listed,
-    market_price: projection,
+    market_price: marketBase,
     player_name: String(row.player_name ?? ''),
     team_name: String(row.team_name ?? ''),
     card_set: String(row.card_set ?? ''),
@@ -347,6 +357,8 @@ export async function applyStagingDraftFieldPricingAction(
     is_1st: Boolean(row.is_1st),
     is_short_print: Boolean(row.is_short_print),
     is_ssp: Boolean(row.is_ssp),
+    p_bull: pBull,
+    p_bear: pBear,
   };
 }
 
@@ -385,9 +397,14 @@ export async function applyStagingDraftImagePricingAction(
   }
 
   const discountRate = await getOracleDiscountRate();
-  const listed = roundMoney(afv * (1 - discountRate / 100));
+  const projection = afv;
+  const marketBase = result.pricing?.current_price != null && Number(result.pricing?.current_price) > 0 ? Number(result.pricing.current_price) : projection;
+  const listed = roundMoney(marketBase * (1 - discountRate / 100));
   const trendPoints = Array.isArray(result.pricing?.trend_points) ? result.pricing!.trend_points : [];
   const playerIndexUrl = String(result.pricing?.player_index_url || '');
+  
+  const pBull = result.pricing?.p_bull != null ? Number(result.pricing.p_bull) : Math.round(projection * 1.15 * 100) / 100;
+  const pBear = result.pricing?.p_bear != null ? Number(result.pricing.p_bear) : Math.round(projection * 0.85 * 100) / 100;
 
   const pick = (v: string | undefined, fallback: string) =>
     (v != null && String(v).trim() !== '' ? String(v).trim() : fallback);
@@ -397,6 +414,8 @@ export async function applyStagingDraftImagePricingAction(
   const card_number = pick(result.card_number, String(row.card_number ?? ''));
   const insert_name = pick(result.insert_name, String(row.insert_name ?? ''));
   const parallel_name = pick(result.parallel_name, String(row.parallel_name ?? ''));
+
+  await pool.query(`ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS p_bull numeric, ADD COLUMN IF NOT EXISTS p_bear numeric`);
 
   await pool.query(
     `UPDATE scan_staging SET
@@ -414,8 +433,10 @@ export async function applyStagingDraftImagePricingAction(
        is_rookie = $11,
        is_1st = $12,
        is_short_print = $13,
-       is_ssp = $14
-     WHERE id = $15::uuid`,
+       is_ssp = $14,
+       p_bull = $15,
+       p_bear = $16
+     WHERE id = $17::uuid`,
     [
       player_name,
       card_set,
@@ -423,14 +444,16 @@ export async function applyStagingDraftImagePricingAction(
       insert_name,
       parallel_name,
       listed,
-      afv,
-      afv,
+      marketBase,
+      projection,
       JSON.stringify(trendPoints),
       playerIndexUrl || null,
       Boolean(result.is_rookie),
       Boolean(result.is_1st),
       Boolean(result.is_short_print),
       Boolean(result.is_ssp),
+      pBull,
+      pBear,
       id,
     ],
   );
@@ -438,7 +461,7 @@ export async function applyStagingDraftImagePricingAction(
   return {
     success: true,
     listed_price: listed,
-    market_price: afv,
+    market_price: marketBase,
     player_name,
     team_name: String(row.team_name ?? ''),
     card_set,
@@ -451,6 +474,8 @@ export async function applyStagingDraftImagePricingAction(
     is_1st: Boolean(result.is_1st),
     is_short_print: Boolean(result.is_short_print),
     is_ssp: Boolean(result.is_ssp),
+    p_bull: pBull,
+    p_bear: pBear,
   };
 }
 
@@ -602,12 +627,17 @@ export async function publishDraftCardsAction(ids: string[]): Promise<PublishDra
   // 1. Read approved rows from staging
   let staged: Record<string, unknown>[] = [];
   try {
+    // Ensure the table schema has p_bull and p_bear columns
+    await pool.query(`ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS p_bull numeric, ADD COLUMN IF NOT EXISTS p_bear numeric`);
+    await pool.query(`ALTER TABLE inventory ADD COLUMN IF NOT EXISTS p_bull numeric, ADD COLUMN IF NOT EXISTS p_bear numeric`);
+    
     const { rows } = await pool.query(
       `SELECT player_name, team_name, card_set, card_number, insert_name, parallel_name, print_run,
               image_url, back_image_url, raw_front_url, raw_back_url,
               listed_price, market_price,
               trend_data, player_index_url, oracle_projection, oracle_trend_percentage,
-              is_rookie, is_1st, is_short_print, is_ssp, is_auto, is_relic, grading_company, grade
+              is_rookie, is_1st, is_short_print, is_ssp, is_auto, is_relic, grading_company, grade,
+              p_bull, p_bear
        FROM scan_staging WHERE id = ANY($1::uuid[])`,
       [ids as string[]],
     );
@@ -671,15 +701,20 @@ export async function publishDraftCardsAction(ids: string[]): Promise<PublishDra
           : market;
       const oracleTrendParsed = parseFloat(String(s.oracle_trend_percentage ?? ''));
       const oracleTrend = Number.isFinite(oracleTrendParsed) ? oracleTrendParsed : null;
+      
+      const pBull = s.p_bull != null ? Number(s.p_bull) : Math.round(oracleProj * 1.15 * 100) / 100;
+      const pBear = s.p_bear != null ? Number(s.p_bear) : Math.round(oracleProj * 0.85 * 100) / 100;
+
       await client.query(
         `
              INSERT INTO inventory (
                player_name, team_name, card_set, card_number, insert_name, parallel_name, parallel_insert_type,
                print_run, image_url, back_image_url, listed_price, market_price,
                trend_data, player_index_url, oracle_projection, oracle_trend_percentage,
-               is_rookie, is_1st, is_short_print, is_ssp, is_auto, is_relic, grading_company, grade, status
+               is_rookie, is_1st, is_short_print, is_ssp, is_auto, is_relic, grading_company, grade, status,
+               p_bull, p_bear
              )
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, 'available')
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, 'available', $25, $26)
           `,
         [
           sqlText(s.player_name),
@@ -706,6 +741,8 @@ export async function publishDraftCardsAction(ids: string[]): Promise<PublishDra
           Boolean(s.is_relic),
           sqlNullableText(s.grading_company),
           sqlNullableText(s.grade),
+          pBull,
+          pBear,
         ],
       );
     }
@@ -824,18 +861,18 @@ export async function applyStagingDraftBatchPricingAction(
       continue;
     }
 
-    // Listed price = average of eBay comps (real market value).
-    // Oracle projection = algorithm's forward-looking expected value (shown alongside).
-    // Falls back to projection only when no comps are available.
+    // Real market price from backend
     const comps = priceResult.ebay_comps || [];
-    const compAvg = comps.length > 0
-      ? comps.reduce((sum: number, c: { price: number }) => sum + c.price, 0) / comps.length
-      : null;
+    const marketBase = priceResult.current_price != null && Number(priceResult.current_price) > 0 ? Number(priceResult.current_price) : projection;
 
-    const listedBase = compAvg ?? projection;
-    const listed = roundMoney(listedBase * (1 - discountRate / 100));
+    const listed = roundMoney(marketBase * (1 - discountRate / 100));
     const trend = priceResult.trend_percentage != null ? Number(priceResult.trend_percentage) : null;
     const playerIndexUrl = priceResult.url || '';
+    
+    const pBull = priceResult.p_bull != null ? Number(priceResult.p_bull) : Math.round(projection * 1.15 * 100) / 100;
+    const pBear = priceResult.p_bear != null ? Number(priceResult.p_bear) : Math.round(projection * 0.85 * 100) / 100;
+
+    await pool.query(`ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS p_bull numeric, ADD COLUMN IF NOT EXISTS p_bear numeric`);
 
     try {
       await pool.query(
@@ -845,11 +882,13 @@ export async function applyStagingDraftBatchPricingAction(
            oracle_projection = $3,
            oracle_trend_percentage = $4,
            player_index_url = $5,
-           oracle_comps = $6::jsonb
-         WHERE id = $7::uuid`,
-        [listed, compAvg ?? projection, projection, trend, playerIndexUrl || null, JSON.stringify(comps), id],
+           oracle_comps = $6::jsonb,
+           p_bull = $7,
+           p_bear = $8
+         WHERE id = $9::uuid`,
+        [listed, marketBase, projection, trend, playerIndexUrl || null, JSON.stringify(comps), pBull, pBear, id],
       );
-      output.push({ id, success: true, listed_price: listed, market_price: projection, player_index_url: playerIndexUrl || null, ebay_comps: comps });
+      output.push({ id, success: true, listed_price: listed, market_price: marketBase, player_index_url: playerIndexUrl || null, ebay_comps: comps });
     } catch (e: unknown) {
       output.push({ id, success: false, error: e instanceof Error ? e.message : String(e) });
     }

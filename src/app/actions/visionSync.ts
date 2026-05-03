@@ -72,6 +72,9 @@ export async function requestPricingAction(imageUrl: string): Promise<{
     trend_points: number[];
     player_index_url: string;
     ebay_comp_urls: string[];
+    current_price?: number;
+    p_bull?: number;
+    p_bear?: number;
   };
 }> {
   const apiKey = await getShopOracleApiKey();
