@@ -15,15 +15,22 @@ import { price } from '@/utils/math'
 import { deriveDisplayPricing } from '@/utils/pricing'
 import { InstructionTrigger } from '@/components/admin/DraggableGuide'
 
-function ToggleSwitch({ checked, onChange, label, disabled, loading }: { checked: boolean; onChange: () => void; label?: string; disabled?: boolean; loading?: boolean }) {
+function ToggleSwitch({ checked, onChange, label, disabled, loading, onLabel, offLabel }: { checked: boolean; onChange: () => void; label?: string; disabled?: boolean; loading?: boolean; onLabel?: string; offLabel?: string }) {
   return (
     <label className={`flex items-center gap-2 cursor-pointer ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`} onClick={(e) => { if (disabled) e.preventDefault(); }}>
       <div className="relative flex items-center">
         <input type="checkbox" className="sr-only peer" checked={checked} onChange={disabled ? undefined : onChange} disabled={disabled} />
-        <div className={`w-8 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all ${checked ? 'peer-checked:bg-indigo-600' : ''}`}></div>
-        {loading && <Loader2 className="absolute left-10 w-3 h-3 animate-spin text-slate-400" />}
+        <div className={`w-8 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all ${checked ? 'peer-checked:bg-emerald-500' : ''}`}></div>
+        {loading && <Loader2 className="absolute -left-5 w-3 h-3 animate-spin text-slate-400" />}
       </div>
-      {label && <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">{label}</span>}
+      <div className="flex flex-col">
+        {label && <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-[2px]">{label}</span>}
+        {(onLabel || offLabel || !label) && (
+          <span className={`text-[10px] font-black uppercase tracking-wider leading-none ${checked ? 'text-emerald-600' : 'text-slate-500'}`}>
+            {checked ? (onLabel || 'On') : (offLabel || 'Off')}
+          </span>
+        )}
+      </div>
     </label>
   );
 }
@@ -1289,6 +1296,8 @@ export function InventoryTable({
               label="Store" 
               loading={isBulkStoreToggling}
               disabled={isBulkStoreToggling}
+              onLabel="Visible"
+              offLabel="Hidden"
             />
             <div className="w-px h-6 bg-slate-200"></div>
             <ToggleSwitch 
@@ -1297,6 +1306,8 @@ export function InventoryTable({
               label="Forecast" 
               loading={isBulkPublishing}
               disabled={isBulkPublishing}
+              onLabel="Visible"
+              offLabel="Hidden"
             />
           </div>
           <button onClick={handleBulkDelete} disabled={isBulkDeleting} className="bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-50 shadow-sm">
@@ -1688,14 +1699,18 @@ export function InventoryTable({
                           label="Store"
                           loading={loadingId === item.id}
                           disabled={loadingId === item.id}
+                          onLabel="Visible"
+                          offLabel="Hidden"
                         />
-                        <div className="w-px h-5 bg-slate-200"></div>
+                        <div className="w-px h-6 bg-slate-200"></div>
                         <ToggleSwitch
                           checked={!!(item as any).show_forecast}
                           onChange={() => handleToggleForecast(item)}
                           label="Forecast"
                           loading={forecastLoadingId === item.id}
                           disabled={forecastLoadingId === item.id}
+                          onLabel="Visible"
+                          offLabel="Hidden"
                         />
                       </div>
 
