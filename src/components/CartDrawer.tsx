@@ -211,10 +211,14 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
           paymentMemo: res.paymentMemo,
         });
         setCheckoutStage('success');
+      } else {
+        setCartError(res.error);
+        setCheckoutStage('cart');
       }
     } catch (err: any) {
       console.error(err);
       setCartError(err.message || "Checkout failed. Please try again.");
+      setCheckoutStage('cart');
     } finally {
       setCheckoutLoading(false);
     }

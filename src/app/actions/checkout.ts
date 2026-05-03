@@ -8,6 +8,9 @@ export type CheckoutResult = {
   shipping: number;
   total: number;
   paymentMemo: string;
+} | {
+  success: false;
+  error: string;
 };
 
 function buildPaymentMemo(opts: {
@@ -62,8 +65,10 @@ export async function submitManualCheckout(
   const tradeProposalCount = Math.max(0, Math.floor(opts?.tradeProposalCount ?? 0));
 
   if (!itemIds || itemIds.length === 0) {
-    throw new Error('No items provided for checkout.')
+    return { success: false, error: 'No items provided for checkout.' };
   }
+
+  try {
 
   // ── Atomic Inventory Locking ──────────────────────────────────────────────
   const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60000).toISOString();
@@ -79,7 +84,7 @@ export async function submitManualCheckout(
   `, [itemIds as any]);
   
   if (testRows.length !== itemIds.length) {
-     throw new Error('One or more items in your cart are no longer available.');
+     return { success: false, error: 'One or more items in your cart are no longer available.' };
   }
 
   // Atomically lock them and fetch fields
@@ -94,7 +99,7 @@ export async function submitManualCheckout(
     if (lockedItems.length > 0) {
        await pool.query(`UPDATE inventory SET status = 'available', checkout_expires_at = null WHERE id = ANY($1::uuid[])`, [lockedItems.map((i: any) => i.id) as any]);
     }
-    throw new Error('One or more items in your cart are no longer available.');
+    return { success: false, error: 'One or more items in your cart are no longer available.' };
   }
   
   const purchaseItems = lockedItems;
@@ -162,5 +167,9 @@ export async function submitManualCheckout(
   );
 
   return { success: true, orderId, subtotal, shipping, total, paymentMemo };
+  } catch (err: any) {
+    console.error("Checkout Server Action Error:", err);
+    return { success: false, error: "An unexpected error occurred during checkout. Please try again." };
+  }
 }
 
