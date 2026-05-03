@@ -1574,9 +1574,6 @@ export function InventoryTable({
                       <div className="flex items-baseline gap-2 mb-1">
                         <span className="text-lg font-black text-purple-900 leading-none">${pricing.playerIndexPrice.toFixed(2)}</span>
                       </div>
-                      <div className="text-[9px] text-purple-500 font-semibold mb-1 italic">
-                        Please double check this pricing as the oracle can sometimes make mistakes.
-                      </div>
                       {/* Bull/Bear Forecast Range */}
                       {((item as any).p_bull != null || (item as any).p_bear != null) && (
                         <div className="flex items-center gap-2 mb-1">
@@ -1659,8 +1656,8 @@ export function InventoryTable({
                   )}
 
                   {/* Pricing row */}
-                  <div className="flex items-end justify-between mt-auto pt-1">
-                    <div>
+                  <div className="flex items-end justify-between mt-auto pt-1 gap-2 flex-wrap sm:flex-nowrap">
+                    <div className="w-full sm:w-auto">
                       <div className="relative flex items-center -ml-1">
                         <span className="absolute left-1 text-xl font-black text-slate-400 pointer-events-none">$</span>
                         <input
@@ -1691,18 +1688,21 @@ export function InventoryTable({
                     </div>
 
                     {/* Status + actions */}
-                    <div className="flex flex-col items-end gap-1.5">
-                      <div className="flex items-center gap-4 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">
-                        <ToggleSwitch
-                          checked={item.status === 'available'}
-                          onChange={() => handleToggle(item)}
-                          label="Store"
-                          loading={loadingId === item.id}
-                          disabled={loadingId === item.id}
-                          onLabel="Visible"
-                          offLabel="Hidden"
-                        />
-                        <div className="w-px h-6 bg-slate-200"></div>
+                    <div className="flex flex-col sm:items-end gap-1.5 w-full sm:w-auto">
+                      <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 sm:gap-4 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 w-full sm:w-auto">
+                        <div className="w-full sm:w-auto flex justify-end">
+                          <ToggleSwitch
+                            checked={item.status === 'available'}
+                            onChange={() => handleToggle(item)}
+                            label="Store"
+                            loading={loadingId === item.id}
+                            disabled={loadingId === item.id}
+                            onLabel="Visible"
+                            offLabel="Hidden"
+                          />
+                        </div>
+                        <div className="hidden sm:block w-px h-6 bg-slate-200"></div>
+                        <div className="w-full sm:w-auto flex justify-end border-t sm:border-t-0 border-slate-200 pt-1 sm:pt-0">
                         <ToggleSwitch
                           checked={!!(item as any).show_forecast}
                           onChange={() => handleToggleForecast(item)}
@@ -1712,6 +1712,7 @@ export function InventoryTable({
                           onLabel="Visible"
                           offLabel="Hidden"
                         />
+                        </div>
                       </div>
 
                       {errorId === item.id && <div className="text-[10px] text-red-500 font-medium">Failed</div>}
