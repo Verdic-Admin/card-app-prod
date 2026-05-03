@@ -1592,7 +1592,15 @@ export function InventoryTable({
                   ) : (
                     <div className="bg-slate-50 border border-slate-200 rounded-lg p-2 mb-1 flex items-center justify-between">
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">🔮 Player Index</span>
-                      <span className="text-[10px] font-bold text-slate-400">No Market Data Found</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-slate-400">No Market Data Found</span>
+                        <button
+                          onClick={() => handleToggleForecastStatus(item.id, (item as any).show_forecast !== false)}
+                          className={`text-[9px] font-bold px-2 py-[2px] rounded border transition-colors ${(item as any).show_forecast !== false ? 'bg-purple-100 text-purple-700 border-purple-200 hover:bg-purple-200' : 'bg-slate-200 text-slate-600 border-slate-300 hover:bg-slate-300'}`}
+                        >
+                          {(item as any).show_forecast !== false ? 'Hide in Store' : 'Show in Store'}
+                        </button>
+                      </div>
                     </div>
                   )}
 
