@@ -285,6 +285,18 @@ export function InventoryTable({
     })
   }
 
+  const handleToggleForecastStatus = async (id: string, currentStatus: boolean) => {
+    try {
+      await toggleForecastStatus(id, currentStatus)
+      setItems(prev => prev.map(item => 
+        item.id === id ? { ...item, show_forecast: !currentStatus } as any : item
+      ))
+      showToast(`Forecast ${currentStatus ? 'hidden' : 'shown'} in store.`, 'success')
+    } catch (e: any) {
+      showToast("Failed to toggle forecast: " + e.message, 'error')
+    }
+  }
+
   const handleToggleForecast = async (item: InventoryItem) => {
     try {
       const current = !!(item as any).show_forecast
@@ -1503,15 +1515,26 @@ export function InventoryTable({
                     <div className="bg-purple-50 border border-purple-100 rounded-lg p-2 mb-1">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-[10px] font-bold text-purple-700 uppercase tracking-wider flex items-center gap-1">🔮 Player Index Value</span>
-                        {(item as any).oracle_trend_percentage != null && (
-                          <span className={`text-[9px] font-bold px-1.5 py-[2px] rounded-sm flex items-center gap-1 ${price((item as any).oracle_trend_percentage) >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                            <span className="opacity-75 uppercase text-[8px]">Momentum:</span>
-                            {price((item as any).oracle_trend_percentage) >= 0 ? '↑' : '↓'} {Math.abs(price((item as any).oracle_trend_percentage)).toFixed(1)}%
-                          </span>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {(item as any).oracle_trend_percentage != null && (
+                            <span className={`text-[9px] font-bold px-1.5 py-[2px] rounded-sm flex items-center gap-1 ${price((item as any).oracle_trend_percentage) >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                              <span className="opacity-75 uppercase text-[8px]">Momentum:</span>
+                              {price((item as any).oracle_trend_percentage) >= 0 ? '↑' : '↓'} {Math.abs(price((item as any).oracle_trend_percentage)).toFixed(1)}%
+                            </span>
+                          )}
+                          <button
+                            onClick={() => handleToggleForecastStatus(item.id, (item as any).show_forecast !== false)}
+                            className={`text-[9px] font-bold px-2 py-[2px] rounded border transition-colors ${(item as any).show_forecast !== false ? 'bg-purple-100 text-purple-700 border-purple-200 hover:bg-purple-200' : 'bg-slate-200 text-slate-600 border-slate-300 hover:bg-slate-300'}`}
+                          >
+                            {(item as any).show_forecast !== false ? 'Hide in Store' : 'Show in Store'}
+                          </button>
+                        </div>
                       </div>
                       <div className="flex items-baseline gap-2 mb-1">
                         <span className="text-lg font-black text-purple-900 leading-none">${pricing.playerIndexPrice.toFixed(2)}</span>
+                      </div>
+                      <div className="text-[9px] text-purple-500 font-semibold mb-1 italic">
+                        Please double check this pricing as the oracle can sometimes make mistakes.
                       </div>
                       {/* Bull/Bear Forecast Range */}
                       {((item as any).p_bull != null || (item as any).p_bear != null) && (
