@@ -28,6 +28,7 @@ interface ItemStagingDraft {
   endTime: string
   description: string
   bidIncrement: string
+  startingPrice: string
 }
 
 const EMPTY_DRAFT: ItemStagingDraft = {
@@ -35,6 +36,7 @@ const EMPTY_DRAFT: ItemStagingDraft = {
   endTime: '',
   description: '',
   bidIncrement: '',
+  startingPrice: '',
 }
 
 const TIMEZONES = [
@@ -196,6 +198,7 @@ export function LiveAuctionStudio({
       const d = stageDrafts[id] ?? EMPTY_DRAFT
       const reservePriceNum = d.reservePrice ? Number(d.reservePrice) : null
       const bidIncrementNum = d.bidIncrement ? Number(d.bidIncrement) : null
+      const startingPriceNum = d.startingPrice ? Number(d.startingPrice) : null
       
       const normalizedEndTime = d.endTime 
         ? combineDateTimeWithTz(d.endTime, stageGlobalTz)
@@ -211,6 +214,8 @@ export function LiveAuctionStudio({
           bidIncrementNum != null && Number.isFinite(bidIncrementNum) && bidIncrementNum > 0
             ? bidIncrementNum
             : null,
+        startingPrice:
+          startingPriceNum != null && Number.isFinite(startingPriceNum) ? startingPriceNum : null,
       }
     })
 
@@ -226,9 +231,19 @@ export function LiveAuctionStudio({
       }
       setStageSuccess(res.count)
       setItems(prev =>
-        prev.map((i: any) =>
-          stageSelection.has(i.id) ? { ...i, is_auction: true, auction_status: 'pending' } : i,
-        ),
+        prev.map((i: any) => {
+          if (stageSelection.has(i.id)) {
+            const draft = stageDrafts[i.id]
+            const sp = draft?.startingPrice ? Number(draft.startingPrice) : null
+            return {
+              ...i,
+              is_auction: true,
+              auction_status: 'pending',
+              listed_price: sp != null && Number.isFinite(sp) ? sp : i.listed_price,
+            }
+          }
+          return i
+        }),
       )
       setStageSelection(new Set())
       setStageDrafts({})
@@ -275,6 +290,9 @@ export function LiveAuctionStudio({
                 auction_bid_increment: formData.get('bidIncrement')
                   ? Number(formData.get('bidIncrement'))
                   : i.auction_bid_increment,
+                listed_price: formData.get('startingPrice')
+                  ? Number(formData.get('startingPrice'))
+                  : i.listed_price,
               }
             : i,
         ),
@@ -606,7 +624,18 @@ export function LiveAuctionStudio({
                         </button>
                       </div>
                     </div>
-                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-4 gap-2">
+                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2">
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Start Price ($)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={draft.startingPrice}
+                          onChange={e => updateStageDraft(item.id, 'startingPrice', e.target.value)}
+                          className="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"
+                          placeholder={item.listed_price ? item.listed_price.toString() : "0.00"}
+                        />
+                      </div>
                       <div>
                         <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Reserve ($)</label>
                         <input
@@ -895,6 +924,9 @@ export function LiveAuctionStudio({
                                   : i.auction_reserve_price,
                                 auction_end_time: (fd.get('endTime') as string) || i.auction_end_time,
                                 auction_description: (fd.get('description') as string) || i.auction_description,
+                                listed_price: fd.get('startingPrice')
+                                  ? Number(fd.get('startingPrice'))
+                                  : i.listed_price,
                               }
                             : i,
                         ),
@@ -908,7 +940,15 @@ export function LiveAuctionStudio({
                     }
                   }}
                 >
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
+                    <input
+                      type="number"
+                      step="0.01"
+                      name="startingPrice"
+                      defaultValue={item.listed_price || ''}
+                      placeholder="Start Price ($)"
+                      className="border border-slate-300 rounded px-2 py-1.5 text-sm"
+                    />
                     <input
                       type="number"
                       step="0.01"
@@ -1051,7 +1091,15 @@ export function LiveAuctionStudio({
                   }}
                   className="bg-white border border-red-100 rounded-lg p-3 flex flex-col gap-2"
                 >
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                    <input
+                      type="number"
+                      step="0.01"
+                      name="startingPrice"
+                      defaultValue={item.listed_price || ''}
+                      placeholder="Start Price ($)"
+                      className="border border-slate-300 rounded px-2 py-1.5 text-sm"
+                    />
                     <input
                       type="number"
                       step="0.01"

@@ -768,6 +768,7 @@ export interface AuctionStageItemInput {
   endTime?: string | null;
   description?: string | null;
   bidIncrement?: number | null;
+  startingPrice?: number | null;
 }
 
 export interface AuctionStageGlobals {
@@ -827,6 +828,11 @@ export async function stageAuctionItems(
           ? Number(raw.bidIncrement)
           : null;
 
+      const startingPrice =
+        raw.startingPrice != null && !Number.isNaN(Number(raw.startingPrice))
+          ? Number(raw.startingPrice)
+          : null;
+
       await pool.query(
         `
         UPDATE inventory
@@ -835,10 +841,11 @@ export async function stageAuctionItems(
             auction_reserve_price = COALESCE($1, auction_reserve_price),
             auction_end_time = COALESCE($2, auction_end_time),
             auction_description = COALESCE($3, auction_description),
-            auction_bid_increment = COALESCE($5, auction_bid_increment)
+            auction_bid_increment = COALESCE($5, auction_bid_increment),
+            listed_price = COALESCE($6, listed_price)
         WHERE id = $4
       `,
-        [reservePrice, endTime, description, raw.id, bidIncrement],
+        [reservePrice, endTime, description, raw.id, bidIncrement, startingPrice],
       );
 
       if (item.is_lot) {
@@ -1026,6 +1033,7 @@ export async function updateStagedAuction(
   const endTime = formData.get('endTime') as string;
   const description = formData.get('description') as string;
   const bidIncrement = formData.get('bidIncrement') as string;
+  const startingPrice = formData.get('startingPrice') as string;
   // Next.js can supply File, Blob, or a string for empty file inputs; accept any Blob.
   const file = formData.get('coinedImage');
   if (reservePrice) {
@@ -1046,6 +1054,12 @@ export async function updateStagedAuction(
   if (bidIncrement && Number(bidIncrement) > 0) {
     await pool.query(`UPDATE inventory SET auction_bid_increment = $1 WHERE id = $2::uuid`, [
       Number(bidIncrement),
+      itemId,
+    ]);
+  }
+  if (startingPrice != null && startingPrice !== '') {
+    await pool.query(`UPDATE inventory SET listed_price = $1 WHERE id = $2::uuid`, [
+      Number(startingPrice),
       itemId,
     ]);
   }
