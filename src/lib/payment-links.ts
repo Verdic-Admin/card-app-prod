@@ -29,6 +29,13 @@ export function paymentUrlWithAmount(profileUrl: string, total: number, note?: s
       return `${parsed.origin}${path}/${amt}`;
     }
   } catch {
+    // If the URL parsing fails, check if they provided a raw email address for PayPal
+    if (raw.includes('@') && !raw.toLowerCase().startsWith('http')) {
+      const amt = total.toFixed(2);
+      const encodedNote = note ? encodeURIComponent(note) : '';
+      // This is the classic PayPal Standard 'Buy Now' link which forces a Goods & Services payment
+      return `https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&business=${encodeURIComponent(raw)}&amount=${amt}&item_name=${encodedNote}&currency_code=USD`;
+    }
     return profileUrl;
   }
   return profileUrl;

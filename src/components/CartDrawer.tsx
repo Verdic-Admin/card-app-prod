@@ -425,14 +425,14 @@ export function CartDrawer({ settings }: { settings: StoreSettings }) {
                              )}
                              {paymentMethod === 'paypal' && settings.payment_paypal && (
                                 settings.payment_paypal.includes('@') && !settings.payment_paypal.toLowerCase().startsWith('http') ? (
-                                   <div className="space-y-2">
-                                     <a href="https://www.paypal.com/myaccount/transfer/homepage" target="_blank" rel="noopener noreferrer" className="block w-full bg-[#003087] hover:bg-[#001C53] text-foreground font-black py-3 rounded-lg transition-colors text-sm shadow-md text-center">
-                                        Open PayPal to send ${checkoutResult.total.toFixed(2)}
+                                   <div className="space-y-3">
+                                     <a href={paymentUrlWithAmount(settings.payment_paypal, checkoutResult.total, checkoutResult.paymentMemo)} target="_blank" rel="noopener noreferrer" className="block w-full bg-[#003087] hover:bg-[#001C53] text-foreground font-black py-3 rounded-lg transition-colors text-sm shadow-md text-center">
+                                        Pay with PayPal (${checkoutResult.total.toFixed(2)})
                                      </a>
                                      <div className="bg-emerald-900/40 p-3 rounded-lg border border-emerald-700/50 text-center space-y-1">
-                                        <p className="text-[10px] text-emerald-200/80 font-bold uppercase tracking-widest">Send Goods & Services to:</p>
+                                        <p className="text-[10px] text-emerald-200/80 font-bold uppercase tracking-widest">Manual fallback:</p>
                                         <p className="text-sm font-mono text-white font-black select-all">{settings.payment_paypal}</p>
-                                        <p className="text-[9px] text-emerald-200/60 leading-tight">Copy this email address, then open PayPal and paste it. Make sure to select Goods & Services!</p>
+                                        <p className="text-[9px] text-emerald-200/60 leading-tight">If the button above fails, open PayPal directly and manually send to this email as Goods & Services.</p>
                                      </div>
                                    </div>
                                 ) : (
