@@ -29,10 +29,14 @@ export function paymentUrlWithAmount(profileUrl: string, total: number, note?: s
       const query = note ? `?note=${encodeURIComponent(note)}` : '';
       return `${parsed.origin}${path}/${amt}${query}`;
     }
-    if (host === "paypal.me") {
-      const path = parsed.pathname.replace(/\/+$/, "") || "";
+    if (host === "paypal.me" || (host === "paypal.com" && parsed.pathname.toLowerCase().startsWith("/paypalme/"))) {
+      let username = parsed.pathname;
+      if (host === "paypal.com") {
+        username = username.replace(/^\/paypalme\//i, "/");
+      }
+      username = username.replace(/\/+$/, "") || "";
       // PayPal.me no longer formally supports passing a note via URL, but amount works
-      return `${parsed.origin}${path}/${amt}`;
+      return `https://paypal.me${username}/${amt}`;
     }
   } catch {
     // If the URL parsing fails, check if they provided a raw email address for PayPal
