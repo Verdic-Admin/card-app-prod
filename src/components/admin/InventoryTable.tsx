@@ -91,6 +91,7 @@ export function InventoryTable({
 
   const [showEditLotModal, setShowEditLotModal] = useState(false);
   const [editingLotId, setEditingLotId] = useState<string | null>(null);
+  const [editingLotPrice, setEditingLotPrice] = useState('0.00');
   const [editingLotStagingItems, setEditingLotStagingItems] = useState<string[]>([]);
   const [editLotSearch, setEditLotSearch] = useState('');
   const [isSavingLot, setIsSavingLot] = useState(false);
@@ -100,6 +101,8 @@ export function InventoryTable({
      const initialChildren = items.filter(i => (i as any).lot_id === lotId).map(i => i.id);
      setEditingLotStagingItems(initialChildren);
      setEditLotSearch('');
+     const parentLot = items.find(i => i.id === lotId);
+     setEditingLotPrice(parentLot?.listed_price?.toFixed(2) || '0.00');
      setShowEditLotModal(true);
   };
 
@@ -122,6 +125,10 @@ export function InventoryTable({
      setIsSavingLot(true);
      try {
        await updateLotChildren(editingLotId, editingLotStagingItems);
+       const numPrice = parseFloat(editingLotPrice);
+       if (!isNaN(numPrice)) {
+         await editCardAction(editingLotId, { listed_price: numPrice });
+       }
        showToast("Lot updated successfully.", 'success');
        window.location.reload(); 
      } catch (e: any) {
@@ -805,6 +812,28 @@ export function InventoryTable({
               <button onClick={() => setShowEditLotModal(false)} className="text-indigo-400 hover:text-indigo-700 p-1 rounded-lg"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-6 overflow-y-auto space-y-6">
+              <div className="bg-indigo-50/50 p-4 rounded-xl border border-indigo-100 shadow-inner space-y-3">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <span className="text-slate-500 font-bold uppercase tracking-widest text-[10px] block mb-0.5">Sum of Listed Prices</span>
+                    <span className="font-mono font-black text-slate-800 text-base">${editingLotStagingItems.map(id => items.find(i => i.id === id)).reduce((acc, i) => acc + (i?.listed_price || 0), 0).toFixed(2)}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-purple-600 font-bold uppercase tracking-widest text-[10px] block mb-0.5">Sum of Projections</span>
+                    <span className="font-mono font-black text-purple-700 text-base">${editingLotStagingItems.map(id => items.find(i => i.id === id)).reduce((acc, i) => acc + ((i as any)?.oracle_projection || 0), 0).toFixed(2)}</span>
+                  </div>
+                </div>
+                <div className="pt-3 border-t border-indigo-100/50">
+                  <label className="text-[10px] font-black text-indigo-900 uppercase tracking-widest block mb-1">Update Lot Price ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={editingLotPrice}
+                    onChange={e => setEditingLotPrice(e.target.value)}
+                    className="w-full px-3 py-2 text-sm font-black font-mono text-indigo-900 bg-white border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+              </div>
               <div>
                 <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">Cards in this Lot ({editingLotStagingItems.length})</h3>
                 <div className="space-y-2">
