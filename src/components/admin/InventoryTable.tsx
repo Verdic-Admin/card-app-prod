@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Database } from '@/types/database.types'
 import { useToastContext } from '@/components/admin/ToastProvider'
-import { toggleCardStatus, toggleStoreVisibility, editCardAction, deleteCardAction, bulkDeleteCardsAction, bulkUpdateMetricsAction, rotateCardImageAction, removeFromAuctionBlock, updateProjectionTimeframe, createLotAction, breakLotAction, updateLotChildren, duplicateInventoryItem, toggleForecastStatus, bulkPublishForecasts, bulkToggleStoreVisibility } from '@/app/actions/inventory'
+import { toggleCardStatus, toggleStoreVisibility, editCardAction, deleteCardAction, bulkDeleteCardsAction, bulkUpdateMetricsAction, rotateCardImageAction, removeFromAuctionBlock, updateProjectionTimeframe, createLotAction, breakLotAction, updateLotChildren, duplicateInventoryItem, toggleForecastStatus, bulkPublishForecasts, bulkToggleStoreVisibility, uploadCoinPhotoAction } from '@/app/actions/inventory'
 import { AuctionBidLogButton } from '@/components/admin/AuctionBidLogButton'
 import { syncSingleItemWithOracle, syncInventoryWithOracle, applyOracleDiscount, applyOracleDiscountAll, applyCorrection, approvePriceOnly, denyCorrection } from '@/app/actions/oracleSync'
 import ParallelTypeahead from '@/components/admin/ParallelTypeahead';
@@ -95,6 +95,8 @@ export function InventoryTable({
   const [editingLotStagingItems, setEditingLotStagingItems] = useState<string[]>([]);
   const [editLotSearch, setEditLotSearch] = useState('');
   const [isSavingLot, setIsSavingLot] = useState(false);
+  const [lotCoinFile, setLotCoinFile] = useState<File | null>(null);
+  const [lotCoinFileLabel, setLotCoinFileLabel] = useState('');
 
   const handleEditLotOpen = (lotId: string) => {
      setEditingLotId(lotId);
@@ -103,6 +105,8 @@ export function InventoryTable({
      setEditLotSearch('');
      const parentLot = items.find(i => i.id === lotId);
      setEditingLotPrice(parentLot?.listed_price?.toFixed(2) || '0.00');
+     setLotCoinFile(null);
+     setLotCoinFileLabel('');
      setShowEditLotModal(true);
   };
 
@@ -114,6 +118,11 @@ export function InventoryTable({
        const numPrice = parseFloat(editingLotPrice);
        if (!isNaN(numPrice)) {
          await editCardAction(editingLotId, { listed_price: numPrice });
+       }
+       if (lotCoinFile) {
+         const formData = new FormData();
+         formData.append('file', lotCoinFile);
+         await uploadCoinPhotoAction(editingLotId, formData);
        }
        showToast("Lot updated successfully.", 'success');
        window.location.reload(); 
@@ -818,6 +827,36 @@ export function InventoryTable({
                     onChange={e => setEditingLotPrice(e.target.value)}
                     className="w-full px-3 py-2 text-sm font-black font-mono text-indigo-900 bg-white border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
                   />
+                </div>
+                <div className="pt-3 border-t border-indigo-100/50">
+                  <label className="text-[10px] font-black text-indigo-900 uppercase tracking-widest block mb-1">Lot Coin Verification Photo</label>
+                  <div className="flex items-center gap-2">
+                    <label
+                      htmlFor={`lot-coin-input`}
+                      className="cursor-pointer bg-white border border-indigo-200 text-indigo-600 rounded-lg px-3 py-1.5 text-xs font-bold hover:bg-indigo-50"
+                    >
+                      Choose file
+                    </label>
+                    <input
+                      id={`lot-coin-input`}
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      onChange={e => {
+                        const f = e.target.files?.[0];
+                        setLotCoinFile(f || null);
+                        setLotCoinFileLabel(f ? f.name : '');
+                      }}
+                    />
+                    <span className="text-xs text-slate-500 truncate" title={lotCoinFileLabel}>
+                      {lotCoinFileLabel || 'No new file selected'}
+                    </span>
+                  </div>
+                  {items.find(i => i.id === editingLotId)?.coined_image_url && (
+                    <div className="mt-2 text-xs text-emerald-600 font-medium">
+                      ✓ This lot currently has a verification photo attached.
+                    </div>
+                  )}
                 </div>
               </div>
               <div>

@@ -93,6 +93,25 @@ export async function uploadAssetAction(formData: FormData) {
   return { url: blob.url };
 }
 
+export async function uploadCoinPhotoAction(id: string, formData: FormData) {
+  await checkAuth();
+  const file = formData.get('file') as File;
+  if (!file) throw new Error("No file provided");
+  
+  const fileExt = file.name.split('.').pop() || 'jpg';
+  const fileName = `coin-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+  
+  const blob = await put(`card-images/${fileName}`, file, {
+    access: 'public',
+  });
+  
+  await pool.query(`UPDATE inventory SET coined_image_url = $1 WHERE id = $2::uuid`, [blob.url, id]);
+  revalidatePath('/');
+  revalidatePath('/admin');
+  
+  return { url: blob.url };
+}
+
 export type AddCardResult =
   | { success: true }
   | { success: false; error: string };
