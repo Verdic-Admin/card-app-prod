@@ -190,22 +190,28 @@ export function ProductCard({ item, discountRate = 0 }: ProductCardProps) {
             ) : showForecastData ? (
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <div className="flex items-center gap-1.5">
-                    <PlayerIndexForecastLink
-                      href={playerIndexCalcUrl}
-                      className="text-xs uppercase tracking-widest font-black text-indigo-300 hover:text-indigo-200 underline-offset-2 hover:underline"
-                    >
-                      Player Index Forecast <span className="line-through opacity-70 ml-1">${pricing.playerIndexPrice.toFixed(2)}</span>
-                    </PlayerIndexForecastLink>
-                    <InstructionTrigger 
-                      iconOnly 
-                      title="Player Index Forecasts" 
-                      steps={[
-                        { title: "What is this?", content: "The Player Index is an algorithmic pricing engine that analyzes player performance (WAR), true market scarcity, and real-time momentum to calculate a fair-value projection for this exact card." },
-                        { title: "Why is it here?", content: "We believe in radical transparency. By showing you the algorithmic fair-value alongside our store price, you can see exactly how much you are saving compared to the open market." },
-                        { title: "Best/Worst Case", content: "This represents a standard volatility band (+/- 15%) showing where the card's price could swing based on short-term market hype or slumps." }
-                      ]} 
-                    />
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-1.5">
+                      <PlayerIndexForecastLink
+                        href={playerIndexCalcUrl}
+                        className="text-xs uppercase tracking-widest font-black text-indigo-300 hover:text-indigo-200 underline-offset-2 hover:underline"
+                      >
+                        {(item as any).is_lot ? "Total Lot Projection" : "Player Index Forecast"} <span className="ml-1">${pricing.playerIndexPrice.toFixed(2)}</span>
+                      </PlayerIndexForecastLink>
+                      <InstructionTrigger 
+                        iconOnly 
+                        title="Player Index Forecasts" 
+                        steps={[
+                          { title: "What is this?", content: "The Player Index is an algorithmic pricing engine that analyzes player performance (WAR), true market scarcity, and real-time momentum to calculate a fair-value projection for this exact card." },
+                          { title: "Why is it here?", content: "We believe in radical transparency. By showing you the algorithmic fair-value alongside our store price, you can see exactly how much you are saving compared to the open market." },
+                          { title: "Best/Worst Case", content: "This represents a standard volatility band (+/- 15%) showing where the card's price could swing based on short-term market hype or slumps." }
+                        ]} 
+                      />
+                    </div>
+                    <div className="flex gap-3 text-[10px] font-medium font-mono">
+                       <span className="text-emerald-400">Best: ${Number((item as any).p_bull || pricing.playerIndexPrice * 1.15).toFixed(2)}</span>
+                       <span className="text-rose-400">Worst: ${Number((item as any).p_bear || pricing.playerIndexPrice * 0.85).toFixed(2)}</span>
+                    </div>
                   </div>
                   {pricing.discountPercent > 0 && (
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-950/70 text-indigo-200 border border-indigo-700/70">

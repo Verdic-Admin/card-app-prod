@@ -358,13 +358,18 @@ export default async function ItemPage({ params }: PageProps) {
             ) : showForecastData ? (
               <div className="space-y-2">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <PlayerIndexForecastLink
-                    href={playerIndexCalcUrl}
-                    className="text-[11px] uppercase tracking-widest text-indigo-300 font-bold hover:text-indigo-200 underline-offset-2 hover:underline"
-                  >
-                    Player Index Forecast
-                    <span className="line-through opacity-70 ml-1">${pricing.playerIndexPrice.toFixed(2)}</span>
-                  </PlayerIndexForecastLink>
+                  <div className="flex flex-col gap-1">
+                    <PlayerIndexForecastLink
+                      href={playerIndexCalcUrl}
+                      className="text-[11px] uppercase tracking-widest text-indigo-300 font-bold hover:text-indigo-200 underline-offset-2 hover:underline"
+                    >
+                      {(item as any).is_lot ? "Total Lot Projection" : "Player Index Forecast"} <span className="ml-1">${pricing.playerIndexPrice.toFixed(2)}</span>
+                    </PlayerIndexForecastLink>
+                    <div className="flex gap-3 text-[10px] font-medium font-mono">
+                       <span className="text-emerald-400">Best: ${Number((item as any).p_bull || pricing.playerIndexPrice * 1.15).toFixed(2)}</span>
+                       <span className="text-rose-400">Worst: ${Number((item as any).p_bear || pricing.playerIndexPrice * 0.85).toFixed(2)}</span>
+                    </div>
+                  </div>
                   {pricing.discountPercent > 0 && (
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-950/70 text-indigo-200 border border-indigo-700/70">
                     {pricing.discountPercent.toFixed(0)}% below Player Index Forecast
