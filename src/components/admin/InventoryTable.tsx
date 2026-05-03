@@ -103,6 +103,20 @@ export function InventoryTable({
      setShowEditLotModal(true);
   };
 
+  const handleBreakLot = async (lotId: string) => {
+    if (!confirm('Are you sure you want to break this lot? The parent lot will be deleted and all children will be returned to standalone status.')) return;
+    setBreakingLotId(lotId);
+    try {
+      await breakLotAction(lotId);
+      showToast('Lot broken successfully.', 'success');
+      window.location.reload();
+    } catch (e: any) {
+      showToast('Error breaking lot: ' + e.message, 'error');
+    } finally {
+      setBreakingLotId(null);
+    }
+  };
+
   const handleSaveEditLot = async () => {
      if (!editingLotId) return;
      setIsSavingLot(true);
@@ -1764,6 +1778,17 @@ export function InventoryTable({
                                 <Gavel className="w-4 h-4" /> Stage for Auction
                               </Link>
                             )}
+
+                            {(item as any).is_lot ? (
+                              <>
+                                <button onClick={() => { handleEditLotOpen(item.id); setOpenMenuId(null); }} className="flex items-center gap-2 px-4 py-2.5 hover:bg-emerald-50 text-emerald-700 text-sm font-bold w-full text-left transition-colors">
+                                  <Package className="w-4 h-4" /> Edit Lot Contents
+                                </button>
+                                <button onClick={() => { handleBreakLot(item.id); setOpenMenuId(null); }} disabled={breakingLotId === item.id} className="flex items-center gap-2 px-4 py-2.5 hover:bg-orange-50 text-orange-700 text-sm font-bold w-full text-left transition-colors">
+                                  {breakingLotId === item.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />} Break Lot
+                                </button>
+                              </>
+                            ) : null}
 
                             <div className="h-px bg-slate-100 my-1 mx-2"></div>
                             <button onClick={() => { handleDelete(item.id, item.image_url); setOpenMenuId(null); }} disabled={isDeleting === item.id} className="flex items-center gap-2 px-4 py-2.5 hover:bg-red-50 text-red-700 text-sm font-bold w-full text-left transition-colors">
