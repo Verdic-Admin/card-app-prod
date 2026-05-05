@@ -262,6 +262,17 @@ export function ManualIngestionGrid({ refreshKey = 0 }: ManualIngestionGridProps
                         className="w-full bg-transparent border-b border-slate-200 focus:border-indigo-500 focus:outline-none py-1 text-xs font-medium text-slate-700"
                         placeholder="Set"
                       />
+                      <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 h-7">
+                        {['mlb', 'nfl', 'nba'].map(s => (
+                          <button 
+                            key={s}
+                            onClick={() => handleUpdate(draft.id, 'sport', s)}
+                            className={`flex-1 text-[9px] font-black uppercase rounded-md transition-all ${draft.sport === s ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
                       <input 
                         type="text" 
                         defaultValue={draft.card_number || ''}
@@ -348,6 +359,7 @@ export function ManualIngestionGrid({ refreshKey = 0 }: ManualIngestionGridProps
                     <th className="px-4 py-3">Images</th>
                     <th className="px-4 py-3">Player Name</th>
                     <th className="px-4 py-3">Set</th>
+                    <th className="px-4 py-3">Sport</th>
                     <th className="px-4 py-3">Card #</th>
                     <th className="px-4 py-3">Parallel/Insert</th>
                     <th className="px-4 py-3">Flags</th>
@@ -401,6 +413,17 @@ export function ManualIngestionGrid({ refreshKey = 0 }: ManualIngestionGridProps
                           className="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none py-1 font-medium text-slate-700 transition-colors"
                           placeholder="Card Set"
                         />
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <select 
+                          value={draft.sport || 'mlb'}
+                          onChange={(e) => handleUpdate(draft.id, 'sport', e.target.value)}
+                          className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none py-1 font-bold text-[10px] text-slate-600 uppercase tracking-widest cursor-pointer"
+                        >
+                          <option value="mlb">⚾ MLB</option>
+                          <option value="nfl">🏈 NFL</option>
+                          <option value="nba">🏀 NBA</option>
+                        </select>
                       </td>
                       <td className="px-4 py-3 align-middle">
                         <input 

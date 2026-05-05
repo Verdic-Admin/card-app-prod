@@ -24,6 +24,7 @@ export async function POST(req: Request) {
       is_auto: body.is_auto,
       is_relic: body.is_relic,
       grade: body.grade,
+      sport: body.sport,
     });
 
     if (!result || typeof result !== 'object' || !('success' in result) || !result.success) {

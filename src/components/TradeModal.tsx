@@ -33,7 +33,8 @@ export function TradeModal({ isOpen, onClose, cartItems, onSuccess }: TradeModal
     insertName: '',
     parallelName: '',
     printRun: '',
-    grade: ''
+    grade: '',
+    sport: 'mlb'
   })
   const [isFetchingComps, setIsFetchingComps] = useState(false)
   const [lastCompFetch, setLastCompFetch] = useState(0)
@@ -101,7 +102,8 @@ export function TradeModal({ isOpen, onClose, cartItems, onSuccess }: TradeModal
              insert_name: activeForm.insertName,
              parallel_name: activeForm.parallelName,
              print_run: activeForm.printRun ? Number(activeForm.printRun) : null,
-             grade: activeForm.grade || null
+             grade: activeForm.grade || null,
+             sport: activeForm.sport
           })
        })
 
@@ -141,6 +143,7 @@ export function TradeModal({ isOpen, onClose, cartItems, onSuccess }: TradeModal
        parallelName: activeForm.parallelName,
        printRun: activeForm.printRun,
        grade: activeForm.grade,
+       sport: activeForm.sport,
        comps: compsResult.ebayComps,
        marketPrice: compsResult.marketPrice,
        playerIndexUrl: compsResult.playerIndexUrl,
@@ -158,7 +161,8 @@ export function TradeModal({ isOpen, onClose, cartItems, onSuccess }: TradeModal
       insertName: '',
       parallelName: '',
       printRun: '',
-      grade: ''
+      grade: '',
+      sport: 'mlb'
     })
     setCompsResult(null)
     setActiveImageFile(null)
@@ -323,6 +327,19 @@ export function TradeModal({ isOpen, onClose, cartItems, onSuccess }: TradeModal
                     <div className="flex items-center justify-between border-b border-border pb-3">
                        <h4 className="font-black text-brand tracking-tight">New Trade Item</h4>
                        <button onClick={() => { setIsAddingItem(false); setCompsResult(null); }} className="text-muted hover:text-foreground text-xs font-bold underline underline-offset-2">Cancel</button>
+                    </div>
+
+                     {/* Sport Selection */}
+                    <div className="flex gap-2">
+                       {['mlb', 'nfl', 'nba'].map(s => (
+                          <button 
+                             key={s}
+                             onClick={() => setActiveForm({...activeForm, sport: s})}
+                             className={`flex-1 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all ${activeForm.sport === s ? 'bg-brand border-brand text-white shadow-md' : 'bg-background border-border text-muted hover:border-brand/50'}`}
+                          >
+                             {s === 'mlb' ? '⚾ MLB' : s === 'nfl' ? '🏈 NFL' : '🏀 NBA'}
+                          </button>
+                       ))}
                     </div>
 
                     {/* Card Fields */}

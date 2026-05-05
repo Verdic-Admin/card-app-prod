@@ -100,6 +100,7 @@ export async function calculatePricingAction(fields: {
   is_auto?: boolean;
   is_relic?: boolean;
   grade?: string | null;
+  sport?: string;
 }) {
   const base = await getOracleGatewayBaseUrl();
   const payload = {
@@ -116,6 +117,7 @@ export async function calculatePricingAction(fields: {
     is_auto: fields.is_auto ?? false,
     is_relic: fields.is_relic ?? false,
     grade: fields.grade || null,
+    sport: fields.sport || 'mlb',
     skip_fuzzy: false,
   };
 
@@ -136,6 +138,7 @@ export async function calculatePricingAction(fields: {
     payload.is_auto ? '1' : '0',
     payload.is_relic ? '1' : '0',
     payload.grade || '',
+    payload.sport || '',
   ].join('|');
 
   return dedupeAndCache(
@@ -176,6 +179,7 @@ export interface BatchPricingItem {
   is_auto?: boolean;
   is_relic?: boolean;
   grade?: string | null;
+  sport?: string;
 }
 
 export interface BatchPricingResultItem {
@@ -216,6 +220,7 @@ export async function calculatePricingBatchAction(
     is_auto: f.is_auto ?? false,
     is_relic: f.is_relic ?? false,
     grade: f.grade || null,
+    sport: f.sport || 'mlb',
     skip_fuzzy: false,
   }));
 
