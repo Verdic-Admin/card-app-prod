@@ -15,6 +15,7 @@ export interface BuiltTradeItem {
   parallelName: string;
   printRun: string;
   grade: string;
+  sport: string;
   comps: any[];
   marketPrice: number;
   playerIndexUrl: string;
