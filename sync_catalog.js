@@ -179,6 +179,51 @@ async function run() {
     console.log(`[sync_catalog]   ✓ catalog_parallels: ${parallels.length} for ${setName}`);
   }
 
+  // Explicitly inject known missing parallels that aren't in the Player Index yet
+  console.log('[sync_catalog] Injecting explicitly known missing parallels...');
+  const missingParallels = [
+    ['2026 Topps Series 1 Baseball', 'Spring Training'],
+    ['2026 Topps Series 1 Baseball', 'Green Spring Training'],
+    ['2026 Topps Series 1 Baseball', 'Gold Spring Training'],
+    ['2026 Topps Series 1 Baseball', 'Orange Spring Training'],
+    ['2026 Topps Series 1 Baseball', 'Red Spring Training'],
+    ['2026 Topps Series 1 Baseball', 'Rose Gold Spring Training'],
+    // Ensure standard color rainbow is present since Supabase only had Holiday variations
+    ['2026 Topps Series 1 Baseball', 'Yellow'],
+    ['2026 Topps Series 1 Baseball', 'Yellow Foil'],
+    ['2026 Topps Series 1 Baseball', 'Rainbow Foil'],
+    ['2026 Topps Series 1 Baseball', 'Gold Foil'],
+    ['2026 Topps Series 1 Baseball', 'Royal Blue'],
+    ['2026 Topps Series 1 Baseball', 'Blue Holofoil'],
+    ['2026 Topps Series 1 Baseball', 'Purple Holofoil'],
+    ['2026 Topps Series 1 Baseball', 'Green Crackle'],
+    ['2026 Topps Series 1 Baseball', 'Orange Crackle'],
+    ['2026 Topps Series 1 Baseball', 'Red Crackle'],
+    ['2026 Topps Series 1 Baseball', 'Vintage Stock'],
+    ['2026 Topps Series 1 Baseball', 'Independence Day'],
+    ['2026 Topps Series 1 Baseball', 'Black'],
+    ['2026 Topps Series 1 Baseball', "Father's Day Powder Blue"],
+    ['2026 Topps Series 1 Baseball', "Mother's Day Hot Pink"],
+    ['2026 Topps Series 1 Baseball', 'Memorial Day Camo'],
+    ['2026 Topps Series 1 Baseball', 'Clear'],
+    ['2026 Topps Series 1 Baseball', 'Platinum'],
+    ['2026 Topps Series 1 Baseball', 'First Edition'],
+    ['2026 Topps Series 1 Baseball', 'Gold'],
+    ['2026 Topps Series 1 Baseball', 'Printing Plate Black'],
+    ['2026 Topps Series 1 Baseball', 'Printing Plate Cyan'],
+    ['2026 Topps Series 1 Baseball', 'Printing Plate Magenta'],
+    ['2026 Topps Series 1 Baseball', 'Printing Plate Yellow'],
+  ];
+
+  for (const [set, parallel] of missingParallels) {
+    await client.query(
+      `INSERT INTO catalog_parallels (card_set, parallel_name) VALUES ($1, $2)
+       ON CONFLICT (COALESCE(card_set, ''), parallel_name) DO NOTHING`,
+      [set, parallel]
+    );
+  }
+  console.log(`[sync_catalog]   ✓ Injected ${missingParallels.length} explicit parallels`);
+
   await client.end();
   console.log('[sync_catalog] Catalog sync complete.');
 }
