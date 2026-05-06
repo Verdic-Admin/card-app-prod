@@ -627,6 +627,14 @@ export function InventoryTable({
         .join(' ');
       
       const title = `"${titleParts.replace(/"/g, '""')}"`;
+
+      const formatUrl = (url: string | null | undefined) => {
+        if (!url) return '';
+        if (url.startsWith('/')) {
+          return `${window.location.origin}${url}`;
+        }
+        return url;
+      };
       
       return [
         '', // Category
@@ -642,8 +650,8 @@ export function InventoryTable({
         ((item as any).grading_company) ? 'Graded' : 'Ungraded', // Condition
         item.cost_basis || 0, // Cost Per Item
         item.id, // SKU
-        `"${item.image_url || ''}"`, // Image URL 1
-        `"${item.back_image_url || ''}"`, // Image URL 2
+        `"${formatUrl(item.image_url)}"`, // Image URL 1
+        `"${formatUrl(item.back_image_url)}"`, // Image URL 2
         '', '', '', '', '', '' // Image URL 3-8
       ];
     });
