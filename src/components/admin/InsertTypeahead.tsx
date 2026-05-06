@@ -1,46 +1,23 @@
 'use client'
 
-import { useState, useRef, useEffect, useMemo } from 'react'
-import { fetchValidInsertsAction } from '@/app/actions/inventory'
+import { useState, useRef, useEffect, useCallback } from 'react'
 
-/**
- * Comprehensive list of known baseball/sports card inserts.
- * Sorted alphabetically for display.
- */
 const KNOWN_INSERTS: string[] = [
-  'All-Etch', 'Blank Slate', 'Color Blast', 'Downtown', 'Gems', 
-  'Genesis', 'Heavy Lumber', 'Home Field Advantage', 'Kaboom', 
-  'Manga', 'Micro Mosaic', 'Mythical', 'Net Marvels', 'Night Moves', 
-  'On the Horizon', 'Peacock', 'Stained Glass', 'Stars of MLB', 
-  'Tiger Stripe', 'Topps Black Gold', 'Zebra', 'Crusade', 'Elite Dominators',
-  'Galactic', 'Jambalaya', 'Precious Metal Gems', 'Rated Rookie', 'Rookie Ticket',
-  'Spectra', 'White Sparkle'
+  'All-Etch', 'Blank Slate', 'Color Blast', 'Crusade', 'Downtown', 'Elite Dominators',
+  'Galactic', 'Gems', 'Genesis', 'Heavy Lumber', 'Home Field Advantage', 'Jambalaya',
+  'Kaboom', 'Manga', 'Micro Mosaic', 'Mythical', 'Net Marvels', 'Night Moves',
+  'On the Horizon', 'Peacock', 'Precious Metal Gems', 'Rated Rookie', 'Rookie Ticket',
+  'Spectra', 'Stained Glass', 'Stars of MLB', 'Tiger Stripe', 'Topps Black Gold',
+  'White Sparkle', 'Zebra',
 ].sort((a, b) => a.localeCompare(b))
 
-/**
- * Simple fuzzy/token match — checks if every token in the query
- * appears somewhere in the candidate (case-insensitive).
- * "chrome ref" matches "Chrome Refractor"
- * "gold 25" matches "Gold /25"
- */
-function fuzzyMatch(query: string, candidate: string): { match: boolean; score: number } {
-  const q = query.toLowerCase().trim()
-  const c = candidate.toLowerCase()
-
-  if (!q) return { match: true, score: 0 }
-
-  // Exact start match gets highest score
-  if (c.startsWith(q)) return { match: true, score: 3 }
-
-  // Full substring match
-  if (c.includes(q)) return { match: true, score: 2 }
-
-  // Token-based: every word in query must appear in candidate
-  const tokens = q.split(/\s+/)
-  const allPresent = tokens.every(t => c.includes(t))
-  if (allPresent) return { match: true, score: 1 }
-
-  return { match: false, score: 0 }
+function useDebounce<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delay)
+    return () => clearTimeout(t)
+  }, [value, delay])
+  return debounced
 }
 
 interface InsertTypeaheadProps {
@@ -52,36 +29,52 @@ interface InsertTypeaheadProps {
   cardSet?: string
 }
 
-export default function InsertTypeahead({ value, onChange, onBlur, className, playerName, cardSet }: InsertTypeaheadProps) {
-  const [open, setOpen] = useState(false)
-  const [focusIdx, setFocusIdx] = useState(-1)
-  const [dynamicOptions, setDynamicOptions] = useState<string[]>([])
+export default function InsertTypeahead({
+  value, onChange, onBlur, className, playerName, cardSet,
+}: InsertTypeaheadProps) {
+  const [open, setOpen]           = useState(false)
+  const [options, setOptions]     = useState<string[]>(KNOWN_INSERTS)
+  const [isLoading, setIsLoading] = useState(false)
+  const [focusIdx, setFocusIdx]   = useState(-1)
   const wrapRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
+  const debouncedValue  = useDebounce(value,      280)
+  const debouncedPlayer = useDebounce(playerName ?? '', 280)
+  const debouncedSet    = useDebounce(cardSet    ?? '', 280)
 
+  // Fetch on keystroke — context-filtered when player+set available
   useEffect(() => {
-    if (playerName && cardSet) {
-      fetchValidInsertsAction(playerName, cardSet).then(opts => {
-        setDynamicOptions(opts)
-      }).catch(e => console.error("Failed to fetch dynamic inserts:", e))
-    } else {
-      setDynamicOptions([])
-    }
-  }, [playerName, cardSet])
+    let cancelled = false
+    setIsLoading(true)
 
-  const suggestions = useMemo(() => {
-    const baseList = dynamicOptions.length > 0 ? dynamicOptions : KNOWN_INSERTS
-    if (!value?.trim()) {
-      return baseList.slice(0, 30).map(p => ({ label: p, match: true, score: 0 }))
-    }
-    return baseList
-      .map(p => ({ label: p, ...fuzzyMatch(value, p) }))
-      .filter(s => s.match)
-      .sort((a, b) => b.score - a.score || a.label.localeCompare(b.label))
-      .slice(0, 20)
-  }, [value, dynamicOptions])
+    const params = new URLSearchParams({ field: 'insert_name' })
+    if (debouncedValue.length >= 1) params.set('q', debouncedValue)
+    if (debouncedPlayer)            params.set('player', debouncedPlayer)
+    if (debouncedSet)               params.set('set', debouncedSet)
 
-  // Close on outside click
+    // If no query and no context, show static fallback immediately
+    if (!debouncedValue && !debouncedPlayer && !debouncedSet) {
+      setOptions(KNOWN_INSERTS)
+      setIsLoading(false)
+      return
+    }
+
+    fetch(`/api/admin/typeahead?${params.toString()}`)
+      .then(r => r.json())
+      .then(({ results }) => {
+        if (!cancelled) setOptions(results?.length > 0 ? results : KNOWN_INSERTS)
+      })
+      .catch(() => { if (!cancelled) setOptions(KNOWN_INSERTS) })
+      .finally(() => { if (!cancelled) setIsLoading(false) })
+
+    return () => { cancelled = true }
+  }, [debouncedValue, debouncedPlayer, debouncedSet])
+
+  // Filter shown list against what's typed (client-side after fetch)
+  const displayOptions = value.trim()
+    ? options.filter(o => o.toLowerCase().includes(value.toLowerCase())).slice(0, 20)
+    : options.slice(0, 30)
+
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
@@ -90,38 +83,22 @@ export default function InsertTypeahead({ value, onChange, onBlur, className, pl
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  // Scroll focused item into view
   useEffect(() => {
     if (focusIdx >= 0 && listRef.current) {
-      const el = listRef.current.children[focusIdx] as HTMLElement
-      el?.scrollIntoView({ block: 'nearest' })
+      ;(listRef.current.children[focusIdx] as HTMLElement)?.scrollIntoView({ block: 'nearest' })
     }
   }, [focusIdx])
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!open) {
-      if (e.key === 'ArrowDown' || e.key === 'Enter') { setOpen(true); e.preventDefault() }
-      return
-    }
-    if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      setFocusIdx(prev => Math.min(prev + 1, suggestions.length - 1))
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      setFocusIdx(prev => Math.max(prev - 1, 0))
-    } else if (e.key === 'Enter' && focusIdx >= 0) {
-      e.preventDefault()
-      selectItem(suggestions[focusIdx].label)
-    } else if (e.key === 'Escape') {
-      setOpen(false)
-    }
-  }
+  const select = useCallback((label: string) => {
+    onChange(label); onBlur?.(label); setOpen(false); setFocusIdx(-1)
+  }, [onChange, onBlur])
 
-  const selectItem = (label: string) => {
-    onChange(label)
-    onBlur?.(label)
-    setOpen(false)
-    setFocusIdx(-1)
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!open) { if (e.key === 'ArrowDown') { setOpen(true); e.preventDefault() } return }
+    if (e.key === 'ArrowDown')       { e.preventDefault(); setFocusIdx(p => Math.min(p + 1, displayOptions.length - 1)) }
+    else if (e.key === 'ArrowUp')    { e.preventDefault(); setFocusIdx(p => Math.max(p - 1, 0)) }
+    else if (e.key === 'Enter' && focusIdx >= 0 && displayOptions[focusIdx]) { e.preventDefault(); select(displayOptions[focusIdx]) }
+    else if (e.key === 'Escape')     { setOpen(false) }
   }
 
   return (
@@ -131,38 +108,31 @@ export default function InsertTypeahead({ value, onChange, onBlur, className, pl
         onChange={e => { onChange(e.target.value); setOpen(true); setFocusIdx(-1) }}
         onFocus={() => setOpen(true)}
         onBlur={e => {
-          // Small delay so click on dropdown item fires first
           setTimeout(() => {
-            if (!wrapRef.current?.contains(document.activeElement)) {
-              setOpen(false)
-              onBlur?.(e.target.value)
-            }
+            if (!wrapRef.current?.contains(document.activeElement)) { setOpen(false); onBlur?.(e.target.value) }
           }, 150)
         }}
         onKeyDown={handleKeyDown}
         placeholder="Insert"
+        autoComplete="off"
         className={`w-full ${className || ''}`}
       />
-
-      {open && suggestions.length > 0 && (
-        <ul
-          ref={listRef}
-          className="absolute z-50 top-full left-0 right-0 mt-0.5 max-h-48 overflow-y-auto
-                     bg-surface border border-border rounded-md shadow-lg"
-        >
-          {suggestions.map((s, i) => (
-            <li
-              key={s.label}
-              onMouseDown={e => { e.preventDefault(); selectItem(s.label) }}
-              className={`px-2 py-1.5 text-xs cursor-pointer transition-colors
-                ${i === focusIdx
-                  ? 'bg-brand/20 text-brand'
-                  : 'text-foreground hover:bg-surface-hover'
-                }`}
-            >
-              {s.label}
-            </li>
-          ))}
+      {open && (isLoading || displayOptions.length > 0) && (
+        <ul ref={listRef}
+          className="absolute z-50 top-full left-0 right-0 mt-0.5 max-h-52 overflow-y-auto
+                     bg-surface border border-border rounded-md shadow-xl">
+          {isLoading
+            ? <li className="px-3 py-2 text-xs text-muted italic text-center">Searching…</li>
+            : displayOptions.map((opt, i) => (
+                <li key={opt}
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={() => select(opt)}
+                  className={`px-3 py-2 text-xs cursor-pointer font-medium transition-colors border-b border-border/30 last:border-none
+                    ${i === focusIdx ? 'bg-brand/20 text-brand' : 'text-foreground hover:bg-surface-hover hover:text-brand'}`}>
+                  {opt}
+                </li>
+              ))
+          }
         </ul>
       )}
     </div>
