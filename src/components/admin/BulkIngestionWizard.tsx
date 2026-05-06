@@ -2,6 +2,8 @@
 import { useState, useCallback, useEffect } from 'react'
 import ParallelTypeahead from '@/components/admin/ParallelTypeahead'
 import InsertTypeahead from '@/components/admin/InsertTypeahead'
+import PlayerTypeahead from '@/components/admin/PlayerTypeahead'
+import CardSetTypeahead from '@/components/admin/CardSetTypeahead'
 import {
   Upload, Loader2, Play, CheckCircle2, Wand2,
   RefreshCw, Trash2, Send, Scissors, DollarSign, Search, AlertCircle
@@ -1058,21 +1060,40 @@ export function BulkIngestionWizard() {
                           )}
 
                           <div className="grid grid-cols-2 gap-1.5">
-                        {[
-                          { field: 'player_name', placeholder: 'Player Name' },
-                          { field: 'team_name', placeholder: 'Team' },
-                          { field: 'card_set', placeholder: 'Card Set' },
-                          { field: 'card_number', placeholder: 'Card #' },
-                          { field: 'print_run', placeholder: 'Print Run' },
-                        ].map(({ field, placeholder }) => (
-                          <input key={field}
-                            value={(card as any)[field] || ''}
-                            onChange={e => updateReviewField(card.id, field as keyof StagingCard, e.target.value)}
-                            onBlur={e => saveReviewField(card.id, field, e.target.value)}
-                            placeholder={placeholder}
-                            className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
-                          />
-                        ))}
+                        <PlayerTypeahead
+                          value={(card as any).player_name || ''}
+                          onChange={val => updateReviewField(card.id, 'player_name', val)}
+                          onBlur={val => saveReviewField(card.id, 'player_name', val)}
+                          className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
+                        />
+                        <input
+                          value={(card as any).team_name || ''}
+                          onChange={e => updateReviewField(card.id, 'team_name', e.target.value)}
+                          onBlur={e => saveReviewField(card.id, 'team_name', e.target.value)}
+                          placeholder="Team"
+                          className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
+                        />
+                        <CardSetTypeahead
+                          value={(card as any).card_set || ''}
+                          onChange={val => updateReviewField(card.id, 'card_set', val)}
+                          onBlur={val => saveReviewField(card.id, 'card_set', val)}
+                          playerName={(card as any).player_name || ''}
+                          className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
+                        />
+                        <input
+                          value={(card as any).card_number || ''}
+                          onChange={e => updateReviewField(card.id, 'card_number', e.target.value)}
+                          onBlur={e => saveReviewField(card.id, 'card_number', e.target.value)}
+                          placeholder="Card #"
+                          className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
+                        />
+                        <input
+                          value={(card as any).print_run || ''}
+                          onChange={e => updateReviewField(card.id, 'print_run', e.target.value)}
+                          onBlur={e => saveReviewField(card.id, 'print_run', e.target.value)}
+                          placeholder="Print Run"
+                          className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
+                        />
                         {/* Insert — fuzzy typeahead with known inserts */}
                         <InsertTypeahead
                           value={(card as any).insert_name || ''}

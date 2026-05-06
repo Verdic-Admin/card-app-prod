@@ -34,6 +34,32 @@ export async function fetchValidParallelsAction(cardSet: string): Promise<string
   return rows.map(r => r.parallel_name);
 }
 
+export async function fetchValidPlayersAction(query: string): Promise<string[]> {
+  if (!query || query.length < 2) return [];
+  const { rows } = await pool.query(
+    `SELECT DISTINCT player_name FROM master_card_catalog 
+     WHERE player_name ILIKE $1
+       AND player_name IS NOT NULL AND player_name != ''
+     ORDER BY player_name
+     LIMIT 50`,
+    [`%${query.trim()}%`]
+  );
+  return rows.map(r => r.player_name);
+}
+
+export async function fetchValidCardSetsAction(playerName: string): Promise<string[]> {
+  if (!playerName) return [];
+  const { rows } = await pool.query(
+    `SELECT DISTINCT card_set FROM master_card_catalog 
+     WHERE player_name ILIKE $1
+       AND card_set IS NOT NULL AND card_set != ''
+     ORDER BY card_set
+     LIMIT 50`,
+    [playerName.trim()]
+  );
+  return rows.map(r => r.card_set);
+}
+
 interface BulkInventoryItem {
   player_name: string;
   card_set: string | null;

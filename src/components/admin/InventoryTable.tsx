@@ -10,6 +10,8 @@ import { syncSingleItemWithOracle, syncInventoryWithOracle, applyOracleDiscount,
 import ParallelTypeahead from '@/components/admin/ParallelTypeahead';
 import PrintRunTypeahead from '@/components/admin/PrintRunTypeahead';
 import InsertTypeahead from '@/components/admin/InsertTypeahead';
+import PlayerTypeahead from '@/components/admin/PlayerTypeahead';
+import CardSetTypeahead from '@/components/admin/CardSetTypeahead';
 import { Loader2, Trash2, Edit2, Check, X, Search, Download, RotateCw, RefreshCw, DollarSign, Save, AlertCircle, Gavel, Package, Share2, CopyPlus, MoreHorizontal, Eye } from 'lucide-react'
 import { price } from '@/utils/math'
 import { deriveDisplayPricing } from '@/utils/pricing'

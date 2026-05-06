@@ -7,6 +7,8 @@ import { deleteStagingCardsAction } from '@/app/actions/inventory';
 import { useToastContext } from '@/components/admin/ToastProvider';
 import ParallelTypeahead from '@/components/admin/ParallelTypeahead';
 import PrintRunTypeahead from '@/components/admin/PrintRunTypeahead';
+import PlayerTypeahead from '@/components/admin/PlayerTypeahead';
+import CardSetTypeahead from '@/components/admin/CardSetTypeahead';
 
 type DraftCard = any;
 
@@ -247,18 +249,17 @@ export function ManualIngestionGrid({ refreshKey = 0 }: ManualIngestionGridProps
                     </div>
                   </div>
                   <div className="flex-1 space-y-2">
-                    <input 
-                      type="text" 
-                      defaultValue={draft.player_name || ''}
-                      onBlur={(e) => handleUpdate(draft.id, 'player_name', e.target.value)}
+                    <PlayerTypeahead
+                      value={draft.player_name || ''}
+                      onChange={(v) => handleUpdate(draft.id, 'player_name', v)}
                       className="w-full bg-transparent border-b border-slate-200 focus:border-indigo-500 focus:outline-none py-1 font-bold text-slate-900"
                       placeholder="Player Name"
                     />
                     <div className="grid grid-cols-2 gap-2">
-                      <input 
-                        type="text" 
-                        defaultValue={draft.card_set || ''}
-                        onBlur={(e) => handleUpdate(draft.id, 'card_set', e.target.value)}
+                      <CardSetTypeahead
+                        value={draft.card_set || ''}
+                        onChange={(v) => handleUpdate(draft.id, 'card_set', v)}
+                        playerName={draft.player_name || ''}
                         className="w-full bg-transparent border-b border-slate-200 focus:border-indigo-500 focus:outline-none py-1 text-xs font-medium text-slate-700"
                         placeholder="Set"
                       />
@@ -398,19 +399,18 @@ export function ManualIngestionGrid({ refreshKey = 0 }: ManualIngestionGridProps
                         </div>
                       </td>
                       <td className="px-4 py-3 align-middle">
-                        <input 
-                          type="text" 
-                          defaultValue={draft.player_name || ''}
-                          onBlur={(e) => handleUpdate(draft.id, 'player_name', e.target.value)}
+                        <PlayerTypeahead
+                          value={draft.player_name || ''}
+                          onChange={(v) => handleUpdate(draft.id, 'player_name', v)}
                           className="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none py-1 font-bold text-slate-900 transition-colors"
                           placeholder="Player Name"
                         />
                       </td>
                       <td className="px-4 py-3 align-middle">
-                        <input 
-                          type="text" 
-                          defaultValue={draft.card_set || ''}
-                          onBlur={(e) => handleUpdate(draft.id, 'card_set', e.target.value)}
+                        <CardSetTypeahead
+                          value={draft.card_set || ''}
+                          onChange={(v) => handleUpdate(draft.id, 'card_set', v)}
+                          playerName={draft.player_name || ''}
                           className="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none py-1 font-medium text-slate-700 transition-colors"
                           placeholder="Card Set"
                         />
