@@ -5,63 +5,15 @@ import pool from '@/utils/db';
  * GET /api/admin/typeahead?field=player_name&q=Jeter
  * GET /api/admin/typeahead?field=card_set&player=Derek+Jeter&q=Topps
  * GET /api/admin/typeahead?field=insert_name&player=Derek+Jeter&set=2023+Topps&q=Gold
- * GET /api/admin/typeahead?field=parallel_name&set=2023+Topps&q=Chrome
+ * GET /api/admin/typeahead?field=parallel_name&set=2026+Topps+Series+1&q=Chro
  *
- * Data source priority:
- *   1. Supabase (if CATALOG_SUPABASE_URL + CATALOG_SUPABASE_ANON_KEY are set)
- *   2. Local inventory table (fallback)
+ * Query priority:
+ *   1. catalog_sets / catalog_parallels  (seeded by seed_catalog.js at every deploy)
+ *   2. inventory table                   (grows as shop owner adds cards)
+ *
+ * Returns: { results: string[], source: string }
  */
-
-// NOTE: env vars are read INSIDE the handler (not module-level) so Railway
-// runtime env vars are picked up without requiring a rebuild.
-async function querySupabase(
-  supabaseUrl: string,
-  supabaseKey: string,
-  table: string,
-  select: string,
-  filters: string
-): Promise<any[]> {
-  const url = `${supabaseUrl}/rest/v1/${table}?select=${encodeURIComponent(select)}&${filters}&limit=30`;
-  const res = await fetch(url, {
-    headers: {
-      'apikey':        supabaseKey,
-      'Authorization': `Bearer ${supabaseKey}`,
-      'Accept':        'application/json',
-    },
-    cache: 'no-store',
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`Supabase ${res.status}: ${body}`);
-  }
-  return res.json();
-}
-
-function dedupe(rows: any[], col: string): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const r of rows) {
-    const v: string = r[col];
-    if (v && !seen.has(v)) { seen.add(v); out.push(v); }
-  }
-  return out.sort((a, b) => a.localeCompare(b));
-}
-
 export async function GET(req: NextRequest) {
-  // Read env vars at request time — works with Railway runtime env vars.
-  // Reuses the existing NEXT_PUBLIC_SUPABASE_* vars already set in Railway — no new vars needed.
-  const SUPABASE_URL = (
-    process.env.CATALOG_SUPABASE_URL ||
-    process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    ''
-  ).trim().replace(/\/+$/, '');
-  const SUPABASE_KEY = (
-    process.env.CATALOG_SUPABASE_ANON_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    ''
-  ).trim();
-  const hasSupabase  = Boolean(SUPABASE_URL && SUPABASE_KEY);
-
   const { searchParams } = req.nextUrl;
   const field  = searchParams.get('field')  ?? '';
   const q      = searchParams.get('q')      ?? '';
@@ -71,70 +23,107 @@ export async function GET(req: NextRequest) {
   if (!field) return NextResponse.json({ results: [] });
 
   try {
-    // ── Supabase path ──────────────────────────────────────────────────────
-    if (hasSupabase) {
-      let results: string[] = [];
+    let rows: any[] = [];
 
-      if (field === 'player_name') {
-        if (q.length < 2) return NextResponse.json({ results: [] });
-        const rows = await querySupabase(
-          SUPABASE_URL, SUPABASE_KEY,
-          'player_metadata',
-          'player_name',
-          `player_name=ilike.*${encodeURIComponent(q)}*`
-        );
-        results = dedupe(rows, 'player_name');
+    // ── card_set ─────────────────────────────────────────────────────────────
+    if (field === 'card_set') {
+      if (!q && !player) return NextResponse.json({ results: [] });
 
-      } else if (field === 'card_set') {
-        if (!player && !q) return NextResponse.json({ results: [] });
-        const filters: string[] = ['card_set=not.is.null'];
-        if (player) filters.push(`player_name=ilike.*${encodeURIComponent(player)}*`);
-        if (q)      filters.push(`card_set=ilike.*${encodeURIComponent(q)}*`);
-        const rows = await querySupabase(SUPABASE_URL, SUPABASE_KEY, 'master_card_catalog', 'card_set', filters.join('&'));
-        results = dedupe(rows, 'card_set');
+      // 1. Try catalog_sets
+      const catalogSql = q
+        ? `SELECT card_set FROM catalog_sets WHERE card_set ILIKE $1 ORDER BY card_set LIMIT 30`
+        : `SELECT card_set FROM catalog_sets ORDER BY card_set LIMIT 30`;
+      const catalogParams = q ? [`%${q}%`] : [];
+      const catalogResult = await pool.query(catalogSql, catalogParams).catch(() => ({ rows: [] }));
 
-      } else if (field === 'insert_name') {
-        if (!player && !set && q.length < 2) return NextResponse.json({ results: [] });
-        const filters: string[] = ['insert_name=not.is.null', 'insert_name=neq.Base'];
-        if (player) filters.push(`player_name=ilike.*${encodeURIComponent(player)}*`);
-        if (set)    filters.push(`card_set=ilike.*${encodeURIComponent(set)}*`);
-        if (q)      filters.push(`insert_name=ilike.*${encodeURIComponent(q)}*`);
-        const rows = await querySupabase(SUPABASE_URL, SUPABASE_KEY, 'master_card_catalog', 'insert_name', filters.join('&'));
-        results = dedupe(rows, 'insert_name');
-
-      } else if (field === 'parallel_name') {
-        if (!set && q.length < 2) return NextResponse.json({ results: [] });
-        const filters: string[] = ['parallel_name=not.is.null', 'parallel_name=neq.Base'];
-        if (set) filters.push(`card_set=ilike.*${encodeURIComponent(set)}*`);
-        if (q)   filters.push(`parallel_name=ilike.*${encodeURIComponent(q)}*`);
-        const rows = await querySupabase(SUPABASE_URL, SUPABASE_KEY, 'master_card_catalog', 'parallel_name', filters.join('&'));
-        results = dedupe(rows, 'parallel_name');
+      // 2. Also search inventory (drilled down by player if available)
+      let invRows: any[] = [];
+      if (player && q) {
+        const r = await pool.query(
+          `SELECT DISTINCT card_set FROM inventory WHERE player_name ILIKE $1 AND card_set ILIKE $2 AND card_set IS NOT NULL ORDER BY card_set LIMIT 20`,
+          [`%${player}%`, `%${q}%`]
+        ).catch(() => ({ rows: [] }));
+        invRows = r.rows;
+      } else if (player) {
+        const r = await pool.query(
+          `SELECT DISTINCT card_set FROM inventory WHERE player_name ILIKE $1 AND card_set IS NOT NULL ORDER BY card_set LIMIT 20`,
+          [`%${player}%`]
+        ).catch(() => ({ rows: [] }));
+        invRows = r.rows;
+      } else if (q) {
+        const r = await pool.query(
+          `SELECT DISTINCT card_set FROM inventory WHERE card_set ILIKE $1 AND card_set IS NOT NULL ORDER BY card_set LIMIT 20`,
+          [`%${q}%`]
+        ).catch(() => ({ rows: [] }));
+        invRows = r.rows;
       }
 
-      return NextResponse.json({ results, source: 'supabase' });
+      // Merge, deduplicate
+      const seen = new Set<string>();
+      const merged: string[] = [];
+      for (const r of [...catalogResult.rows, ...invRows]) {
+        const v: string = r.card_set;
+        if (v && !seen.has(v)) { seen.add(v); merged.push(v); }
+      }
+      return NextResponse.json({ results: merged.sort((a, b) => a.localeCompare(b)), source: 'catalog+inventory' });
     }
 
-    // ── Inventory fallback (no Supabase creds) ─────────────────────────────
-    let sql   = '';
-    const params: string[] = [];
+    // ── parallel_name ─────────────────────────────────────────────────────────
+    if (field === 'parallel_name') {
+      if (!set && q.length < 1) return NextResponse.json({ results: [] });
 
-    if (field === 'player_name' && q.length >= 2) {
-      sql = `SELECT DISTINCT player_name FROM inventory WHERE player_name ILIKE $1 AND player_name IS NOT NULL ORDER BY player_name LIMIT 20`;
-      params.push(`%${q}%`);
-
-    } else if (field === 'card_set') {
-      if (player && q) {
-        sql = `SELECT DISTINCT card_set FROM inventory WHERE player_name ILIKE $1 AND card_set ILIKE $2 AND card_set IS NOT NULL ORDER BY card_set LIMIT 30`;
-        params.push(`%${player}%`, `%${q}%`);
-      } else if (player) {
-        sql = `SELECT DISTINCT card_set FROM inventory WHERE player_name ILIKE $1 AND card_set IS NOT NULL ORDER BY card_set LIMIT 30`;
-        params.push(`%${player}%`);
+      // 1. catalog_parallels (with set filter if provided)
+      let catalogRows: any[] = [];
+      if (set && q) {
+        const r = await pool.query(
+          `SELECT parallel_name FROM catalog_parallels WHERE card_set ILIKE $1 AND parallel_name ILIKE $2 ORDER BY parallel_name LIMIT 30`,
+          [set, `%${q}%`]
+        ).catch(() => ({ rows: [] }));
+        catalogRows = r.rows;
+      } else if (set) {
+        const r = await pool.query(
+          `SELECT parallel_name FROM catalog_parallels WHERE card_set ILIKE $1 ORDER BY parallel_name LIMIT 30`,
+          [set]
+        ).catch(() => ({ rows: [] }));
+        catalogRows = r.rows;
       } else if (q) {
-        sql = `SELECT DISTINCT card_set FROM inventory WHERE card_set ILIKE $1 AND card_set IS NOT NULL ORDER BY card_set LIMIT 30`;
-        params.push(`%${q}%`);
+        const r = await pool.query(
+          `SELECT parallel_name FROM catalog_parallels WHERE parallel_name ILIKE $1 ORDER BY parallel_name LIMIT 30`,
+          [`%${q}%`]
+        ).catch(() => ({ rows: [] }));
+        catalogRows = r.rows;
       }
 
-    } else if (field === 'insert_name') {
+      // 2. inventory parallels
+      let invRows: any[] = [];
+      if (set) {
+        const r = await pool.query(
+          `SELECT DISTINCT parallel_name FROM inventory WHERE card_set ILIKE $1 AND parallel_name IS NOT NULL AND parallel_name != '' ORDER BY parallel_name LIMIT 20`,
+          [set]
+        ).catch(() => ({ rows: [] }));
+        invRows = r.rows;
+      } else if (q) {
+        const r = await pool.query(
+          `SELECT DISTINCT parallel_name FROM inventory WHERE parallel_name ILIKE $1 AND parallel_name IS NOT NULL AND parallel_name != '' ORDER BY parallel_name LIMIT 20`,
+          [`%${q}%`]
+        ).catch(() => ({ rows: [] }));
+        invRows = r.rows;
+      }
+
+      const seen = new Set<string>();
+      const merged: string[] = [];
+      for (const r of [...catalogRows, ...invRows]) {
+        const v: string = r.parallel_name;
+        if (v && !seen.has(v)) { seen.add(v); merged.push(v); }
+      }
+      return NextResponse.json({ results: merged.sort((a, b) => a.localeCompare(b)), source: 'catalog+inventory' });
+    }
+
+    // ── insert_name ───────────────────────────────────────────────────────────
+    if (field === 'insert_name') {
+      if (!player && !set && q.length < 2) return NextResponse.json({ results: [] });
+      let sql = '';
+      const params: string[] = [];
       if (player && set) {
         sql = `SELECT DISTINCT insert_name FROM inventory WHERE player_name ILIKE $1 AND card_set ILIKE $2 AND insert_name IS NOT NULL AND insert_name != '' ORDER BY insert_name LIMIT 20`;
         params.push(`%${player}%`, `%${set}%`);
@@ -142,22 +131,22 @@ export async function GET(req: NextRequest) {
         sql = `SELECT DISTINCT insert_name FROM inventory WHERE insert_name ILIKE $1 AND insert_name IS NOT NULL AND insert_name != '' ORDER BY insert_name LIMIT 20`;
         params.push(`%${q}%`);
       }
-
-    } else if (field === 'parallel_name') {
-      if (set) {
-        sql = `SELECT DISTINCT parallel_name FROM inventory WHERE card_set ILIKE $1 AND parallel_name IS NOT NULL AND parallel_name != '' ORDER BY parallel_name LIMIT 20`;
-        params.push(`%${set}%`);
-      } else if (q) {
-        sql = `SELECT DISTINCT parallel_name FROM inventory WHERE parallel_name ILIKE $1 AND parallel_name IS NOT NULL AND parallel_name != '' ORDER BY parallel_name LIMIT 20`;
-        params.push(`%${q}%`);
-      }
+      if (!sql) return NextResponse.json({ results: [] });
+      rows = (await pool.query(sql, params).catch(() => ({ rows: [] }))).rows;
+      return NextResponse.json({ results: rows.map((r: any) => r.insert_name).filter(Boolean), source: 'inventory' });
     }
 
-    if (!sql) return NextResponse.json({ results: [] });
+    // ── player_name ───────────────────────────────────────────────────────────
+    if (field === 'player_name') {
+      if (q.length < 2) return NextResponse.json({ results: [] });
+      rows = (await pool.query(
+        `SELECT DISTINCT player_name FROM inventory WHERE player_name ILIKE $1 AND player_name IS NOT NULL ORDER BY player_name LIMIT 20`,
+        [`%${q}%`]
+      ).catch(() => ({ rows: [] }))).rows;
+      return NextResponse.json({ results: rows.map((r: any) => r.player_name).filter(Boolean), source: 'inventory' });
+    }
 
-    const { rows } = await pool.query(sql, params);
-    const results  = rows.map((r: any) => r[field]).filter(Boolean);
-    return NextResponse.json({ results, source: 'inventory' });
+    return NextResponse.json({ results: [] });
 
   } catch (err: any) {
     console.error('[typeahead API] error:', err.message);

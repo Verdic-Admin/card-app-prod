@@ -9,6 +9,9 @@ set -e
 echo "[entrypoint] Running database schema initialization..."
 node init_db.js 2>&1 || echo "[entrypoint] DB init warning (non-fatal) — continuing startup."
 
+echo "[entrypoint] Seeding 2026 card catalog..."
+node seed_catalog.js 2>&1 || echo "[entrypoint] Catalog seed warning (non-fatal) — continuing startup."
+
 echo "[entrypoint] Syncing card catalog reference tables from Player Index..."
 node sync_catalog.js 2>&1 || echo "[entrypoint] Catalog sync warning (non-fatal) — continuing startup."
 

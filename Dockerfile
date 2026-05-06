@@ -63,6 +63,7 @@ COPY --from=builder /app/.next/static ./.next/static
 # Copy the DB init + catalog sync scripts (run at startup)
 COPY --from=builder /app/init_db.js ./init_db.js
 COPY --from=builder /app/sync_catalog.js ./sync_catalog.js
+COPY --from=builder /app/seed_catalog.js ./seed_catalog.js
 
 # Copy the entrypoint script
 COPY docker-entrypoint.sh ./docker-entrypoint.sh
