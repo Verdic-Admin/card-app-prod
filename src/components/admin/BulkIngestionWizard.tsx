@@ -1079,6 +1079,8 @@ export function BulkIngestionWizard() {
                           onChange={val => updateReviewField(card.id, 'insert_name' as keyof StagingCard, val)}
                           onBlur={val => saveReviewField(card.id, 'insert_name', val)}
                           className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
+                          playerName={(card as any).player_name || ''}
+                          cardSet={(card as any).card_set || ''}
                         />
                         {/* Parallel — fuzzy typeahead with known parallels */}
                         <ParallelTypeahead
@@ -1086,6 +1088,7 @@ export function BulkIngestionWizard() {
                           onChange={val => updateReviewField(card.id, 'parallel_name' as keyof StagingCard, val)}
                           onBlur={val => saveReviewField(card.id, 'parallel_name', val)}
                           className="border border-border rounded-md p-1.5 text-xs bg-surface text-foreground focus:ring-1 focus:ring-brand outline-none"
+                          cardSet={(card as any).card_set || ''}
                         />
                       </div>
                       {card.team_name_source && card.team_name_source !== 'none' && (

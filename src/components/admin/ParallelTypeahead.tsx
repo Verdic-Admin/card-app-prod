@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useMemo } from 'react'
+import { fetchValidParallelsAction } from '@/app/actions/inventory'
 
 /**
  * Comprehensive list of known baseball card parallels.
@@ -126,24 +127,37 @@ interface ParallelTypeaheadProps {
   onChange: (val: string) => void
   onBlur?: (val: string) => void
   className?: string
+  cardSet?: string
 }
 
-export default function ParallelTypeahead({ value, onChange, onBlur, className }: ParallelTypeaheadProps) {
+export default function ParallelTypeahead({ value, onChange, onBlur, className, cardSet }: ParallelTypeaheadProps) {
   const [open, setOpen] = useState(false)
   const [focusIdx, setFocusIdx] = useState(-1)
+  const [dynamicOptions, setDynamicOptions] = useState<string[]>([])
   const wrapRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
 
-  const suggestions = useMemo(() => {
-    if (!value?.trim()) {
-      return KNOWN_PARALLELS.slice(0, 30).map(p => ({ label: p, match: true, score: 0 }))
+  useEffect(() => {
+    if (cardSet) {
+      fetchValidParallelsAction(cardSet).then(opts => {
+        setDynamicOptions(opts)
+      }).catch(e => console.error("Failed to fetch dynamic parallels:", e))
+    } else {
+      setDynamicOptions([])
     }
-    return KNOWN_PARALLELS
+  }, [cardSet])
+
+  const suggestions = useMemo(() => {
+    const baseList = dynamicOptions.length > 0 ? dynamicOptions : KNOWN_PARALLELS
+    if (!value?.trim()) {
+      return baseList.slice(0, 30).map(p => ({ label: p, match: true, score: 0 }))
+    }
+    return baseList
       .map(p => ({ label: p, ...fuzzyMatch(value, p) }))
       .filter(s => s.match)
       .sort((a, b) => b.score - a.score || a.label.localeCompare(b.label))
       .slice(0, 20)
-  }, [value])
+  }, [value, dynamicOptions])
 
   // Close on outside click
   useEffect(() => {

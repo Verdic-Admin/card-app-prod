@@ -8,6 +8,32 @@ import { calculatePricingAction } from '@/app/actions/oracleAPI';
 import { price } from '@/utils/math';
 import { normalizeCardNumberForPlayerIndex } from '@/lib/player-index-deeplink';
 
+export async function fetchValidInsertsAction(playerName: string, cardSet: string): Promise<string[]> {
+  if (!playerName || !cardSet) return [];
+  const { rows } = await pool.query(
+    `SELECT DISTINCT insert_name FROM master_card_catalog 
+     WHERE player_name ILIKE $1 AND card_set ILIKE $2
+       AND insert_name IS NOT NULL AND insert_name != 'Base' AND insert_name != ''
+     ORDER BY insert_name
+     LIMIT 100`,
+    [playerName.trim(), cardSet.trim()]
+  );
+  return rows.map(r => r.insert_name);
+}
+
+export async function fetchValidParallelsAction(cardSet: string): Promise<string[]> {
+  if (!cardSet) return [];
+  const { rows } = await pool.query(
+    `SELECT DISTINCT parallel_name FROM set_parallel_catalog 
+     WHERE card_set ILIKE $1
+       AND parallel_name IS NOT NULL AND parallel_name != 'Base' AND parallel_name != ''
+     ORDER BY parallel_name
+     LIMIT 200`,
+    [cardSet.trim()]
+  );
+  return rows.map(r => r.parallel_name);
+}
+
 interface BulkInventoryItem {
   player_name: string;
   card_set: string | null;

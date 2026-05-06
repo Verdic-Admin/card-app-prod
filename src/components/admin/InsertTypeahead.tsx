@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useMemo } from 'react'
+import { fetchValidInsertsAction } from '@/app/actions/inventory'
 
 /**
  * Comprehensive list of known baseball/sports card inserts.
@@ -47,24 +48,38 @@ interface InsertTypeaheadProps {
   onChange: (val: string) => void
   onBlur?: (val: string) => void
   className?: string
+  playerName?: string
+  cardSet?: string
 }
 
-export default function InsertTypeahead({ value, onChange, onBlur, className }: InsertTypeaheadProps) {
+export default function InsertTypeahead({ value, onChange, onBlur, className, playerName, cardSet }: InsertTypeaheadProps) {
   const [open, setOpen] = useState(false)
   const [focusIdx, setFocusIdx] = useState(-1)
+  const [dynamicOptions, setDynamicOptions] = useState<string[]>([])
   const wrapRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
 
-  const suggestions = useMemo(() => {
-    if (!value?.trim()) {
-      return KNOWN_INSERTS.slice(0, 30).map(p => ({ label: p, match: true, score: 0 }))
+  useEffect(() => {
+    if (playerName && cardSet) {
+      fetchValidInsertsAction(playerName, cardSet).then(opts => {
+        setDynamicOptions(opts)
+      }).catch(e => console.error("Failed to fetch dynamic inserts:", e))
+    } else {
+      setDynamicOptions([])
     }
-    return KNOWN_INSERTS
+  }, [playerName, cardSet])
+
+  const suggestions = useMemo(() => {
+    const baseList = dynamicOptions.length > 0 ? dynamicOptions : KNOWN_INSERTS
+    if (!value?.trim()) {
+      return baseList.slice(0, 30).map(p => ({ label: p, match: true, score: 0 }))
+    }
+    return baseList
       .map(p => ({ label: p, ...fuzzyMatch(value, p) }))
       .filter(s => s.match)
       .sort((a, b) => b.score - a.score || a.label.localeCompare(b.label))
       .slice(0, 20)
-  }, [value])
+  }, [value, dynamicOptions])
 
   // Close on outside click
   useEffect(() => {

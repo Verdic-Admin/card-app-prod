@@ -1543,11 +1543,14 @@ export function InventoryTable({
                       value={editForm.insert_name || ''}
                       onChange={val => setEditForm({...editForm, insert_name: val})}
                       className="w-1/4 p-1.5 text-xs font-bold text-slate-900 bg-white border border-indigo-100 rounded focus:border-indigo-500 outline-none"
+                      playerName={editForm.player_name || ''}
+                      cardSet={editForm.card_set || ''}
                     />
                     <ParallelTypeahead
                       value={editForm.parallel_name || ''}
                       onChange={val => setEditForm({...editForm, parallel_name: val})}
                       className="w-1/4 p-1.5 text-xs font-bold text-slate-900 bg-white border border-indigo-100 rounded focus:border-indigo-500 outline-none"
+                      cardSet={editForm.card_set || ''}
                     />
                   </div>
                   <div className="flex gap-1.5">

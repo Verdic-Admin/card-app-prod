@@ -291,6 +291,7 @@ export function ManualIngestionGrid({ refreshKey = 0 }: ManualIngestionGridProps
                       value={draft.parallel_name || draft.insert_name || ''}
                       onChange={(val) => handleUpdate(draft.id, 'parallel_name', val)}
                       className="bg-slate-50 border border-slate-200 rounded px-2 py-1.5 text-xs font-medium text-slate-700 w-full"
+                      cardSet={draft.card_set}
                     />
                   </div>
                   <div>
@@ -439,6 +440,7 @@ export function ManualIngestionGrid({ refreshKey = 0 }: ManualIngestionGridProps
                           value={draft.parallel_name || draft.insert_name || ''}
                           onChange={(val) => handleUpdate(draft.id, 'parallel_name', val)}
                           className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none py-1 font-medium text-slate-700 transition-colors w-full"
+                          cardSet={draft.card_set}
                         />
                       </td>
                       <td className="px-4 py-3 align-middle">
