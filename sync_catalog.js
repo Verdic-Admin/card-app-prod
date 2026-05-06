@@ -1,244 +1,182 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 /**
- * sync_catalog.js — Card Catalog Reference Sync
- * ─────────────────────────────────────────────
- * Runs at container startup (after init_db.js) to populate local read-only
- * reference tables from the Player Index Supabase instance.
+ * sync_catalog.js — Card Catalog Sync from Player Index (Supabase)
+ * ─────────────────────────────────────────────────────────────────
+ * Runs at container startup. Pulls 2026 Topps Series 1, Heritage, and
+ * Heritage Chrome data from the Player Index Supabase DB and writes it
+ * into local Railway Postgres read-only reference tables.
  *
- * Tables created/refreshed in Railway Postgres:
- *   catalog_players  (player_name, sport)
- *   catalog_sets     (player_name, card_set, sport)
- *   catalog_inserts  (player_name, card_set, insert_name)
+ * Tables populated:
+ *   catalog_cards    (player_name, card_number, card_set, insert_name, parallel_name)
+ *   catalog_sets     (card_set, sport)
  *   catalog_parallels(card_set, parallel_name)
  *
- * These are NEVER written to by the app — read-only reference for typeaheads.
- * The Card Shop DB never connects to Supabase at runtime; this script is the
- * only bridge and only runs at deploy time.
- *
- * Required env vars (set on Railway service):
- *   CATALOG_SUPABASE_URL     — Supabase project URL (e.g. https://xxx.supabase.co)
- *   CATALOG_SUPABASE_ANON_KEY — Supabase anon/public key
- *   DATABASE_URL or POSTGRES_URL — Card Shop's Railway Postgres
+ * Uses env vars already present in Railway — no new vars needed:
+ *   NEXT_PUBLIC_SUPABASE_URL      — Supabase project URL
+ *   NEXT_PUBLIC_SUPABASE_ANON_KEY — Supabase anon key
+ *   DATABASE_URL / POSTGRES_URL   — Card Shop Railway Postgres
  */
 
 const { Client } = require('pg');
 
-const SUPABASE_URL = (process.env.CATALOG_SUPABASE_URL || '').trim().replace(/\/+$/, '');
-const SUPABASE_KEY = (process.env.CATALOG_SUPABASE_ANON_KEY || '').trim();
+// Use existing Railway env vars — no new vars needed
+const SUPABASE_URL = (
+  process.env.CATALOG_SUPABASE_URL ||
+  process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  ''
+).trim().replace(/\/+$/, '');
+
+const SUPABASE_KEY = (
+  process.env.CATALOG_SUPABASE_ANON_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  ''
+).trim();
+
 const DATABASE_URL = (process.env.DATABASE_URL || process.env.POSTGRES_URL || '').trim();
 
+// Only sync these sets
+const TARGET_SETS = [
+  '2026 Topps Series 1 Baseball',
+  '2026 Topps Heritage Baseball',
+  '2026 Topps Heritage',
+];
+
 if (!SUPABASE_URL || !SUPABASE_KEY) {
-  console.log('[sync_catalog] CATALOG_SUPABASE_URL / CATALOG_SUPABASE_ANON_KEY not set — skipping catalog sync.');
+  console.log('[sync_catalog] No Supabase credentials found — skipping catalog sync.');
   process.exit(0);
 }
-
 if (!DATABASE_URL) {
-  console.log('[sync_catalog] DATABASE_URL not set — skipping catalog sync.');
+  console.log('[sync_catalog] No DATABASE_URL — skipping catalog sync.');
   process.exit(0);
 }
 
-/** Fetch all pages from a Supabase table via REST API */
-async function fetchAll(table, select, filter = '') {
-  const PAGE_SIZE = 1000;
-  let offset = 0;
+async function fetchPage(setName, offset) {
+  const filter = `card_set=eq.${encodeURIComponent(setName)}`;
+  const url = `${SUPABASE_URL}/rest/v1/master_card_catalog?select=player_name,card_number,card_set,insert_name,parallel_name&${filter}&limit=1000&offset=${offset}`;
+  const res = await fetch(url, {
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Accept': 'application/json',
+    },
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    throw new Error(`Supabase ${res.status}: ${txt}`);
+  }
+  return res.json();
+}
+
+async function fetchAllForSet(setName) {
   const all = [];
-
+  let offset = 0;
   while (true) {
-    const url = `${SUPABASE_URL}/rest/v1/${table}?select=${encodeURIComponent(select)}&limit=${PAGE_SIZE}&offset=${offset}${filter ? '&' + filter : ''}`;
-    const res = await fetch(url, {
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'Accept': 'application/json',
-      },
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Supabase REST error on ${table}: ${res.status} ${text}`);
-    }
-
-    const rows = await res.json();
+    const rows = await fetchPage(setName, offset);
     if (!Array.isArray(rows) || rows.length === 0) break;
     all.push(...rows);
-    if (rows.length < PAGE_SIZE) break;
-    offset += PAGE_SIZE;
+    if (rows.length < 1000) break;
+    offset += 1000;
   }
-
   return all;
 }
 
 async function run() {
   const client = new Client({ connectionString: DATABASE_URL, connectionTimeoutMillis: 15_000 });
   await client.connect();
-  await client.query("SET statement_timeout = '120s'");
+  await client.query("SET statement_timeout = '180s'");
 
-  console.log('[sync_catalog] Creating reference tables if needed...');
+  console.log('[sync_catalog] Creating catalog tables if needed...');
 
-  // Create tables (idempotent)
   await client.query(`
-    CREATE TABLE IF NOT EXISTS catalog_players (
-      player_name TEXT NOT NULL,
-      sport       TEXT,
-      PRIMARY KEY (player_name)
+    CREATE TABLE IF NOT EXISTS catalog_cards (
+      id            SERIAL PRIMARY KEY,
+      card_set      TEXT NOT NULL,
+      player_name   TEXT,
+      card_number   TEXT,
+      insert_name   TEXT,
+      parallel_name TEXT
     );
   `);
 
   await client.query(`
     CREATE TABLE IF NOT EXISTS catalog_sets (
-      player_name TEXT NOT NULL,
-      card_set    TEXT NOT NULL,
-      sport       TEXT,
-      PRIMARY KEY (player_name, card_set)
-    );
-  `);
-
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS catalog_inserts (
-      player_name TEXT NOT NULL,
-      card_set    TEXT NOT NULL,
-      insert_name TEXT NOT NULL,
-      PRIMARY KEY (player_name, card_set, insert_name)
+      card_set TEXT PRIMARY KEY,
+      sport    TEXT DEFAULT 'mlb'
     );
   `);
 
   await client.query(`
     CREATE TABLE IF NOT EXISTS catalog_parallels (
-      card_set      TEXT NOT NULL,
+      id            SERIAL PRIMARY KEY,
+      card_set      TEXT,
       parallel_name TEXT NOT NULL,
-      PRIMARY KEY (card_set, parallel_name)
+      UNIQUE (COALESCE(card_set, ''), parallel_name)
     );
   `);
 
-  // ── Sync players ────────────────────────────────────────────────────────────
-  console.log('[sync_catalog] Fetching players from Supabase...');
-  let players = [];
-  try {
-    players = await fetchAll('player_metadata', 'player_name,sport', 'player_name=not.is.null');
-    console.log(`[sync_catalog]   → ${players.length} players fetched`);
-  } catch (e) {
-    console.warn('[sync_catalog] Could not fetch players:', e.message);
-  }
+  // Add indexes for fast typeahead queries
+  await client.query(`CREATE INDEX IF NOT EXISTS idx_catalog_cards_player ON catalog_cards (player_name);`);
+  await client.query(`CREATE INDEX IF NOT EXISTS idx_catalog_cards_set    ON catalog_cards (card_set);`);
+  await client.query(`CREATE INDEX IF NOT EXISTS idx_catalog_cards_num    ON catalog_cards (card_number);`);
 
-  if (players.length > 0) {
-    await client.query('TRUNCATE catalog_players');
-    for (let i = 0; i < players.length; i += 500) {
-      const chunk = players.slice(i, i + 500);
-      const values = chunk.map((_, j) => `($${j * 2 + 1}, $${j * 2 + 2})`).join(', ');
-      const params = chunk.flatMap(r => [r.player_name, r.sport || 'mlb']);
-      await client.query(
-        `INSERT INTO catalog_players (player_name, sport) VALUES ${values} ON CONFLICT DO NOTHING`,
-        params
-      );
+  // Sync each set
+  for (const setName of TARGET_SETS) {
+    console.log(`[sync_catalog] Fetching: ${setName}...`);
+    let rows = [];
+    try {
+      rows = await fetchAllForSet(setName);
+      console.log(`[sync_catalog]   → ${rows.length} rows`);
+    } catch (e) {
+      console.warn(`[sync_catalog]   ✗ Failed: ${e.message}`);
+      continue;
     }
-    console.log(`[sync_catalog]   ✓ catalog_players synced (${players.length} rows)`);
-  }
 
-  // ── Sync sets (player_name + card_set combos) ───────────────────────────────
-  console.log('[sync_catalog] Fetching card sets from Supabase...');
-  let sets = [];
-  try {
-    sets = await fetchAll(
-      'master_card_catalog',
-      'player_name,card_set,sport',
-      'player_name=not.is.null&card_set=not.is.null'
+    if (rows.length === 0) continue;
+
+    // Clear old data for this set, re-insert fresh
+    await client.query(`DELETE FROM catalog_cards WHERE card_set = $1`, [setName]);
+    await client.query(`DELETE FROM catalog_parallels WHERE card_set = $1`, [setName]);
+    await client.query(`DELETE FROM catalog_sets WHERE card_set = $1`, [setName]);
+
+    // Insert set
+    await client.query(
+      `INSERT INTO catalog_sets (card_set, sport) VALUES ($1, 'mlb') ON CONFLICT (card_set) DO NOTHING`,
+      [setName]
     );
-    console.log(`[sync_catalog]   → ${sets.length} set rows fetched`);
-  } catch (e) {
-    console.warn('[sync_catalog] Could not fetch sets:', e.message);
-  }
 
-  if (sets.length > 0) {
-    await client.query('TRUNCATE catalog_sets');
-    // Deduplicate before insert
-    const seen = new Set();
-    const dedupedSets = sets.filter(r => {
-      const key = `${r.player_name}|${r.card_set}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-    for (let i = 0; i < dedupedSets.length; i += 500) {
-      const chunk = dedupedSets.slice(i, i + 500);
-      const values = chunk.map((_, j) => `($${j * 3 + 1}, $${j * 3 + 2}, $${j * 3 + 3})`).join(', ');
-      const params = chunk.flatMap(r => [r.player_name, r.card_set, r.sport || 'mlb']);
+    // Bulk insert cards in chunks of 500
+    let inserted = 0;
+    for (let i = 0; i < rows.length; i += 500) {
+      const chunk = rows.slice(i, i + 500);
+      const values = chunk.map((_, j) => {
+        const base = j * 5;
+        return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5})`;
+      }).join(', ');
+      const params = chunk.flatMap(r => [
+        r.card_set    || setName,
+        r.player_name || null,
+        r.card_number || null,
+        r.insert_name || null,
+        r.parallel_name || null,
+      ]);
       await client.query(
-        `INSERT INTO catalog_sets (player_name, card_set, sport) VALUES ${values} ON CONFLICT DO NOTHING`,
+        `INSERT INTO catalog_cards (card_set, player_name, card_number, insert_name, parallel_name) VALUES ${values}`,
         params
       );
+      inserted += chunk.length;
     }
-    console.log(`[sync_catalog]   ✓ catalog_sets synced (${dedupedSets.length} unique rows)`);
-  }
+    console.log(`[sync_catalog]   ✓ catalog_cards: ${inserted} rows for ${setName}`);
 
-  // ── Sync inserts ─────────────────────────────────────────────────────────────
-  console.log('[sync_catalog] Fetching inserts from Supabase...');
-  let inserts = [];
-  try {
-    inserts = await fetchAll(
-      'master_card_catalog',
-      'player_name,card_set,insert_name',
-      'insert_name=not.is.null&insert_name=neq.Base&insert_name=neq.'
-    );
-    console.log(`[sync_catalog]   → ${inserts.length} insert rows fetched`);
-  } catch (e) {
-    console.warn('[sync_catalog] Could not fetch inserts:', e.message);
-  }
-
-  if (inserts.length > 0) {
-    await client.query('TRUNCATE catalog_inserts');
-    const seen = new Set();
-    const dedupedInserts = inserts.filter(r => {
-      if (!r.player_name || !r.card_set || !r.insert_name) return false;
-      const key = `${r.player_name}|${r.card_set}|${r.insert_name}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-    for (let i = 0; i < dedupedInserts.length; i += 500) {
-      const chunk = dedupedInserts.slice(i, i + 500);
-      const values = chunk.map((_, j) => `($${j * 3 + 1}, $${j * 3 + 2}, $${j * 3 + 3})`).join(', ');
-      const params = chunk.flatMap(r => [r.player_name, r.card_set, r.insert_name]);
+    // Extract unique parallels for this set
+    const parallels = [...new Set(rows.map(r => r.parallel_name).filter(Boolean))];
+    for (const p of parallels) {
       await client.query(
-        `INSERT INTO catalog_inserts (player_name, card_set, insert_name) VALUES ${values} ON CONFLICT DO NOTHING`,
-        params
+        `INSERT INTO catalog_parallels (card_set, parallel_name) VALUES ($1, $2)
+         ON CONFLICT (COALESCE(card_set, ''), parallel_name) DO NOTHING`,
+        [setName, p]
       );
     }
-    console.log(`[sync_catalog]   ✓ catalog_inserts synced (${dedupedInserts.length} unique rows)`);
-  }
-
-  // ── Sync parallels ───────────────────────────────────────────────────────────
-  console.log('[sync_catalog] Fetching parallels from Supabase...');
-  let parallels = [];
-  try {
-    parallels = await fetchAll(
-      'master_card_catalog',
-      'card_set,parallel_name',
-      'parallel_name=not.is.null&parallel_name=neq.Base&parallel_name=neq.'
-    );
-    console.log(`[sync_catalog]   → ${parallels.length} parallel rows fetched`);
-  } catch (e) {
-    console.warn('[sync_catalog] Could not fetch parallels:', e.message);
-  }
-
-  if (parallels.length > 0) {
-    await client.query('TRUNCATE catalog_parallels');
-    const seen = new Set();
-    const dedupedParallels = parallels.filter(r => {
-      if (!r.card_set || !r.parallel_name) return false;
-      const key = `${r.card_set}|${r.parallel_name}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-    for (let i = 0; i < dedupedParallels.length; i += 500) {
-      const chunk = dedupedParallels.slice(i, i + 500);
-      const values = chunk.map((_, j) => `($${j * 2 + 1}, $${j * 2 + 2})`).join(', ');
-      const params = chunk.flatMap(r => [r.card_set, r.parallel_name]);
-      await client.query(
-        `INSERT INTO catalog_parallels (card_set, parallel_name) VALUES ${values} ON CONFLICT DO NOTHING`,
-        params
-      );
-    }
-    console.log(`[sync_catalog]   ✓ catalog_parallels synced (${dedupedParallels.length} unique rows)`);
+    console.log(`[sync_catalog]   ✓ catalog_parallels: ${parallels.length} for ${setName}`);
   }
 
   await client.end();
@@ -247,6 +185,5 @@ async function run() {
 
 run().catch(err => {
   console.warn('[sync_catalog] Sync failed (non-fatal):', err.message || err);
-  // Never crash the container — sync failure is always non-fatal
   process.exit(0);
 });
