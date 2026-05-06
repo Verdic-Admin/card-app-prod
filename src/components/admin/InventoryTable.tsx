@@ -612,6 +612,51 @@ export function InventoryTable({
     URL.revokeObjectURL(link.href);
   }
 
+  const handleWhatnotExportCSV = () => {
+    if (filteredItems.length === 0) return;
+    
+    const headers = [
+      'Category', 'Sub Category', 'Title', 'Description', 'Quantity', 'Type', 'Price', 
+      'Shipping Profile', 'Offerable', 'Hazmat', 'Condition', 'Cost Per Item', 'SKU', 
+      'Image URL 1', 'Image URL 2', 'Image URL 3', 'Image URL 4', 'Image URL 5', 'Image URL 6', 'Image URL 7', 'Image URL 8'
+    ];
+    
+    const rows = filteredItems.map(item => {
+      const titleParts = [item.card_set, item.player_name, item.insert_name, item.parallel_name, item.card_number ? `#${item.card_number}` : '']
+        .filter(Boolean)
+        .join(' ');
+      
+      const title = `"${titleParts.replace(/"/g, '""')}"`;
+      
+      return [
+        '', // Category
+        '', // Sub Category
+        title, // Title
+        title, // Description
+        '1', // Quantity
+        'Buy It Now', // Type
+        item.listed_price || 0, // Price
+        '', // Shipping Profile
+        item.accepts_offers ? 'Yes' : 'No', // Offerable
+        'No', // Hazmat
+        ((item as any).grading_company) ? 'Graded' : 'Ungraded', // Condition
+        item.cost_basis || 0, // Cost Per Item
+        item.id, // SKU
+        `"${item.image_url || ''}"`, // Image URL 1
+        `"${item.back_image_url || ''}"`, // Image URL 2
+        '', '', '', '', '', '' // Image URL 3-8
+      ];
+    });
+    
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `Whatnot_Export_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
   // Auction Block Handlers
   const auctionItems = items.filter(i => (i as any).is_auction === true)
 
@@ -1317,7 +1362,11 @@ export function InventoryTable({
             </button>
            <button onClick={handleExportCSV} className="flex-1 sm:flex-none justify-center whitespace-nowrap bg-zinc-800 hover:bg-zinc-900 text-white px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer">
              <Download className="w-4 h-4" />
-             CSV
+             eBay CSV
+           </button>
+           <button onClick={handleWhatnotExportCSV} className="flex-1 sm:flex-none justify-center whitespace-nowrap bg-[#FFE500] hover:bg-[#FFD500] text-black px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer">
+             <Download className="w-4 h-4" />
+             Whatnot CSV
            </button>
          </div>
       </div>
