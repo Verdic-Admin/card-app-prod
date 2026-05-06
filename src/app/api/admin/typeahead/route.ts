@@ -49,8 +49,12 @@ function dedupe(rows: any[], col: string): string[] {
 
 export async function GET(req: NextRequest) {
   // Read env vars at request time — works with Railway runtime env vars.
-  // Falls back to NEXT_PUBLIC_SUPABASE_ANON_KEY if the catalog-specific key isn't set.
-  const SUPABASE_URL = (process.env.CATALOG_SUPABASE_URL      || '').trim().replace(/\/+$/, '');
+  // Reuses the existing NEXT_PUBLIC_SUPABASE_* vars already set in Railway — no new vars needed.
+  const SUPABASE_URL = (
+    process.env.CATALOG_SUPABASE_URL ||
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    ''
+  ).trim().replace(/\/+$/, '');
   const SUPABASE_KEY = (
     process.env.CATALOG_SUPABASE_ANON_KEY ||
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
