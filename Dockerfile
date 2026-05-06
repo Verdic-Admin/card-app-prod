@@ -60,8 +60,9 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/static ./.next/static
 
-# Copy the DB init script (runs at startup to migrate schema)
+# Copy the DB init + catalog sync scripts (run at startup)
 COPY --from=builder /app/init_db.js ./init_db.js
+COPY --from=builder /app/sync_catalog.js ./sync_catalog.js
 
 # Copy the entrypoint script
 COPY docker-entrypoint.sh ./docker-entrypoint.sh

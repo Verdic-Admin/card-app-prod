@@ -9,6 +9,9 @@ set -e
 echo "[entrypoint] Running database schema initialization..."
 node init_db.js 2>&1 || echo "[entrypoint] DB init warning (non-fatal) — continuing startup."
 
+echo "[entrypoint] Syncing card catalog reference tables from Player Index..."
+node sync_catalog.js 2>&1 || echo "[entrypoint] Catalog sync warning (non-fatal) — continuing startup."
+
 # ── Self-registration: tell Oracle where this store lives ────────────────────
 if [ -n "$RAILWAY_PUBLIC_DOMAIN" ]; then
   STORE_URL="https://$RAILWAY_PUBLIC_DOMAIN"
