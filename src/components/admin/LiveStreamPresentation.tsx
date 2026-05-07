@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { X, Loader2, CheckCircle2 } from 'lucide-react'
-import { removeFromStreamQueue } from '@/app/actions/inventory'
+import { removeFromStreamQueue, updateStreamQueueOrder } from '@/app/actions/inventory'
 
 interface LiveStreamPresentationProps {
   initialItems: any[]
@@ -15,6 +15,7 @@ export function LiveStreamPresentation({ initialItems, allChildren }: LiveStream
   const [items, setItems] = useState<any[]>(initialItems)
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [isRemoving, setIsRemoving] = useState(false)
+  const [draggedId, setDraggedId] = useState<string | null>(null)
 
   const selectedItem = items.find(i => i.id === selectedItemId)
   
@@ -51,6 +52,41 @@ export function LiveStreamPresentation({ initialItems, allChildren }: LiveStream
       console.error("Failed to clear queue:", e)
     } finally {
       setIsRemoving(false)
+    }
+  }
+
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    setDraggedId(id)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', id)
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+  }
+
+  const handleDrop = async (e: React.DragEvent, targetId: string) => {
+    e.preventDefault()
+    if (!draggedId || draggedId === targetId) return
+
+    const newItems = [...items]
+    const draggedIdx = newItems.findIndex(i => i.id === draggedId)
+    const targetIdx = newItems.findIndex(i => i.id === targetId)
+    
+    if (draggedIdx === -1 || targetIdx === -1) return
+
+    const [draggedItem] = newItems.splice(draggedIdx, 1)
+    newItems.splice(targetIdx, 0, draggedItem)
+    
+    setItems(newItems)
+    setDraggedId(null)
+
+    const updates = newItems.map((item, index) => ({ id: item.id, order: index }))
+    try {
+      await updateStreamQueueOrder(updates)
+    } catch (err) {
+      console.error("Failed to update order:", err)
     }
   }
 
@@ -98,6 +134,10 @@ export function LiveStreamPresentation({ initialItems, allChildren }: LiveStream
               return (
                 <div
                   key={item.id}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, item.id)}
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, item.id)}
                   onClick={() => setSelectedItemId(item.id)}
                   className={`
                     group cursor-pointer relative rounded-xl p-3 flex gap-3 transition-all duration-300
@@ -105,6 +145,7 @@ export function LiveStreamPresentation({ initialItems, allChildren }: LiveStream
                       ? 'bg-zinc-800 ring-1 ring-zinc-700 shadow-lg scale-[1.02]' 
                       : 'bg-zinc-900/50 hover:bg-zinc-800/50 border border-transparent hover:border-zinc-800'
                     }
+                    ${draggedId === item.id ? 'opacity-50 border-dashed border-zinc-600' : ''}
                   `}
                 >
                   <div className="relative w-14 h-14 flex-shrink-0 rounded-lg overflow-hidden bg-zinc-950 shadow-inner">
@@ -112,7 +153,7 @@ export function LiveStreamPresentation({ initialItems, allChildren }: LiveStream
                       <img 
                         src={item.image_url} 
                         alt="" 
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover pointer-events-none"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-zinc-800">
@@ -134,6 +175,11 @@ export function LiveStreamPresentation({ initialItems, allChildren }: LiveStream
                     <p className="text-[11px] text-zinc-500 truncate mt-0.5 font-medium">
                       {item.card_set}
                     </p>
+                  </div>
+                  <div className="absolute top-2 right-8 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <svg className="w-4 h-4 text-zinc-600 cursor-grab active:cursor-grabbing" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                    </svg>
                   </div>
                   <button
                     onClick={(e) => handleRemoveFromQueue(item.id, e)}

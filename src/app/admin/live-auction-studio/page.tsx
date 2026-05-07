@@ -9,7 +9,7 @@ export default async function LiveAuctionStudioPage() {
   const { rows: items } = await pool.query(
     `SELECT * FROM inventory 
      WHERE is_stream_queue = true
-     ORDER BY player_name ASC`
+     ORDER BY stream_queue_sort_order ASC, player_name ASC`
   );
 
   const { rows: allChildren } = await pool.query(

@@ -817,6 +817,30 @@ export async function removeFromStreamQueue(ids: string[]) {
   return { success: true };
 }
 
+export async function updateStreamQueueOrder(updates: { id: string, order: number }[]) {
+  await checkAuth();
+  if (updates.length > 0) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (const update of updates) {
+        await client.query(
+          `UPDATE inventory SET stream_queue_sort_order = $1 WHERE id = $2`,
+          [update.order, update.id]
+        );
+      }
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+  revalidatePath('/admin');
+  return { success: true };
+}
+
 export async function bulkUpdateMetricsAction(ids: string[], costBasis: number, acceptsOffers: boolean) {
   await checkAuth();
 

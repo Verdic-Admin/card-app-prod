@@ -8,6 +8,8 @@ import {
   stageAuctionItems,
   updateStagedAuction,
   stageToStreamQueue,
+  removeFromStreamQueue,
+  updateStreamQueueOrder,
   type AuctionStageItemInput,
 } from '@/app/actions/inventory'
 import { Loader2, CheckCircle2, X, AlertTriangle, Gavel, Search, Check } from 'lucide-react'
@@ -97,6 +99,68 @@ export function LiveAuctionStudio({
   const [liveQrUrl, setLiveQrUrl] = useState(initialAuctionQrUrl || '')
 
   const [inventoryQuery, setInventoryQuery] = useState('')
+
+  // Queue state
+  const streamQueueItems = useMemo(() => {
+    return [...items]
+      .filter((i: any) => i.is_stream_queue)
+      .sort((a, b) => (a.stream_queue_sort_order || 0) - (b.stream_queue_sort_order || 0))
+  }, [items])
+  const [draggedQueueId, setDraggedQueueId] = useState<string | null>(null)
+  const [removingQueueId, setRemovingQueueId] = useState<string | null>(null)
+
+  const handleDragQueueStart = (e: React.DragEvent, id: string) => {
+    setDraggedQueueId(id)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', id)
+  }
+
+  const handleDragQueueOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+  }
+
+  const handleDropQueue = async (e: React.DragEvent, targetId: string) => {
+    e.preventDefault()
+    if (!draggedQueueId || draggedQueueId === targetId) return
+
+    const newItems = [...streamQueueItems]
+    const draggedIdx = newItems.findIndex(i => i.id === draggedQueueId)
+    const targetIdx = newItems.findIndex(i => i.id === targetId)
+    
+    if (draggedIdx === -1 || targetIdx === -1) return
+
+    const [draggedItem] = newItems.splice(draggedIdx, 1)
+    newItems.splice(targetIdx, 0, draggedItem)
+    
+    // Optimistically update
+    setItems(prev => {
+      const others = prev.filter(i => !i.is_stream_queue)
+      return [...others, ...newItems]
+    })
+    setDraggedQueueId(null)
+
+    const updates = newItems.map((item, index) => ({ id: item.id, order: index }))
+    try {
+      await updateStreamQueueOrder(updates)
+    } catch (err) {
+      console.error("Failed to update order:", err)
+    }
+  }
+
+  const handleRemoveFromStreamQueue = async (id: string) => {
+    setRemovingQueueId(id)
+    try {
+      await removeFromStreamQueue([id])
+      setItems(prev => prev.map(i => i.id === id ? { ...i, is_stream_queue: false } : i))
+      showToast('success', 'Removed from Live Queue')
+    } catch (e) {
+      showToast('error', 'Failed to remove from Live Queue')
+    } finally {
+      setRemovingQueueId(null)
+    }
+  }
+
   const [stageSelection, setStageSelection] = useState<Set<string>>(new Set())
   const [stageDrafts, setStageDrafts] = useState<Record<string, ItemStagingDraft>>({})
   const [stageGlobalEnd, setStageGlobalEnd] = useState('')
@@ -719,6 +783,70 @@ export function LiveAuctionStudio({
                 )
               })}
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* 1.5) Whatnot Live Queue */}
+      <div
+        id="live-queue"
+        className="bg-white text-slate-900 p-6 rounded-xl shadow-sm border border-slate-200 scroll-mt-24"
+      >
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+          <div>
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+              </span>
+              Live Queue (Presentation)
+            </h2>
+            <p className="text-sm text-slate-500 mt-1 max-w-2xl">
+              These cards are staged for the live stream presentation. Drag and drop to reorder.
+            </p>
+          </div>
+        </div>
+        
+        {streamQueueItems.length === 0 ? (
+          <div className="text-center py-6 px-4 bg-slate-50 rounded-xl border border-slate-200">
+            <p className="text-sm font-bold text-slate-400">Queue is empty</p>
+          </div>
+        ) : (
+          <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar">
+            {streamQueueItems.map(item => (
+              <div
+                key={item.id}
+                draggable
+                onDragStart={(e) => handleDragQueueStart(e, item.id)}
+                onDragOver={handleDragQueueOver}
+                onDrop={(e) => handleDropQueue(e, item.id)}
+                className={`flex-shrink-0 w-32 border bg-white rounded-xl p-2 relative group cursor-grab active:cursor-grabbing transition-all ${draggedQueueId === item.id ? 'opacity-50 border-dashed border-slate-400' : 'border-slate-200 hover:border-slate-400'}`}
+              >
+                <div className="aspect-[3/4] rounded-lg bg-slate-100 overflow-hidden mb-2 relative">
+                  {item.image_url ? (
+                    <img src={item.image_url} alt="" className="w-full h-full object-cover pointer-events-none" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-slate-300">No Image</div>
+                  )}
+                  {item.is_lot && (
+                    <div className="absolute top-1 left-1 bg-black/80 px-1.5 py-0.5 rounded text-[8px] font-bold text-white uppercase">
+                      Lot
+                    </div>
+                  )}
+                </div>
+                <div className="text-xs font-bold text-slate-800 truncate">{item.player_name}</div>
+                <div className="text-[10px] text-slate-500 truncate">{item.card_set}</div>
+                
+                <button
+                  onClick={() => handleRemoveFromStreamQueue(item.id)}
+                  disabled={removingQueueId === item.id}
+                  className="absolute -top-2 -right-2 bg-white border border-slate-200 rounded-full p-1 text-slate-400 hover:text-red-500 hover:border-red-200 shadow-sm opacity-0 group-hover:opacity-100 transition-all"
+                  title="Remove from queue"
+                >
+                  {removingQueueId === item.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
+                </button>
+              </div>
+            ))}
           </div>
         )}
       </div>

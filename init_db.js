@@ -115,6 +115,7 @@ ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS sport TEXT DEFAULT 'mlb';
 
 -- Stream Queue for Live Auction Studio
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS is_stream_queue BOOLEAN DEFAULT false;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS stream_queue_sort_order INTEGER DEFAULT 0;
 `;
 
 async function runIdempotentAlters(client) {
