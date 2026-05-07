@@ -201,7 +201,8 @@ export function LiveAuctionStudio({
         (i: any) =>
           i.status === 'available' &&
           !i.is_auction &&
-          !i.lot_id,
+          !i.lot_id &&
+          !i.is_stream_queue
       ),
     [items],
   )
