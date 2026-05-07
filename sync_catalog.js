@@ -39,6 +39,7 @@ const TARGET_SETS = [
   '2026 Topps Series 1 Baseball',
   '2026 Topps Heritage Baseball',
   '2026 Topps Heritage',
+  '2026 Topps Now World Baseball Classic',
 ];
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
