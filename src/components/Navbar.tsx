@@ -94,7 +94,7 @@ export function Navbar({ settings }: { settings: StoreSettings }) {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
                 </span>
-                Live Auctions
+                Daily Auctions
               </Link>
               <Link href="/faq" className="text-sm font-bold text-muted hover:text-foreground transition-colors">
                 FAQ

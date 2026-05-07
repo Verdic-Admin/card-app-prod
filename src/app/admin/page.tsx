@@ -154,6 +154,12 @@ export default async function AdminPage() {
                 </span>
               )}
             </Link>
+            <Link
+              href="/admin/live-auction-studio"
+              className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-5 py-3 bg-red-600 text-white font-black rounded-lg hover:bg-red-500 transition-colors shadow-md border border-red-500/50 text-xs uppercase tracking-wide"
+            >
+              Live Auction Studio
+            </Link>
             <Link href="/admin/add-inventory" className="flex-1 lg:flex-none inline-flex items-center justify-center px-5 py-3 bg-brand text-background font-bold rounded-lg hover:bg-brand/90 transition-colors shadow-md text-xs">
               + Add Inventory
             </Link>

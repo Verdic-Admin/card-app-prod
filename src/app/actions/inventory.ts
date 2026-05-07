@@ -797,6 +797,26 @@ export async function rotateCardImageAction(
   return { newUrl }
 }
 
+export async function stageToStreamQueue(ids: string[]) {
+  await checkAuth();
+  if (ids.length > 0) {
+    await pool.query(`UPDATE inventory SET is_stream_queue = true WHERE id = ANY($1::uuid[])`, [ids]);
+  }
+  revalidatePath('/');
+  revalidatePath('/admin');
+  return { success: true };
+}
+
+export async function removeFromStreamQueue(ids: string[]) {
+  await checkAuth();
+  if (ids.length > 0) {
+    await pool.query(`UPDATE inventory SET is_stream_queue = false WHERE id = ANY($1::uuid[])`, [ids]);
+  }
+  revalidatePath('/');
+  revalidatePath('/admin');
+  return { success: true };
+}
+
 export async function bulkUpdateMetricsAction(ids: string[], costBasis: number, acceptsOffers: boolean) {
   await checkAuth();
 

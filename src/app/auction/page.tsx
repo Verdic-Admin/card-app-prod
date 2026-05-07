@@ -56,7 +56,7 @@ export default async function AuctionPage() {
       {liveItems.length === 0 && timedAuctions.length === 0 && (
         <div className="text-center py-20">
           <div className="text-zinc-600 text-6xl mb-4">🔨</div>
-          <h2 className="text-xl font-bold text-zinc-400 mb-2">No active auctions right now</h2>
+          <h2 className="text-xl font-bold text-zinc-400 mb-2">No active Daily Auctions right now</h2>
           <p className="text-zinc-500 text-sm">Check back soon — the shop owner drops new listings regularly.</p>
         </div>
       )}

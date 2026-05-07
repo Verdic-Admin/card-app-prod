@@ -7,6 +7,7 @@ import { AuctionBidLogButton } from '@/components/admin/AuctionBidLogButton'
 import {
   stageAuctionItems,
   updateStagedAuction,
+  stageToStreamQueue,
   type AuctionStageItemInput,
 } from '@/app/actions/inventory'
 import { Loader2, CheckCircle2, X, AlertTriangle, Gavel, Search, Check } from 'lucide-react'
@@ -256,6 +257,34 @@ export function LiveAuctionStudio({
     }
   }
 
+  const handleStageToLiveQueue = async () => {
+    setStageError(null)
+    setStageSuccess(null)
+    if (stageSelection.size === 0) {
+      setStageError('Select at least one card, then click Stage to Live Queue.')
+      return
+    }
+    const ids = Array.from(stageSelection)
+    setStageCommitting(true)
+    try {
+      await stageToStreamQueue(ids)
+      showToast('success', `Staged ${ids.length} item(s) to the Whatnot Live Queue.`)
+      setItems(prev =>
+        prev.map((i: any) =>
+          stageSelection.has(i.id) ? { ...i, is_stream_queue: true } : i
+        )
+      )
+      setStageSelection(new Set())
+      setStageDrafts({})
+      setInventoryQuery('')
+      router.refresh()
+    } catch (e: unknown) {
+      setStageError(e instanceof Error ? e.message : 'Failed to stage items to live queue.')
+    } finally {
+      setStageCommitting(false)
+    }
+  }
+
   const handleSaveTimeframe = async (val: string) => {
     setIsSavingTimeframe(true)
     setTimeframe(val)
@@ -413,20 +442,27 @@ export function LiveAuctionStudio({
               <Gavel className="w-5 h-5 text-indigo-600" /> 1. Add cards from inventory
             </h2>
             <p className="text-sm text-slate-500 mt-1">
-              Search and check the cards you want to run on your stream, set a reserve price and end time, then click
-              "Stage to auction" to move them into the queue below. Bundled lot cards won't appear here — break them
-              apart in your inventory first.
+              Search and check the cards you want to run. Click <strong>Stage to Daily Auction</strong> to put them in the automated shop auctions. Click <strong>Stage to Whatnot Live Queue</strong> to send them to your stream presentation.
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <button
               type="button"
-              onClick={handleStageToAuction}
+              onClick={handleStageToLiveQueue}
               disabled={stageSelection.size === 0 || stageCommitting}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-bold disabled:opacity-50 transition-colors flex items-center gap-2"
+              className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg font-bold disabled:opacity-50 transition-colors flex items-center gap-2"
             >
               {stageCommitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-              Stage {stageSelection.size > 0 ? `${stageSelection.size} ` : ''}to auction
+              Stage {stageSelection.size > 0 ? `${stageSelection.size} ` : ''}to Whatnot Live Queue
+            </button>
+            <button
+              type="button"
+              onClick={handleStageToAuction}
+              disabled={stageSelection.size === 0 || stageCommitting}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold disabled:opacity-50 transition-colors flex items-center gap-2"
+            >
+              {stageCommitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+              Stage {stageSelection.size > 0 ? `${stageSelection.size} ` : ''}to Daily Auction
             </button>
             {stageSelection.size > 0 && (
               <button

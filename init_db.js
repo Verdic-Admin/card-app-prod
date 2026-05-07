@@ -112,6 +112,9 @@ ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS is_short_print BOOLEAN DEFAULT
 ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS is_ssp BOOLEAN DEFAULT false;
 ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS oracle_comps JSONB;
 ALTER TABLE scan_staging ADD COLUMN IF NOT EXISTS sport TEXT DEFAULT 'mlb';
+
+-- Stream Queue for Live Auction Studio
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS is_stream_queue BOOLEAN DEFAULT false;
 `;
 
 async function runIdempotentAlters(client) {
