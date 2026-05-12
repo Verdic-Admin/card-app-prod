@@ -677,7 +677,7 @@ export function InventoryTable({
     };
     
     const headers = [
-      'Player Name', 'Card Set', 'Card Number', 'Insert Name', 'Parallel Name', 
+      'Player Name', 'Team Name', 'Card Set', 'Card Number', 'Insert Name', 'Parallel Name', 
       'Print Run', 'Sport', 'Is Rookie', 'Is Auto', 'Is Relic', 'Grading Company', 
       'Grade', 'Quantity', 'Cost Basis', 'Acquired Date', 'Acquisition Source', 'Notes',
       'Image URL Front', 'Image URL Back'
@@ -685,6 +685,7 @@ export function InventoryTable({
     
     const rows = filteredItems.map(item => [
       `"${(item.player_name || '').replace(/"/g, '""')}"`,
+      `"${((item as any).team_name || (item as any).team || '').replace(/"/g, '""')}"`,
       `"${(item.card_set || '').replace(/"/g, '""')}"`,
       `"${(item.card_number || '').replace(/"/g, '""')}"`,
       `"${(item.insert_name || '').replace(/"/g, '""')}"`,
