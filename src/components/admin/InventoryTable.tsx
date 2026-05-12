@@ -587,7 +587,7 @@ export function InventoryTable({
 
   const handleExportCSV = () => {
     if (filteredItems.length === 0) return;
-    const headers = ['Card ID', 'Player Name', 'Team Name', 'Set', 'Number', 'Insert Name', 'Parallel Name', 'Legacy Parallel/Insert', 'Status', 'Cost Basis', 'Listed Price', 'Accepts Offers', 'Image URL'];
+    const headers = ['Card ID', 'Player Name', 'Team Name', 'Set', 'Number', 'Insert Name', 'Parallel Name', 'Legacy Parallel/Insert', 'Is SP', 'Is SSP', 'Status', 'Cost Basis', 'Listed Price', 'Accepts Offers', 'Image URL'];
     
     const rows = filteredItems.map(item => [
       item.id,
@@ -598,6 +598,8 @@ export function InventoryTable({
       `"${(item.insert_name || '').replace(/"/g, '""')}"`,
       `"${(item.parallel_name || '').replace(/"/g, '""')}"`,
       `"${(item.parallel_insert_type || '').replace(/"/g, '""')}"`,
+      (item as any).is_sp ? 'true' : 'false',
+      (item as any).is_ssp ? 'true' : 'false',
       (item.status || 'available').toUpperCase(),
       item.cost_basis || 0,
       item.listed_price || 0,
@@ -624,11 +626,12 @@ export function InventoryTable({
     ];
     
     const rows = filteredItems.map(item => {
+      const raritySuffix = (item as any).is_ssp ? ' SSP' : (item as any).is_sp ? ' SP' : '';
       const titleParts = [item.card_set, item.player_name, item.insert_name, item.parallel_name, item.card_number ? `#${item.card_number}` : '']
         .filter(Boolean)
         .join(' ');
       
-      const title = `"${titleParts.replace(/"/g, '""')}"`;
+      const title = `"${(titleParts + raritySuffix).replace(/"/g, '""')}"`;
 
       const formatUrl = (url: string | null | undefined) => {
         if (!url) return '';
@@ -678,7 +681,7 @@ export function InventoryTable({
     
     const headers = [
       'Player Name', 'Team Name', 'Card Set', 'Card Number', 'Insert Name', 'Parallel Name', 
-      'Print Run', 'Sport', 'Is Rookie', 'Is Auto', 'Is Relic', 'Grading Company', 
+      'Print Run', 'Sport', 'Is Rookie', 'Is Auto', 'Is Relic', 'Is SP', 'Is SSP', 'Grading Company', 
       'Grade', 'Quantity', 'Cost Basis', 'Acquired Date', 'Acquisition Source', 'Notes',
       'Image URL Front', 'Image URL Back'
     ];
@@ -695,6 +698,8 @@ export function InventoryTable({
       (item as any).is_rookie ? 'true' : 'false',
       (item as any).is_auto ? 'true' : 'false',
       (item as any).is_relic ? 'true' : 'false',
+      (item as any).is_sp ? 'true' : 'false',
+      (item as any).is_ssp ? 'true' : 'false',
       `"${((item as any).grading_company || '').replace(/"/g, '""')}"`,
       `"${((item as any).grade || '').replace(/"/g, '""')}"`,
       '1', // quantity
