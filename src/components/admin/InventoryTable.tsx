@@ -667,6 +667,54 @@ export function InventoryTable({
     URL.revokeObjectURL(link.href);
   };
 
+  const handleBinderExportCSV = () => {
+    if (filteredItems.length === 0) return;
+
+    const formatUrl = (url: string | null | undefined) => {
+      if (!url) return '';
+      if (url.startsWith('/')) return `${window.location.origin}${url}`;
+      return url;
+    };
+    
+    const headers = [
+      'Player Name', 'Card Set', 'Card Number', 'Insert Name', 'Parallel Name', 
+      'Print Run', 'Sport', 'Is Rookie', 'Is Auto', 'Is Relic', 'Grading Company', 
+      'Grade', 'Quantity', 'Cost Basis', 'Acquired Date', 'Acquisition Source', 'Notes',
+      'Image URL Front', 'Image URL Back'
+    ];
+    
+    const rows = filteredItems.map(item => [
+      `"${(item.player_name || '').replace(/"/g, '""')}"`,
+      `"${(item.card_set || '').replace(/"/g, '""')}"`,
+      `"${(item.card_number || '').replace(/"/g, '""')}"`,
+      `"${(item.insert_name || '').replace(/"/g, '""')}"`,
+      `"${(item.parallel_name || '').replace(/"/g, '""')}"`,
+      item.print_run || '',
+      (item as any).sport || 'mlb',
+      (item as any).is_rookie ? 'true' : 'false',
+      (item as any).is_auto ? 'true' : 'false',
+      (item as any).is_relic ? 'true' : 'false',
+      `"${((item as any).grading_company || '').replace(/"/g, '""')}"`,
+      `"${((item as any).grade || '').replace(/"/g, '""')}"`,
+      '1', // quantity
+      item.cost_basis || 0,
+      `"${new Date().toISOString().split('T')[0]}"`, // acquired date
+      '"Card Shop Export"', // source
+      '""', // notes
+      `"${formatUrl(item.image_url)}"`,
+      `"${formatUrl(item.back_image_url)}"`
+    ]);
+    
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `PlayerIndex_Binder_Export_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
+
   // Auction Block Handlers
   const auctionItems = items.filter(i => (i as any).is_auction === true)
 
@@ -1377,6 +1425,10 @@ export function InventoryTable({
            <button onClick={handleWhatnotExportCSV} className="flex-1 sm:flex-none justify-center whitespace-nowrap bg-[#FFE500] hover:bg-[#FFD500] text-black px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer">
              <Download className="w-4 h-4" />
              Whatnot CSV
+           </button>
+           <button onClick={handleBinderExportCSV} className="flex-1 sm:flex-none justify-center whitespace-nowrap bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer">
+             <Download className="w-4 h-4" />
+             Binder CSV
            </button>
          </div>
       </div>
